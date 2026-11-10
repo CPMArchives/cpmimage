@@ -27,7 +27,8 @@ with tempfile.TemporaryDirectory(prefix='cpmimage-export-') as temp:
  try:
   listing=request('open',image=str(image),format='ibm-3740',container='raw');assert listing['ok'],listing
   assert len(listing['result']['entries'])==3,listing
-  token=listing['result']['session'];expected={'00binary.bin':'110009dcee21620b166f3abfecb5eff7a873be729d1c2d53822e7acc5f34eb9b','07binary.bin':'cd6816b77f68d70001fc3eaa4d42bdd67cb5973b3151cc5292ecc02a3daac6ab','15tail.bin':'e92de1c61e03ecf17afd276aa6bad358b8b2cad5fe4e607a42152df1befd5a6f'}
+  token=listing['result']['session'];expected={'00BINARY.BIN':'110009dcee21620b166f3abfecb5eff7a873be729d1c2d53822e7acc5f34eb9b','07BINARY.BIN':'cd6816b77f68d70001fc3eaa4d42bdd67cb5973b3151cc5292ecc02a3daac6ab','15TAIL.BIN':'e92de1c61e03ecf17afd276aa6bad358b8b2cad5fe4e607a42152df1befd5a6f'}
+  assert {entry["name"] for entry in listing["result"]["entries"]}==set(expected),listing
   exports=[]
   for name,sha in expected.items():
    dest=d/(name+' ü export');reply=request('export',session=token,name=name,destination=str(dest));assert reply['ok'],reply

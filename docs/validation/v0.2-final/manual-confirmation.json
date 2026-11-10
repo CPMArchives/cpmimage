@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-11",
+  "source": "User response in this chat",
+  "response": "windows and debian checks pass.",
+  "checklist": {
+    "windows": [
+      "Whole user area 0 creates a 0 folder with exported files",
+      "Empty user area creates its numbered folder"
+    ],
+    "debian": [
+      "Whole-user-area export",
+      "Repeated export displays conflict choices",
+      "Filename translation dialog defaults /\u2192_, :\u2192~, backslash\u2192^"
+    ]
+  },
+  "independent_verification": [
+    "Windows and Linux post-export folder trees and file hashes",
+    "Source image SHA-256 unchanged"
+  ]
+}

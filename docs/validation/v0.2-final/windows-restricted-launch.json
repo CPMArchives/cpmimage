@@ -1,0 +1,9 @@
+{
+  "pid": 2356,
+  "administrator_sid": "deny-only",
+  "maximum_privileges": "disabled",
+  "integrity": "medium",
+  "default_dacl": "user and SYSTEM full access to newly created objects",
+  "token_owner": "user SID",
+  "system_security_settings_changed": false
+}

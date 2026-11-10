@@ -1,0 +1,322 @@
+[
+  {
+    "path": "libexec/cpmimage-helper",
+    "rpath": "$ORIGIN/../lib",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffa371c000)\n\tlibdsk.so.3 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/libexec/../lib/libdsk.so.3 (0x0000ffffa3640000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffa3460000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffa36e0000)\n"
+  },
+  {
+    "path": "lib/libdsk.so.3.3.13",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffadb1c000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffad890000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffadae0000)\n"
+  },
+  {
+    "path": "lib/libQt6OpenGL.so.6.12.0",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff9396c000)\n\tlibQt6Gui.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/lib/libQt6Gui.so.6 (0x0000ffff92da0000)\n\tlibOpenGL.so.0 => /lib/aarch64-linux-gnu/libOpenGL.so.0 (0x0000ffff92d10000)\n\tlibQt6Core.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/lib/libQt6Core.so.6 (0x0000ffff921b0000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffff91f40000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffff91e90000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff91cd0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff93930000)\n\tlibEGL.so.1 => /lib/aarch64-linux-gnu/libEGL.so.1 (0x0000ffff91c90000)\n\tlibX11.so.6 => /lib/aarch64-linux-gnu/libX11.so.6 (0x0000ffff91b20000)\n\tlibxkbcommon.so.0 => /lib/aarch64-linux-gnu/libxkbcommon.so.0 (0x0000ffff91ab0000)\n\tlibGLX.so.0 => /lib/aarch64-linux-gnu/libGLX.so.0 (0x0000ffff91a50000)\n\tlibfontconfig.so.1 => /lib/aarch64-linux-gnu/libfontconfig.so.1 (0x0000ffff919e0000)\n\tlibGLdispatch.so.0 => /lib/aarch64-linux-gnu/libGLdispatch.so.0 (0x0000ffff91850000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffff91810000)\n\tlibxcb.so.1 => /lib/aarch64-linux-gnu/libxcb.so.1 (0x0000ffff917c0000)\n\tlibfreetype.so.6 => /lib/aarch64-linux-gnu/libfreetype.so.6 (0x0000ffff916e0000)\n\tlibexpat.so.1 => /lib/aarch64-linux-gnu/libexpat.so.1 (0x0000ffff91690000)\n\tlibXau.so.6 => /lib/aarch64-linux-gnu/libXau.so.6 (0x0000ffff91660000)\n\tlibXdmcp.so.6 => /lib/aarch64-linux-gnu/libXdmcp.so.6 (0x0000ffff91630000)\n\tlibz.so.1 => /lib/aarch64-linux-gnu/libz.so.1 (0x0000ffff915f0000)\n\tlibbz2.so.1.0 => /lib/aarch64-linux-gnu/libbz2.so.1.0 (0x0000ffff915c0000)\n\tlibpng16.so.16 => /lib/aarch64-linux-gnu/libpng16.so.16 (0x0000ffff91560000)\n\tlibbrotlidec.so.1 => /lib/aarch64-linux-gnu/libbrotlidec.so.1 (0x0000ffff91530000)\n\tlibbrotlicommon.so.1 => /lib/aarch64-linux-gnu/libbrotlicommon.so.1 (0x0000ffff914f0000)\n"
+  },
+  {
+    "path": "lib/libQt6XcbQpa.so.6.12.0",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff90038000)\n\tlibxcb-cursor.so.0 => /lib/aarch64-linux-gnu/libxcb-cursor.so.0 (0x0000ffff8fed0000)\n\tlibxcb-icccm.so.4 => /lib/aarch64-linux-gnu/libxcb-icccm.so.4 (0x0000ffff8fea0000)\n\tlibxcb-image.so.0 => /lib/aarch64-linux-gnu/libxcb-image.so.0 (0x0000ffff8fe70000)\n\tlibxcb-keysyms.so.1 => /lib/aarch64-linux-gnu/libxcb-keysyms.so.1 (0x0000ffff8fe40000)\n\tlibxcb-randr.so.0 => /lib/aarch64-linux-gnu/libxcb-randr.so.0 (0x0000ffff8fe10000)\n\tlibxcb-render.so.0 => /lib/aarch64-linux-gnu/libxcb-render.so.0 (0x0000ffff8fde0000)\n\tlibxcb-render-util.so.0 => /lib/aarch64-linux-gnu/libxcb-render-util.so.0 (0x0000ffff8fdb0000)\n\tlibxcb-shape.so.0 => /lib/aarch64-linux-gnu/libxcb-shape.so.0 (0x0000ffff8fd80000)\n\tlibxcb-shm.so.0 => /lib/aarch64-linux-gnu/libxcb-shm.so.0 (0x0000ffff8fd50000)\n\tlibxcb-sync.so.1 => /lib/aarch64-linux-gnu/libxcb-sync.so.1 (0x0000ffff8fd20000)\n\tlibxcb.so.1 => /lib/aarch64-linux-gnu/libxcb.so.1 (0x0000ffff8fcd0000)\n\tlibxcb-xfixes.so.0 => /lib/aarch64-linux-gnu/libxcb-xfixes.so.0 (0x0000ffff8fca0000)\n\tlibxcb-xkb.so.1 => /lib/aarch64-linux-gnu/libxcb-xkb.so.1 (0x0000ffff8fc60000)\n\tlibxkbcommon.so.0 => /lib/aarch64-linux-gnu/libxkbcommon.so.0 (0x0000ffff8fbf0000)\n\tlibX11-xcb.so.1 => /lib/aarch64-linux-gnu/libX11-xcb.so.1 (0x0000ffff8fbc0000)\n\tlibX11.so.6 => /lib/aarch64-linux-gnu/libX11.so.6 (0x0000ffff8fa50000)\n\tlibxkbcommon-x11.so.0 => /lib/aarch64-linux-gnu/libxkbcommon-x11.so.0 (0x0000ffff8fa20000)\n\tlibQt6Gui.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/lib/libQt6Gui.so.6 (0x0000ffff8ef60000)\n\tlibQt6Core.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/lib/libQt6Core.so.6 (0x0000ffff8e400000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffff8e190000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffff8e0e0000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff8df20000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff8fff0000)\n\tlibxcb-util.so.1 => /lib/aarch64-linux-gnu/libxcb-util.so.1 (0x0000ffff8def0000)\n\tlibXau.so.6 => /lib/aarch64-linux-gnu/libXau.so.6 (0x0000ffff8dec0000)\n\tlibXdmcp.so.6 => /lib/aarch64-linux-gnu/libXdmcp.so.6 (0x0000ffff8de90000)\n\tlibEGL.so.1 => /lib/aarch64-linux-gnu/libEGL.so.1 (0x0000ffff8de50000)\n\tlibGLX.so.0 => /lib/aarch64-linux-gnu/libGLX.so.0 (0x0000ffff8ddf0000)\n\tlibOpenGL.so.0 => /lib/aarch64-linux-gnu/libOpenGL.so.0 (0x0000ffff8dd70000)\n\tlibfontconfig.so.1 => /lib/aarch64-linux-gnu/libfontconfig.so.1 (0x0000ffff8dd00000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffff8dcc0000)\n\tlibGLdispatch.so.0 => /lib/aarch64-linux-gnu/libGLdispatch.so.0 (0x0000ffff8db30000)\n\tlibfreetype.so.6 => /lib/aarch64-linux-gnu/libfreetype.so.6 (0x0000ffff8da50000)\n\tlibexpat.so.1 => /lib/aarch64-linux-gnu/libexpat.so.1 (0x0000ffff8da00000)\n\tlibz.so.1 => /lib/aarch64-linux-gnu/libz.so.1 (0x0000ffff8d9c0000)\n\tlibbz2.so.1.0 => /lib/aarch64-linux-gnu/libbz2.so.1.0 (0x0000ffff8d990000)\n\tlibpng16.so.16 => /lib/aarch64-linux-gnu/libpng16.so.16 (0x0000ffff8d930000)\n\tlibbrotlidec.so.1 => /lib/aarch64-linux-gnu/libbrotlidec.so.1 (0x0000ffff8d900000)\n\tlibbrotlicommon.so.1 => /lib/aarch64-linux-gnu/libbrotlicommon.so.1 (0x0000ffff8d8c0000)\n"
+  },
+  {
+    "path": "lib/libQt6Widgets.so.6.12.0",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffb4926000)\n\tlibQt6Gui.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/lib/libQt6Gui.so.6 (0x0000ffffb3620000)\n\tlibQt6Core.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/lib/libQt6Core.so.6 (0x0000ffffb2ac0000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffffb2830000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffffb2780000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffb25c0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffb48e0000)\n\tlibEGL.so.1 => /lib/aarch64-linux-gnu/libEGL.so.1 (0x0000ffffb2580000)\n\tlibX11.so.6 => /lib/aarch64-linux-gnu/libX11.so.6 (0x0000ffffb2410000)\n\tlibxkbcommon.so.0 => /lib/aarch64-linux-gnu/libxkbcommon.so.0 (0x0000ffffb23a0000)\n\tlibGLX.so.0 => /lib/aarch64-linux-gnu/libGLX.so.0 (0x0000ffffb2340000)\n\tlibOpenGL.so.0 => /lib/aarch64-linux-gnu/libOpenGL.so.0 (0x0000ffffb22c0000)\n\tlibfontconfig.so.1 => /lib/aarch64-linux-gnu/libfontconfig.so.1 (0x0000ffffb2250000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffffb2210000)\n\tlibGLdispatch.so.0 => /lib/aarch64-linux-gnu/libGLdispatch.so.0 (0x0000ffffb2080000)\n\tlibxcb.so.1 => /lib/aarch64-linux-gnu/libxcb.so.1 (0x0000ffffb2030000)\n\tlibfreetype.so.6 => /lib/aarch64-linux-gnu/libfreetype.so.6 (0x0000ffffb1f50000)\n\tlibexpat.so.1 => /lib/aarch64-linux-gnu/libexpat.so.1 (0x0000ffffb1f00000)\n\tlibXau.so.6 => /lib/aarch64-linux-gnu/libXau.so.6 (0x0000ffffb1ed0000)\n\tlibXdmcp.so.6 => /lib/aarch64-linux-gnu/libXdmcp.so.6 (0x0000ffffb1ea0000)\n\tlibz.so.1 => /lib/aarch64-linux-gnu/libz.so.1 (0x0000ffffb1e60000)\n\tlibbz2.so.1.0 => /lib/aarch64-linux-gnu/libbz2.so.1.0 (0x0000ffffb1e30000)\n\tlibpng16.so.16 => /lib/aarch64-linux-gnu/libpng16.so.16 (0x0000ffffb1dd0000)\n\tlibbrotlidec.so.1 => /lib/aarch64-linux-gnu/libbrotlidec.so.1 (0x0000ffffb1da0000)\n\tlibbrotlicommon.so.1 => /lib/aarch64-linux-gnu/libbrotlicommon.so.1 (0x0000ffffb1d60000)\n"
+  },
+  {
+    "path": "lib/libQt6Gui.so.6.12.0",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff8c37c000)\n\tlibEGL.so.1 => /lib/aarch64-linux-gnu/libEGL.so.1 (0x0000ffff8b830000)\n\tlibX11.so.6 => /lib/aarch64-linux-gnu/libX11.so.6 (0x0000ffff8b6c0000)\n\tlibxkbcommon.so.0 => /lib/aarch64-linux-gnu/libxkbcommon.so.0 (0x0000ffff8b650000)\n\tlibGLX.so.0 => /lib/aarch64-linux-gnu/libGLX.so.0 (0x0000ffff8b5f0000)\n\tlibOpenGL.so.0 => /lib/aarch64-linux-gnu/libOpenGL.so.0 (0x0000ffff8b570000)\n\tlibQt6Core.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/lib/libQt6Core.so.6 (0x0000ffff8aa10000)\n\tlibfontconfig.so.1 => /lib/aarch64-linux-gnu/libfontconfig.so.1 (0x0000ffff8a9a0000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffff8a730000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffff8a680000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff8a4c0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff8c340000)\n\tlibGLdispatch.so.0 => /lib/aarch64-linux-gnu/libGLdispatch.so.0 (0x0000ffff8a330000)\n\tlibxcb.so.1 => /lib/aarch64-linux-gnu/libxcb.so.1 (0x0000ffff8a2e0000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffff8a2a0000)\n\tlibfreetype.so.6 => /lib/aarch64-linux-gnu/libfreetype.so.6 (0x0000ffff8a1c0000)\n\tlibexpat.so.1 => /lib/aarch64-linux-gnu/libexpat.so.1 (0x0000ffff8a170000)\n\tlibXau.so.6 => /lib/aarch64-linux-gnu/libXau.so.6 (0x0000ffff8a140000)\n\tlibXdmcp.so.6 => /lib/aarch64-linux-gnu/libXdmcp.so.6 (0x0000ffff8a110000)\n\tlibz.so.1 => /lib/aarch64-linux-gnu/libz.so.1 (0x0000ffff8a0d0000)\n\tlibbz2.so.1.0 => /lib/aarch64-linux-gnu/libbz2.so.1.0 (0x0000ffff8a0a0000)\n\tlibpng16.so.16 => /lib/aarch64-linux-gnu/libpng16.so.16 (0x0000ffff8a040000)\n\tlibbrotlidec.so.1 => /lib/aarch64-linux-gnu/libbrotlidec.so.1 (0x0000ffff8a010000)\n\tlibbrotlicommon.so.1 => /lib/aarch64-linux-gnu/libbrotlicommon.so.1 (0x0000ffff89fd0000)\n"
+  },
+  {
+    "path": "lib/libQt6Core.so.6.12.0",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff8098c000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffff7fb50000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffff7faa0000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffff7fa60000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff7f8a0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff80940000)\n"
+  },
+  {
+    "path": "bin/cpmimage",
+    "rpath": "$ORIGIN/../lib",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff97898000)\n\tlibQt6Widgets.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/bin/../lib/libQt6Widgets.so.6 (0x0000ffff96f20000)\n\tlibQt6Gui.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/bin/../lib/libQt6Gui.so.6 (0x0000ffff96460000)\n\tlibQt6Core.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/bin/../lib/libQt6Core.so.6 (0x0000ffff95900000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffff95670000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffff95630000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff95470000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffff953c0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff97850000)\n\tlibEGL.so.1 => /lib/aarch64-linux-gnu/libEGL.so.1 (0x0000ffff95380000)\n\tlibX11.so.6 => /lib/aarch64-linux-gnu/libX11.so.6 (0x0000ffff95210000)\n\tlibxkbcommon.so.0 => /lib/aarch64-linux-gnu/libxkbcommon.so.0 (0x0000ffff951a0000)\n\tlibGLX.so.0 => /lib/aarch64-linux-gnu/libGLX.so.0 (0x0000ffff95140000)\n\tlibOpenGL.so.0 => /lib/aarch64-linux-gnu/libOpenGL.so.0 (0x0000ffff950c0000)\n\tlibfontconfig.so.1 => /lib/aarch64-linux-gnu/libfontconfig.so.1 (0x0000ffff95050000)\n\tlibGLdispatch.so.0 => /lib/aarch64-linux-gnu/libGLdispatch.so.0 (0x0000ffff94ec0000)\n\tlibxcb.so.1 => /lib/aarch64-linux-gnu/libxcb.so.1 (0x0000ffff94e70000)\n\tlibfreetype.so.6 => /lib/aarch64-linux-gnu/libfreetype.so.6 (0x0000ffff94d90000)\n\tlibexpat.so.1 => /lib/aarch64-linux-gnu/libexpat.so.1 (0x0000ffff94d40000)\n\tlibXau.so.6 => /lib/aarch64-linux-gnu/libXau.so.6 (0x0000ffff94d10000)\n\tlibXdmcp.so.6 => /lib/aarch64-linux-gnu/libXdmcp.so.6 (0x0000ffff94ce0000)\n\tlibz.so.1 => /lib/aarch64-linux-gnu/libz.so.1 (0x0000ffff94ca0000)\n\tlibbz2.so.1.0 => /lib/aarch64-linux-gnu/libbz2.so.1.0 (0x0000ffff94c70000)\n\tlibpng16.so.16 => /lib/aarch64-linux-gnu/libpng16.so.16 (0x0000ffff94c10000)\n\tlibbrotlidec.so.1 => /lib/aarch64-linux-gnu/libbrotlidec.so.1 (0x0000ffff94be0000)\n\tlibbrotlicommon.so.1 => /lib/aarch64-linux-gnu/libbrotlicommon.so.1 (0x0000ffff94ba0000)\n"
+  },
+  {
+    "path": "plugins/imageformats/libqgif.so",
+    "rpath": "$ORIGIN/../../lib",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff8099c000)\n\tlibQt6Gui.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/imageformats/../../lib/libQt6Gui.so.6 (0x0000ffff7fe70000)\n\tlibQt6Core.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/imageformats/../../lib/libQt6Core.so.6 (0x0000ffff7f310000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffff7f080000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff7eec0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff80960000)\n\tlibEGL.so.1 => /lib/aarch64-linux-gnu/libEGL.so.1 (0x0000ffff7ee80000)\n\tlibX11.so.6 => /lib/aarch64-linux-gnu/libX11.so.6 (0x0000ffff7ed10000)\n\tlibxkbcommon.so.0 => /lib/aarch64-linux-gnu/libxkbcommon.so.0 (0x0000ffff7eca0000)\n\tlibGLX.so.0 => /lib/aarch64-linux-gnu/libGLX.so.0 (0x0000ffff7ec40000)\n\tlibOpenGL.so.0 => /lib/aarch64-linux-gnu/libOpenGL.so.0 (0x0000ffff7ebc0000)\n\tlibfontconfig.so.1 => /lib/aarch64-linux-gnu/libfontconfig.so.1 (0x0000ffff7eb50000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffff7eaa0000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffff7ea60000)\n\tlibGLdispatch.so.0 => /lib/aarch64-linux-gnu/libGLdispatch.so.0 (0x0000ffff7e8d0000)\n\tlibxcb.so.1 => /lib/aarch64-linux-gnu/libxcb.so.1 (0x0000ffff7e880000)\n\tlibfreetype.so.6 => /lib/aarch64-linux-gnu/libfreetype.so.6 (0x0000ffff7e7a0000)\n\tlibexpat.so.1 => /lib/aarch64-linux-gnu/libexpat.so.1 (0x0000ffff7e750000)\n\tlibXau.so.6 => /lib/aarch64-linux-gnu/libXau.so.6 (0x0000ffff7e720000)\n\tlibXdmcp.so.6 => /lib/aarch64-linux-gnu/libXdmcp.so.6 (0x0000ffff7e6f0000)\n\tlibz.so.1 => /lib/aarch64-linux-gnu/libz.so.1 (0x0000ffff7e6b0000)\n\tlibbz2.so.1.0 => /lib/aarch64-linux-gnu/libbz2.so.1.0 (0x0000ffff7e680000)\n\tlibpng16.so.16 => /lib/aarch64-linux-gnu/libpng16.so.16 (0x0000ffff7e620000)\n\tlibbrotlidec.so.1 => /lib/aarch64-linux-gnu/libbrotlidec.so.1 (0x0000ffff7e5f0000)\n\tlibbrotlicommon.so.1 => /lib/aarch64-linux-gnu/libbrotlicommon.so.1 (0x0000ffff7e5b0000)\n"
+  },
+  {
+    "path": "plugins/imageformats/libqico.so",
+    "rpath": "$ORIGIN/../../lib",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffa60f5000)\n\tlibQt6Gui.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/imageformats/../../lib/libQt6Gui.so.6 (0x0000ffffa55c0000)\n\tlibQt6Core.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/imageformats/../../lib/libQt6Core.so.6 (0x0000ffffa4a60000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffffa47d0000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffa4610000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffa60b0000)\n\tlibEGL.so.1 => /lib/aarch64-linux-gnu/libEGL.so.1 (0x0000ffffa45d0000)\n\tlibX11.so.6 => /lib/aarch64-linux-gnu/libX11.so.6 (0x0000ffffa4460000)\n\tlibxkbcommon.so.0 => /lib/aarch64-linux-gnu/libxkbcommon.so.0 (0x0000ffffa43f0000)\n\tlibGLX.so.0 => /lib/aarch64-linux-gnu/libGLX.so.0 (0x0000ffffa4390000)\n\tlibOpenGL.so.0 => /lib/aarch64-linux-gnu/libOpenGL.so.0 (0x0000ffffa4310000)\n\tlibfontconfig.so.1 => /lib/aarch64-linux-gnu/libfontconfig.so.1 (0x0000ffffa42a0000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffffa41f0000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffffa41b0000)\n\tlibGLdispatch.so.0 => /lib/aarch64-linux-gnu/libGLdispatch.so.0 (0x0000ffffa4020000)\n\tlibxcb.so.1 => /lib/aarch64-linux-gnu/libxcb.so.1 (0x0000ffffa3fd0000)\n\tlibfreetype.so.6 => /lib/aarch64-linux-gnu/libfreetype.so.6 (0x0000ffffa3ef0000)\n\tlibexpat.so.1 => /lib/aarch64-linux-gnu/libexpat.so.1 (0x0000ffffa3ea0000)\n\tlibXau.so.6 => /lib/aarch64-linux-gnu/libXau.so.6 (0x0000ffffa3e70000)\n\tlibXdmcp.so.6 => /lib/aarch64-linux-gnu/libXdmcp.so.6 (0x0000ffffa3e40000)\n\tlibz.so.1 => /lib/aarch64-linux-gnu/libz.so.1 (0x0000ffffa3e00000)\n\tlibbz2.so.1.0 => /lib/aarch64-linux-gnu/libbz2.so.1.0 (0x0000ffffa3dd0000)\n\tlibpng16.so.16 => /lib/aarch64-linux-gnu/libpng16.so.16 (0x0000ffffa3d70000)\n\tlibbrotlidec.so.1 => /lib/aarch64-linux-gnu/libbrotlidec.so.1 (0x0000ffffa3d40000)\n\tlibbrotlicommon.so.1 => /lib/aarch64-linux-gnu/libbrotlicommon.so.1 (0x0000ffffa3d00000)\n"
+  },
+  {
+    "path": "plugins/imageformats/libqjpeg.so",
+    "rpath": "$ORIGIN/../../lib",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff829bc000)\n\tlibQt6Gui.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/imageformats/../../lib/libQt6Gui.so.6 (0x0000ffff81e30000)\n\tlibQt6Core.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/imageformats/../../lib/libQt6Core.so.6 (0x0000ffff812d0000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffff81040000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff80e80000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff82980000)\n\tlibEGL.so.1 => /lib/aarch64-linux-gnu/libEGL.so.1 (0x0000ffff80e40000)\n\tlibX11.so.6 => /lib/aarch64-linux-gnu/libX11.so.6 (0x0000ffff80cd0000)\n\tlibxkbcommon.so.0 => /lib/aarch64-linux-gnu/libxkbcommon.so.0 (0x0000ffff80c60000)\n\tlibGLX.so.0 => /lib/aarch64-linux-gnu/libGLX.so.0 (0x0000ffff80c00000)\n\tlibOpenGL.so.0 => /lib/aarch64-linux-gnu/libOpenGL.so.0 (0x0000ffff80b80000)\n\tlibfontconfig.so.1 => /lib/aarch64-linux-gnu/libfontconfig.so.1 (0x0000ffff80b10000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffff80a60000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffff80a20000)\n\tlibGLdispatch.so.0 => /lib/aarch64-linux-gnu/libGLdispatch.so.0 (0x0000ffff80890000)\n\tlibxcb.so.1 => /lib/aarch64-linux-gnu/libxcb.so.1 (0x0000ffff80840000)\n\tlibfreetype.so.6 => /lib/aarch64-linux-gnu/libfreetype.so.6 (0x0000ffff80760000)\n\tlibexpat.so.1 => /lib/aarch64-linux-gnu/libexpat.so.1 (0x0000ffff80710000)\n\tlibXau.so.6 => /lib/aarch64-linux-gnu/libXau.so.6 (0x0000ffff806e0000)\n\tlibXdmcp.so.6 => /lib/aarch64-linux-gnu/libXdmcp.so.6 (0x0000ffff806b0000)\n\tlibz.so.1 => /lib/aarch64-linux-gnu/libz.so.1 (0x0000ffff80670000)\n\tlibbz2.so.1.0 => /lib/aarch64-linux-gnu/libbz2.so.1.0 (0x0000ffff80640000)\n\tlibpng16.so.16 => /lib/aarch64-linux-gnu/libpng16.so.16 (0x0000ffff805e0000)\n\tlibbrotlidec.so.1 => /lib/aarch64-linux-gnu/libbrotlidec.so.1 (0x0000ffff805b0000)\n\tlibbrotlicommon.so.1 => /lib/aarch64-linux-gnu/libbrotlicommon.so.1 (0x0000ffff80570000)\n"
+  },
+  {
+    "path": "plugins/xcbglintegrations/libqxcb-glx-integration.so",
+    "rpath": "$ORIGIN/../../lib",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffb5679000)\n\tlibQt6XcbQpa.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/xcbglintegrations/../../lib/libQt6XcbQpa.so.6 (0x0000ffffb5510000)\n\tlibxcb-glx.so.0 => /lib/aarch64-linux-gnu/libxcb-glx.so.0 (0x0000ffffb54c0000)\n\tlibQt6Gui.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/xcbglintegrations/../../lib/libQt6Gui.so.6 (0x0000ffffb4a00000)\n\tlibQt6Core.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/xcbglintegrations/../../lib/libQt6Core.so.6 (0x0000ffffb3ea0000)\n\tlibGLX.so.0 => /lib/aarch64-linux-gnu/libGLX.so.0 (0x0000ffffb3e40000)\n\tlibOpenGL.so.0 => /lib/aarch64-linux-gnu/libOpenGL.so.0 (0x0000ffffb3dc0000)\n\tlibX11.so.6 => /lib/aarch64-linux-gnu/libX11.so.6 (0x0000ffffb3c50000)\n\tlibxcb.so.1 => /lib/aarch64-linux-gnu/libxcb.so.1 (0x0000ffffb3c00000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffffb3990000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffb37d0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffb5630000)\n\tlibxcb-cursor.so.0 => /lib/aarch64-linux-gnu/libxcb-cursor.so.0 (0x0000ffffb37a0000)\n\tlibxcb-icccm.so.4 => /lib/aarch64-linux-gnu/libxcb-icccm.so.4 (0x0000ffffb3770000)\n\tlibxcb-image.so.0 => /lib/aarch64-linux-gnu/libxcb-image.so.0 (0x0000ffffb3740000)\n\tlibxcb-keysyms.so.1 => /lib/aarch64-linux-gnu/libxcb-keysyms.so.1 (0x0000ffffb3710000)\n\tlibxcb-randr.so.0 => /lib/aarch64-linux-gnu/libxcb-randr.so.0 (0x0000ffffb36e0000)\n\tlibxcb-render.so.0 => /lib/aarch64-linux-gnu/libxcb-render.so.0 (0x0000ffffb36b0000)\n\tlibxcb-render-util.so.0 => /lib/aarch64-linux-gnu/libxcb-render-util.so.0 (0x0000ffffb3680000)\n\tlibxcb-shape.so.0 => /lib/aarch64-linux-gnu/libxcb-shape.so.0 (0x0000ffffb3650000)\n\tlibxcb-shm.so.0 => /lib/aarch64-linux-gnu/libxcb-shm.so.0 (0x0000ffffb3620000)\n\tlibxcb-sync.so.1 => /lib/aarch64-linux-gnu/libxcb-sync.so.1 (0x0000ffffb35f0000)\n\tlibxcb-xfixes.so.0 => /lib/aarch64-linux-gnu/libxcb-xfixes.so.0 (0x0000ffffb35c0000)\n\tlibxcb-xkb.so.1 => /lib/aarch64-linux-gnu/libxcb-xkb.so.1 (0x0000ffffb3580000)\n\tlibxkbcommon.so.0 => /lib/aarch64-linux-gnu/libxkbcommon.so.0 (0x0000ffffb3510000)\n\tlibX11-xcb.so.1 => /lib/aarch64-linux-gnu/libX11-xcb.so.1 (0x0000ffffb34e0000)\n\tlibxkbcommon-x11.so.0 => /lib/aarch64-linux-gnu/libxkbcommon-x11.so.0 (0x0000ffffb34b0000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffffb3400000)\n\tlibEGL.so.1 => /lib/aarch64-linux-gnu/libEGL.so.1 (0x0000ffffb33c0000)\n\tlibfontconfig.so.1 => /lib/aarch64-linux-gnu/libfontconfig.so.1 (0x0000ffffb3350000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffffb3310000)\n\tlibGLdispatch.so.0 => /lib/aarch64-linux-gnu/libGLdispatch.so.0 (0x0000ffffb3180000)\n\tlibXau.so.6 => /lib/aarch64-linux-gnu/libXau.so.6 (0x0000ffffb3150000)\n\tlibXdmcp.so.6 => /lib/aarch64-linux-gnu/libXdmcp.so.6 (0x0000ffffb3120000)\n\tlibxcb-util.so.1 => /lib/aarch64-linux-gnu/libxcb-util.so.1 (0x0000ffffb30f0000)\n\tlibfreetype.so.6 => /lib/aarch64-linux-gnu/libfreetype.so.6 (0x0000ffffb3010000)\n\tlibexpat.so.1 => /lib/aarch64-linux-gnu/libexpat.so.1 (0x0000ffffb2fc0000)\n\tlibz.so.1 => /lib/aarch64-linux-gnu/libz.so.1 (0x0000ffffb2f80000)\n\tlibbz2.so.1.0 => /lib/aarch64-linux-gnu/libbz2.so.1.0 (0x0000ffffb2f50000)\n\tlibpng16.so.16 => /lib/aarch64-linux-gnu/libpng16.so.16 (0x0000ffffb2ef0000)\n\tlibbrotlidec.so.1 => /lib/aarch64-linux-gnu/libbrotlidec.so.1 (0x0000ffffb2ec0000)\n\tlibbrotlicommon.so.1 => /lib/aarch64-linux-gnu/libbrotlicommon.so.1 (0x0000ffffb2e80000)\n"
+  },
+  {
+    "path": "plugins/xcbglintegrations/libqxcb-egl-integration.so",
+    "rpath": "$ORIGIN/../../lib",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffad77f000)\n\tlibQt6XcbQpa.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/xcbglintegrations/../../lib/libQt6XcbQpa.so.6 (0x0000ffffad620000)\n\tlibEGL.so.1 => /lib/aarch64-linux-gnu/libEGL.so.1 (0x0000ffffad5d0000)\n\tlibQt6Gui.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/xcbglintegrations/../../lib/libQt6Gui.so.6 (0x0000ffffacb10000)\n\tlibQt6Core.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/xcbglintegrations/../../lib/libQt6Core.so.6 (0x0000ffffabfb0000)\n\tlibxcb.so.1 => /lib/aarch64-linux-gnu/libxcb.so.1 (0x0000ffffabf60000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffffabcf0000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffabb30000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffad730000)\n\tlibxcb-cursor.so.0 => /lib/aarch64-linux-gnu/libxcb-cursor.so.0 (0x0000ffffabb00000)\n\tlibxcb-icccm.so.4 => /lib/aarch64-linux-gnu/libxcb-icccm.so.4 (0x0000ffffabad0000)\n\tlibxcb-image.so.0 => /lib/aarch64-linux-gnu/libxcb-image.so.0 (0x0000ffffabaa0000)\n\tlibxcb-keysyms.so.1 => /lib/aarch64-linux-gnu/libxcb-keysyms.so.1 (0x0000ffffaba70000)\n\tlibxcb-randr.so.0 => /lib/aarch64-linux-gnu/libxcb-randr.so.0 (0x0000ffffaba40000)\n\tlibxcb-render.so.0 => /lib/aarch64-linux-gnu/libxcb-render.so.0 (0x0000ffffaba10000)\n\tlibxcb-render-util.so.0 => /lib/aarch64-linux-gnu/libxcb-render-util.so.0 (0x0000ffffab9e0000)\n\tlibxcb-shape.so.0 => /lib/aarch64-linux-gnu/libxcb-shape.so.0 (0x0000ffffab9b0000)\n\tlibxcb-shm.so.0 => /lib/aarch64-linux-gnu/libxcb-shm.so.0 (0x0000ffffab980000)\n\tlibxcb-sync.so.1 => /lib/aarch64-linux-gnu/libxcb-sync.so.1 (0x0000ffffab950000)\n\tlibxcb-xfixes.so.0 => /lib/aarch64-linux-gnu/libxcb-xfixes.so.0 (0x0000ffffab920000)\n\tlibxcb-xkb.so.1 => /lib/aarch64-linux-gnu/libxcb-xkb.so.1 (0x0000ffffab8e0000)\n\tlibxkbcommon.so.0 => /lib/aarch64-linux-gnu/libxkbcommon.so.0 (0x0000ffffab870000)\n\tlibX11-xcb.so.1 => /lib/aarch64-linux-gnu/libX11-xcb.so.1 (0x0000ffffab840000)\n\tlibX11.so.6 => /lib/aarch64-linux-gnu/libX11.so.6 (0x0000ffffab6d0000)\n\tlibxkbcommon-x11.so.0 => /lib/aarch64-linux-gnu/libxkbcommon-x11.so.0 (0x0000ffffab6a0000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffffab5f0000)\n\tlibGLdispatch.so.0 => /lib/aarch64-linux-gnu/libGLdispatch.so.0 (0x0000ffffab460000)\n\tlibGLX.so.0 => /lib/aarch64-linux-gnu/libGLX.so.0 (0x0000ffffab400000)\n\tlibOpenGL.so.0 => /lib/aarch64-linux-gnu/libOpenGL.so.0 (0x0000ffffab380000)\n\tlibfontconfig.so.1 => /lib/aarch64-linux-gnu/libfontconfig.so.1 (0x0000ffffab310000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffffab2d0000)\n\tlibXau.so.6 => /lib/aarch64-linux-gnu/libXau.so.6 (0x0000ffffab2a0000)\n\tlibXdmcp.so.6 => /lib/aarch64-linux-gnu/libXdmcp.so.6 (0x0000ffffab270000)\n\tlibxcb-util.so.1 => /lib/aarch64-linux-gnu/libxcb-util.so.1 (0x0000ffffab240000)\n\tlibfreetype.so.6 => /lib/aarch64-linux-gnu/libfreetype.so.6 (0x0000ffffab160000)\n\tlibexpat.so.1 => /lib/aarch64-linux-gnu/libexpat.so.1 (0x0000ffffab110000)\n\tlibz.so.1 => /lib/aarch64-linux-gnu/libz.so.1 (0x0000ffffab0d0000)\n\tlibbz2.so.1.0 => /lib/aarch64-linux-gnu/libbz2.so.1.0 (0x0000ffffab0a0000)\n\tlibpng16.so.16 => /lib/aarch64-linux-gnu/libpng16.so.16 (0x0000ffffab040000)\n\tlibbrotlidec.so.1 => /lib/aarch64-linux-gnu/libbrotlidec.so.1 (0x0000ffffab010000)\n\tlibbrotlicommon.so.1 => /lib/aarch64-linux-gnu/libbrotlicommon.so.1 (0x0000ffffaafd0000)\n"
+  },
+  {
+    "path": "plugins/platforms/libqoffscreen.so",
+    "rpath": "$ORIGIN/../../lib",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff8dbd4000)\n\tlibX11.so.6 => /lib/aarch64-linux-gnu/libX11.so.6 (0x0000ffff8d9c0000)\n\tlibQt6Gui.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/platforms/../../lib/libQt6Gui.so.6 (0x0000ffff8cf00000)\n\tlibQt6Core.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/platforms/../../lib/libQt6Core.so.6 (0x0000ffff8c3a0000)\n\tlibGLX.so.0 => /lib/aarch64-linux-gnu/libGLX.so.0 (0x0000ffff8c340000)\n\tlibOpenGL.so.0 => /lib/aarch64-linux-gnu/libOpenGL.so.0 (0x0000ffff8c2c0000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffff8c050000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff8be90000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff8db90000)\n\tlibxcb.so.1 => /lib/aarch64-linux-gnu/libxcb.so.1 (0x0000ffff8be40000)\n\tlibEGL.so.1 => /lib/aarch64-linux-gnu/libEGL.so.1 (0x0000ffff8be00000)\n\tlibxkbcommon.so.0 => /lib/aarch64-linux-gnu/libxkbcommon.so.0 (0x0000ffff8bd90000)\n\tlibfontconfig.so.1 => /lib/aarch64-linux-gnu/libfontconfig.so.1 (0x0000ffff8bd20000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffff8bc70000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffff8bc30000)\n\tlibGLdispatch.so.0 => /lib/aarch64-linux-gnu/libGLdispatch.so.0 (0x0000ffff8baa0000)\n\tlibXau.so.6 => /lib/aarch64-linux-gnu/libXau.so.6 (0x0000ffff8ba70000)\n\tlibXdmcp.so.6 => /lib/aarch64-linux-gnu/libXdmcp.so.6 (0x0000ffff8ba40000)\n\tlibfreetype.so.6 => /lib/aarch64-linux-gnu/libfreetype.so.6 (0x0000ffff8b960000)\n\tlibexpat.so.1 => /lib/aarch64-linux-gnu/libexpat.so.1 (0x0000ffff8b910000)\n\tlibz.so.1 => /lib/aarch64-linux-gnu/libz.so.1 (0x0000ffff8b8d0000)\n\tlibbz2.so.1.0 => /lib/aarch64-linux-gnu/libbz2.so.1.0 (0x0000ffff8b8a0000)\n\tlibpng16.so.16 => /lib/aarch64-linux-gnu/libpng16.so.16 (0x0000ffff8b840000)\n\tlibbrotlidec.so.1 => /lib/aarch64-linux-gnu/libbrotlidec.so.1 (0x0000ffff8b810000)\n\tlibbrotlicommon.so.1 => /lib/aarch64-linux-gnu/libbrotlicommon.so.1 (0x0000ffff8b7d0000)\n"
+  },
+  {
+    "path": "plugins/platforms/libqxcb.so",
+    "rpath": "$ORIGIN/../../lib",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffbb2dc000)\n\tlibQt6XcbQpa.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/platforms/../../lib/libQt6XcbQpa.so.6 (0x0000ffffbb190000)\n\tlibQt6Gui.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/platforms/../../lib/libQt6Gui.so.6 (0x0000ffffba6d0000)\n\tlibQt6Core.so.6 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/plugins/platforms/../../lib/libQt6Core.so.6 (0x0000ffffb9b70000)\n\tlibstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffffb98e0000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffb9720000)\n\tlibxcb-cursor.so.0 => /lib/aarch64-linux-gnu/libxcb-cursor.so.0 (0x0000ffffb96f0000)\n\tlibxcb-icccm.so.4 => /lib/aarch64-linux-gnu/libxcb-icccm.so.4 (0x0000ffffb96c0000)\n\tlibxcb-image.so.0 => /lib/aarch64-linux-gnu/libxcb-image.so.0 (0x0000ffffb9690000)\n\tlibxcb-keysyms.so.1 => /lib/aarch64-linux-gnu/libxcb-keysyms.so.1 (0x0000ffffb9660000)\n\tlibxcb-randr.so.0 => /lib/aarch64-linux-gnu/libxcb-randr.so.0 (0x0000ffffb9630000)\n\tlibxcb-render.so.0 => /lib/aarch64-linux-gnu/libxcb-render.so.0 (0x0000ffffb9600000)\n\tlibxcb-render-util.so.0 => /lib/aarch64-linux-gnu/libxcb-render-util.so.0 (0x0000ffffb95d0000)\n\tlibxcb-shape.so.0 => /lib/aarch64-linux-gnu/libxcb-shape.so.0 (0x0000ffffb95a0000)\n\tlibxcb-shm.so.0 => /lib/aarch64-linux-gnu/libxcb-shm.so.0 (0x0000ffffb9570000)\n\tlibxcb-sync.so.1 => /lib/aarch64-linux-gnu/libxcb-sync.so.1 (0x0000ffffb9540000)\n\tlibxcb.so.1 => /lib/aarch64-linux-gnu/libxcb.so.1 (0x0000ffffb94f0000)\n\tlibxcb-xfixes.so.0 => /lib/aarch64-linux-gnu/libxcb-xfixes.so.0 (0x0000ffffb94c0000)\n\tlibxcb-xkb.so.1 => /lib/aarch64-linux-gnu/libxcb-xkb.so.1 (0x0000ffffb9480000)\n\tlibxkbcommon.so.0 => /lib/aarch64-linux-gnu/libxkbcommon.so.0 (0x0000ffffb9410000)\n\tlibX11-xcb.so.1 => /lib/aarch64-linux-gnu/libX11-xcb.so.1 (0x0000ffffb93e0000)\n\tlibX11.so.6 => /lib/aarch64-linux-gnu/libX11.so.6 (0x0000ffffb9270000)\n\tlibxkbcommon-x11.so.0 => /lib/aarch64-linux-gnu/libxkbcommon-x11.so.0 (0x0000ffffb9240000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffffb9190000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffbb2a0000)\n\tlibEGL.so.1 => /lib/aarch64-linux-gnu/libEGL.so.1 (0x0000ffffb9150000)\n\tlibGLX.so.0 => /lib/aarch64-linux-gnu/libGLX.so.0 (0x0000ffffb90f0000)\n\tlibOpenGL.so.0 => /lib/aarch64-linux-gnu/libOpenGL.so.0 (0x0000ffffb9070000)\n\tlibfontconfig.so.1 => /lib/aarch64-linux-gnu/libfontconfig.so.1 (0x0000ffffb9000000)\n\tlibgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffffb8fc0000)\n\tlibxcb-util.so.1 => /lib/aarch64-linux-gnu/libxcb-util.so.1 (0x0000ffffb8f90000)\n\tlibXau.so.6 => /lib/aarch64-linux-gnu/libXau.so.6 (0x0000ffffb8f60000)\n\tlibXdmcp.so.6 => /lib/aarch64-linux-gnu/libXdmcp.so.6 (0x0000ffffb8f30000)\n\tlibGLdispatch.so.0 => /lib/aarch64-linux-gnu/libGLdispatch.so.0 (0x0000ffffb8da0000)\n\tlibfreetype.so.6 => /lib/aarch64-linux-gnu/libfreetype.so.6 (0x0000ffffb8cc0000)\n\tlibexpat.so.1 => /lib/aarch64-linux-gnu/libexpat.so.1 (0x0000ffffb8c70000)\n\tlibz.so.1 => /lib/aarch64-linux-gnu/libz.so.1 (0x0000ffffb8c30000)\n\tlibbz2.so.1.0 => /lib/aarch64-linux-gnu/libbz2.so.1.0 (0x0000ffffb8c00000)\n\tlibpng16.so.16 => /lib/aarch64-linux-gnu/libpng16.so.16 (0x0000ffffb8ba0000)\n\tlibbrotlidec.so.1 => /lib/aarch64-linux-gnu/libbrotlidec.so.1 (0x0000ffffb8b70000)\n\tlibbrotlicommon.so.1 => /lib/aarch64-linux-gnu/libbrotlicommon.so.1 (0x0000ffffb8b30000)\n"
+  },
+  {
+    "path": "runtime/lib/libpython3.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffb27dc000)\n\tlibpython3.13.so.1.0 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/runtime/lib/libpython3.13.so.1.0 (0x0000ffffb2140000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffb1f60000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffffb1eb0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffb27a0000)\n"
+  },
+  {
+    "path": "runtime/lib/libpython3.13.so.1.0",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffa439c000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffffa3c80000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffa3ac0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffa4360000)\n"
+  },
+  {
+    "path": "runtime/bin/python3.13",
+    "rpath": "$ORIGIN/../lib",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff8f49a000)\n\tlibpython3.13.so.1.0 => /tmp/cpmimage-final/cpmimage/packaging/dist/CPMImage-linux-arm64/runtime/bin/../lib/libpython3.13.so.1.0 (0x0000ffff8edf0000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff8ec10000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffff8eb60000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff8f450000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/resource.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff929f8000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff92790000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff929b0000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_sha2.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff8327c000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff83020000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff83240000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_codecs_tw.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffad38f000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffad110000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffad340000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_random.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff9d585000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff9d320000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff9d540000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_sha3.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff81049000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff80de0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff81000000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/fcntl.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffa7879000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffa7610000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffa7830000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_pickle.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffa9bfc000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffa9990000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffa9bc0000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/math.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffbe0bc000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffffbdf60000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffbdda0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffbe070000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_codecs_kr.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffb0e3c000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffb0bc0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffb0df0000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_heapq.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tstatically linked\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/unicodedata.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff89fcc000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff89cd0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff89f90000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_interpreters.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff9659c000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff96340000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff96560000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_interpchannels.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff8428c000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff84030000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff84250000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_zoneinfo.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff8f5dc000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff8f380000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff8f5a0000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_opcode.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tstatically linked\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/select.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff9b3bc000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff9b150000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff9b370000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_contextvars.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tstatically linked\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/termios.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffb84b5000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffb8250000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffb8470000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_codecs_cn.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff9cd7c000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff9cb10000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff9cd40000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_csv.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tstatically linked\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_multiprocessing.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffbbc64000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffbba00000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffbbc20000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_codecs_hk.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff7fba8000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff7f920000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff7fb60000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_interpqueues.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff8cb7e000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff8c910000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff8cb30000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_bisect.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tstatically linked\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_lsprof.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff8e12c000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff8dec0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff8e0e0000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/grp.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffaa387000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffaa120000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffaa340000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_struct.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff8f97f000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff8f710000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff8f930000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_socket.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff8104c000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff80de0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff81010000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_md5.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff83309000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff830a0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff832c0000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_codecs_iso2022.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff94546000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff942e0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff94500000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_codecs_jp.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffbd6c6000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffbd430000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffbd680000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/mmap.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffa27da000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffa2570000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffa2790000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_statistics.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff999f7000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffff998b0000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff996f0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff999b0000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_sha1.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff83dc9000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff83b60000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff83d80000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/syslog.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffa504c000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffa4df0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffa5010000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/array.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffa90f6000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffa8e90000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffa90b0000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_posixsubprocess.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff9b545000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff9b2e0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff9b500000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_asyncio.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tstatically linked\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_multibytecodec.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffa0456000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffa01f0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffa0410000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_json.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tstatically linked\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_datetime.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff9473e000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffff945e0000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff94420000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff946f0000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/cmath.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffac559000)\n\tlibm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffffac410000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffac250000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffac510000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_posixshmem.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff800dc000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff7fe80000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff800a0000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_blake2.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffa2008000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffa1da0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffa1fc0000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/_queue.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffffbbdcc000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffbbb70000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffffbbd90000)\n"
+  },
+  {
+    "path": "runtime/lib/python3.13/lib-dynload/binascii.cpython-313-aarch64-linux-gnu.so",
+    "rpath": "$ORIGIN",
+    "dependencies": "\tlinux-vdso.so.1 (0x0000ffff90b67000)\n\tlibz.so.1 => /lib/aarch64-linux-gnu/libz.so.1 (0x0000ffff90a90000)\n\tlibc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff908d0000)\n\t/lib/ld-linux-aarch64.so.1 (0x0000ffff90b20000)\n"
+  }
+]

@@ -20,7 +20,11 @@ for f in [runtime/'bin/idle3',runtime/'bin/idle3.13',runtime/'bin/pydoc3',runtim
  if f.exists() or f.is_symlink():f.unlink()
 # The interpreter discovers stdlib relative to itself; eliminate its build-prefix dylib reference.
 py=runtime/'bin/python3.13';lib=runtime/'lib/libpython3.13.dylib'
-subprocess.run(['install_name_tool','-change',str(BASE/'python-macos/lib/libpython3.13.dylib'),'@loader_path/../lib/libpython3.13.dylib',str(py)],check=True)
+# Reused private runtimes can retain their original build-prefix reference.
+for line in subprocess.check_output(['otool','-L',str(py)],text=True).splitlines()[1:]:
+ dependency=line.strip().split(' (')[0]
+ if dependency.startswith('/') and dependency.endswith('/libpython3.13.dylib'):
+  subprocess.run(['install_name_tool','-change',dependency,'@loader_path/../lib/libpython3.13.dylib',str(py)],check=True)
 subprocess.run(['install_name_tool','-id','@rpath/libpython3.13.dylib',str(lib)],check=True)
 frameworks=app/'Contents/Frameworks';frameworks.mkdir(exist_ok=True)
 shutil.copy2(str(BASE/'helper-deps-macos/lib/libdsk.3.dylib'),frameworks/'libdsk.3.dylib')
