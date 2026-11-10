@@ -2,6 +2,7 @@
 #pragma once
 #include <QMainWindow>
 #include "filename_policy.h"
+#include "export_plan.h"
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QProcess>
@@ -12,6 +13,7 @@ class QPushButton;
 class QTableWidget;
 class QListWidget;
 class QSettings;
+class QProgressBar;
 
 class Window : public QMainWindow {
     Q_OBJECT
@@ -20,12 +22,16 @@ public:
     ~Window() override;
     void openImage(const QString &path, const QString &format, const QString &container);
     void exportFile(const QString &destination);
+    void exportSelection(const QString &directory, bool skipExisting = false);
+    void exportUserArea(const QString &directory, bool skipExisting = false);
+    QString lastBatchReport() const { return batchReport; }
     int entryCount() const;
     bool readerRunning() const { return process.state() != QProcess::NotRunning; }
     void selectEntry(int row);
     QString lastError() const { return error; }
 signals:
     void completed(bool success);
+    void exportProgress(int completed, int total);
 protected:
     void closeEvent(QCloseEvent *event) override;
 private:
@@ -44,6 +50,12 @@ private:
     void chooseImage();
     void chooseExport();
     void editFilenameSettings();
+    void chooseBatch(bool wholeArea);
+    QJsonArray exportEntries(bool wholeArea) const;
+    void startBatch(ExportPlan plan, bool skipExisting);
+    void nextBatchFile();
+    void finishBatch();
+    void showExportReport();
     QString selectedExportName(QString *problem) const;
     QString root, python, helper, image, format, container, session, requestId, operation, error;
     QByteArray output;
@@ -62,4 +74,10 @@ private:
     QString imageNote;
     FilenamePolicy filenamePolicy;
     QSettings *settings;
+    QPushButton *areaExportButton, *reportButton;
+    QProgressBar *progress;
+    ExportPlan batch;
+    int batchIndex = 0;
+    bool batchActive = false, batchInFlight = false, batchCancelRequested = false;
+    QString batchReport;
 };

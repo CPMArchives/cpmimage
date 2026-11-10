@@ -21,6 +21,7 @@
 #include <QSettings>
 #include <QAction>
 #include <QDialogButtonBox>
+#include <QMessageBox>
 
 static QFileDialog *fileDialog() {
     for (auto *w : QApplication::topLevelWidgets())
@@ -31,6 +32,172 @@ static QFileDialog *fileDialog() {
 class GuiCheck : public QObject {
     Q_OBJECT
 private slots:
+    void exportPlanning() {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        FilenamePolicy policy;
+        auto entry=[](const QString &name){return QJsonObject{{"name",name},{"size",128}};};
+        auto plan=planExport({entry("00SIG/M.LIB"),entry("00A:B.TXT")},dir.path(),3,policy);
+        QVERIFY(plan.error.isEmpty()); QCOMPARE(plan.items.size(),2);
+        QVERIFY(plan.items[0].destination.endsWith("/3/SIG_M.LIB"));
+        QVERIFY(!QDir(dir.filePath("3")).exists()); // Preflight has no side effects.
+        QVERIFY(!planExport({entry("00A/B.TXT"),entry("00A_B.TXT")},dir.path(),3,policy).error.isEmpty());
+        QVERIFY(!planExport({entry("00A|B.TXT")},dir.path(),3,policy).error.isEmpty());
+        QVERIFY(!planExport({entry("00CON.TXT")},dir.path(),3,policy).error.isEmpty());
+        QFile existing(dir.filePath("binary.bin")); QVERIFY(existing.open(QIODevice::WriteOnly));existing.write("keep");existing.close();
+        plan=planExport({entry("00BINARY.BIN")},dir.path(),-1,policy);
+        QCOMPARE(plan.conflicts,QStringList{"BINARY.BIN"}); QVERIFY(plan.items[0].exists);
+        QFile numbered(dir.filePath("3"));QVERIFY(numbered.open(QIODevice::WriteOnly));numbered.close();
+        QVERIFY(!planExport({},dir.path(),3,policy).error.isEmpty());
+    }
+    void batchExportWorkflows() {
+        const auto root=qEnvironmentVariable("CPMIMAGE_ROOT");
+        QFile original(root+"/fixtures/ibm3740-independent.raw");QVERIFY(original.open(QIODevice::ReadOnly));
+        auto bytes=original.readAll(); bytes[6656+32]=0;bytes.replace(6656+33,8,"SMALL   ");bytes[6656+64]=0;
+        QTemporaryDir temp; QVERIFY(temp.isValid());
+        QFile image(temp.filePath("batch.raw"));QVERIFY(image.open(QIODevice::WriteOnly));image.write(bytes);image.close();
+        Window window(root,qEnvironmentVariable("CPMIMAGE_PYTHON","python3"),qEnvironmentVariable("CPMIMAGE_HELPER"));
+        QSignalSpy done(&window,&Window::completed);
+        window.openImage(image.fileName(),"ibm-3740","raw");QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        auto *files=window.findChild<QTableWidget *>("fileList");files->selectAll();
+        QTemporaryDir output;QVERIFY(output.isValid());
+        window.exportSelection(output.path());QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        QCOMPARE(QDir(output.path()).entryList(QDir::Files).size(),3);
+        QFile binary(output.filePath("BINARY.BIN"));QVERIFY(binary.open(QIODevice::ReadOnly));
+        QCOMPARE(QCryptographicHash::hash(binary.readAll(),QCryptographicHash::Sha256).toHex(),QByteArray("110009dcee21620b166f3abfecb5eff7a873be729d1c2d53822e7acc5f34eb9b"));
+        for(const auto &oracle:QList<QPair<QString,QByteArray>>{
+            {"SMALL.BIN","cd6816b77f68d70001fc3eaa4d42bdd67cb5973b3151cc5292ecc02a3daac6ab"},
+            {"TAIL.BIN","e92de1c61e03ecf17afd276aa6bad358b8b2cad5fe4e607a42152df1befd5a6f"}}) {
+            QFile file(output.filePath(oracle.first));QVERIFY(file.open(QIODevice::ReadOnly));
+            QCOMPARE(QCryptographicHash::hash(file.readAll(),QCryptographicHash::Sha256).toHex(),oracle.second);
+        }
+        QVERIFY(window.lastBatchReport().contains("3 exported"));
+        window.exportSelection(output.path());QCOMPARE(done.size(),1);QVERIFY(!done.takeFirst()[0].toBool());
+        window.exportSelection(output.path(),true);QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        QVERIFY(window.lastBatchReport().contains("3 skipped"));
+        QTemporaryDir mixed; QFile keep(mixed.filePath("binary.bin"));QVERIFY(keep.open(QIODevice::WriteOnly));keep.write("keep");keep.close();
+        window.exportSelection(mixed.path(),true);QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        QVERIFY(window.lastBatchReport().contains("2 exported · 1 skipped"));
+        QVERIFY(keep.open(QIODevice::ReadOnly));QCOMPARE(keep.readAll(),QByteArray("keep"));
+        QTemporaryDir subset;files->clearSelection();window.selectEntry(0);
+        files->selectionModel()->select(files->model()->index(2,0),QItemSelectionModel::Select|QItemSelectionModel::Rows);
+        window.exportSelection(subset.path());QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        QCOMPARE(QDir(subset.path()).entryList(QDir::Files),QStringList({"BINARY.BIN","TAIL.BIN"}));
+        QTemporaryDir areas;files->clearSelection();window.selectEntry(0);window.exportUserArea(areas.path());QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        QCOMPARE(QDir(areas.filePath("0")).entryList(QDir::Files).size(),3);
+        auto *navigation=window.findChild<QListWidget *>("userAreas");navigation->setCurrentRow(1);
+        window.exportUserArea(areas.path());QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        QVERIFY(QDir(areas.filePath("1")).exists());QVERIFY(QDir(areas.filePath("1")).isEmpty());
+        QVERIFY(image.open(QIODevice::ReadOnly));QCOMPARE(image.readAll(),bytes);
+        window.openImage(root+"/fixtures/ibm3740-independent.raw","ibm-3740","raw");QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        navigation->setCurrentRow(7);window.exportUserArea(areas.path());QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        QFile seven(areas.filePath("7/BINARY.BIN"));QVERIFY(seven.open(QIODevice::ReadOnly));
+        QCOMPARE(QCryptographicHash::hash(seven.readAll(),QCryptographicHash::Sha256).toHex(),QByteArray("cd6816b77f68d70001fc3eaa4d42bdd67cb5973b3151cc5292ecc02a3daac6ab"));
+    }
+    void batchCancellationAndFailure() {
+        const auto root=qEnvironmentVariable("CPMIMAGE_ROOT");
+        QFile original(root+"/fixtures/ibm3740-independent.raw");QVERIFY(original.open(QIODevice::ReadOnly));
+        auto bytes=original.readAll();bytes[6656+32]=0;bytes.replace(6656+33,8,"SMALL   ");bytes[6656+64]=0;
+        QTemporaryDir temp;QFile image(temp.filePath("batch.raw"));QVERIFY(image.open(QIODevice::WriteOnly));image.write(bytes);image.close();
+        Window window(root,qEnvironmentVariable("CPMIMAGE_PYTHON","python3"),qEnvironmentVariable("CPMIMAGE_HELPER"));
+        QSignalSpy done(&window,&Window::completed);
+        window.openImage(image.fileName(),"ibm-3740","raw");QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        auto *files=window.findChild<QTableWidget *>("fileList");files->selectAll();
+        QTemporaryDir output;
+        auto connection=connect(&window,&Window::exportProgress,&window,[&](int count,int){
+            if(count==1) window.findChild<QPushButton *>("cancelOperation")->click();
+        });
+        window.exportSelection(output.path());QVERIFY(done.wait(15000));QVERIFY(!done.takeFirst()[0].toBool());
+        disconnect(connection);
+        QCOMPARE(QDir(output.path()).entryList(QDir::Files|QDir::Hidden).size(),1);
+        QVERIFY(window.lastBatchReport().contains("1 exported"));QVERIFY(window.lastBatchReport().contains("2 not attempted"));
+        QVERIFY(window.lastBatchReport().contains("Completed exports were retained"));
+        // A file created after preflight must still never be replaced.
+        QTemporaryDir race;
+        connection=connect(&window,&Window::exportProgress,&window,[&](int count,int){
+            if(count==0) { QFile file(race.filePath("BINARY.BIN"));if(file.open(QIODevice::WriteOnly)) file.write("raced"); }
+        });
+        window.exportSelection(race.path());QVERIFY(done.wait(15000));QVERIFY(!done.takeFirst()[0].toBool());disconnect(connection);
+        QFile raced(race.filePath("BINARY.BIN"));QVERIFY(raced.open(QIODevice::ReadOnly));QCOMPARE(raced.readAll(),QByteArray("raced"));
+        QVERIFY(window.lastBatchReport().contains("1 failed"));QVERIFY(window.lastBatchReport().contains("2 not attempted"));
+        QTemporaryDir changed;
+        connection=connect(&window,&Window::exportProgress,&window,[&](int count,int){
+            if(count==1) { QFile file(image.fileName());if(file.open(QIODevice::WriteOnly)) file.write(bytes.left(bytes.size()-1)+"!"); }
+        });
+        window.exportSelection(changed.path());QVERIFY(done.wait(15000));QVERIFY(!done.takeFirst()[0].toBool());disconnect(connection);
+        QVERIFY2(QDir(changed.path()).entryList(QDir::Files|QDir::Hidden).size()==1,qPrintable(window.lastBatchReport()));
+        QVERIFY(window.lastBatchReport().contains("1 exported"));QVERIFY(window.lastBatchReport().contains("1 failed"));
+        QVERIFY(window.lastBatchReport().contains("source image changed",Qt::CaseInsensitive));
+    }
+
+    void batchCancelDuringExtraction_data() {
+        QTest::addColumn<bool>("closeBusy");
+        QTest::newRow("cancel")<<false;
+        QTest::newRow("close-busy")<<true;
+    }
+    void batchCancelDuringExtraction() {
+#ifdef Q_OS_WIN
+        QSKIP("POSIX helper-script fault fixture; normal batch cancellation remains covered on Windows.");
+#else
+        QFETCH(bool,closeBusy);
+        const auto root=qEnvironmentVariable("CPMIMAGE_ROOT");
+        QTemporaryDir temp;
+        QFile original(root+"/fixtures/ibm3740-independent.raw");QVERIFY(original.open(QIODevice::ReadOnly));
+        auto bytes=original.readAll();bytes[6656+32]=0;bytes.replace(6656+33,8,"SMALL   ");bytes[6656+64]=0;
+        QFile image(temp.filePath("batch.raw"));QVERIFY(image.open(QIODevice::WriteOnly));image.write(bytes);image.close();
+        auto literal=[](const QString &value){auto b=QJsonDocument(QJsonArray{value}).toJson(QJsonDocument::Compact);return b.mid(1,b.size()-2);};
+        const auto marker=temp.filePath("started"), partial=temp.filePath("partial-path");
+        QFile wrapper(temp.filePath("slow-helper"));QVERIFY(wrapper.open(QIODevice::WriteOnly));
+        wrapper.write("#!/usr/bin/env python3\nimport os,sys,pathlib,time\n"
+            "if sys.argv[1]=='export' and sys.argv[5]=='00SMALL.BIN':\n"
+            " pathlib.Path(sys.argv[6]).write_bytes(b'incomplete')\n pathlib.Path("+literal(partial)+").write_text(sys.argv[6])\n pathlib.Path("+literal(marker)+").touch()\n time.sleep(60)\n"
+            "os.execv("+literal(qEnvironmentVariable("CPMIMAGE_HELPER"))+",["+literal(qEnvironmentVariable("CPMIMAGE_HELPER"))+"]+sys.argv[1:])\n");
+        wrapper.close();QVERIFY(wrapper.setPermissions(QFile::ReadOwner|QFile::WriteOwner|QFile::ExeOwner));
+        Window window(root,qEnvironmentVariable("CPMIMAGE_PYTHON","python3"),wrapper.fileName());
+        window.show();QSignalSpy done(&window,&Window::completed);
+        window.openImage(image.fileName(),"ibm-3740","raw");QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        window.findChild<QTableWidget *>("fileList")->selectAll();
+        QTemporaryDir output;window.exportSelection(output.path());
+        QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(marker),5000);
+        if(closeBusy) window.close();
+        else window.findChild<QPushButton *>("cancelOperation")->click();
+        if(done.isEmpty()) QVERIFY(done.wait(5000));QVERIFY(!done.takeFirst()[0].toBool());
+        QCOMPARE(QDir(output.path()).entryList(QDir::Files|QDir::Hidden),QStringList{"BINARY.BIN"});
+        QVERIFY(window.lastBatchReport().contains("1 exported · 0 skipped · 0 failed · 1 cancelled · 1 not attempted"));
+        QFile staged(partial);QVERIFY(staged.open(QIODevice::ReadOnly));
+        QVERIFY(!QFile::exists(QString::fromUtf8(staged.readAll())));
+        if(closeBusy) QVERIFY(!window.isVisible());
+#endif
+    }
+    void batchDirectoryDialog() {
+        QApplication::setAttribute(Qt::AA_DontUseNativeDialogs,true);
+        const auto root=qEnvironmentVariable("CPMIMAGE_ROOT");QTemporaryDir output,config;
+        Window window(root,qEnvironmentVariable("CPMIMAGE_PYTHON","python3"),qEnvironmentVariable("CPMIMAGE_HELPER"),30000,2000,{},config.filePath("settings.ini"));
+        window.show();QSignalSpy done(&window,&Window::completed);
+        window.openImage(root+"/fixtures/ibm3740-independent.raw","ibm-3740","raw");QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        bool visited=false;
+        QTimer poll;poll.setInterval(25);
+        connect(&poll,&QTimer::timeout,&window,[&]{
+            if(auto *dialog=fileDialog()) { visited=true;dialog->setDirectory(output.path());QMetaObject::invokeMethod(dialog,"accept"); }
+        });poll.start();
+        window.findChild<QPushButton *>("exportUserArea")->click();QVERIFY(visited);
+        if(done.isEmpty()) QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());poll.stop();
+        QVERIFY(QFile::exists(output.filePath("0/BINARY.BIN")));
+        QSettings settings(config.filePath("settings.ini"),QSettings::IniFormat);
+        QCOMPARE(settings.value("exports/directory").toString(),output.path());
+        // Repeating the area export reaches the no-overwrite choice.
+        bool conflict=false;
+        connect(&poll,&QTimer::timeout,&window,[&]{
+            if(auto *box=qobject_cast<QMessageBox *>(QApplication::activeModalWidget())) {
+                conflict=true;
+                for(auto *button:box->buttons()) if(button->text()=="Skip existing") { button->click();break; }
+            }
+        });poll.start();
+        window.findChild<QPushButton *>("exportUserArea")->click();
+        if(done.isEmpty()) QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());poll.stop();
+        QVERIFY(conflict);QVERIFY(window.lastBatchReport().contains("1 skipped"));
+        QApplication::setAttribute(Qt::AA_DontUseNativeDialogs,false);
+    }
+
     void filenameTranslationPolicy() {
         FilenamePolicy policy;
         QCOMPARE(policy.translate("SIG/M.LIB"),QString("SIG_M.LIB"));
@@ -203,8 +370,8 @@ private slots:
         QCOMPARE(files->selectionModel()->selectedRows().size(),3);
         QVERIFY(status->text().contains("3 of 3 files selected · 1536 bytes"));
         QPushButton *exportButton=nullptr;
-        for(auto *button:window.findChildren<QPushButton *>()) if(button->text().startsWith("Export")) exportButton=button;
-        QVERIFY(exportButton); QVERIFY(!exportButton->isEnabled());
+        for(auto *button:window.findChildren<QPushButton *>()) if(button->text().startsWith("Export selected")) exportButton=button;
+        QVERIFY(exportButton); QVERIFY(exportButton->isEnabled());
         window.exportFile(temp.filePath("must-not-export.bin"));
         QVERIFY(done.isEmpty()); QVERIFY(!QFile::exists(temp.filePath("must-not-export.bin")));
         // Qt maps ControlModifier to the Command key on macOS.
