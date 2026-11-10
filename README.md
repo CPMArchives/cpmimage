@@ -11,6 +11,7 @@ The prototype uses Qt 6 Widgets/C++17, a separate Python broker, and a read-only
 - [Build and run](docs/BUILDING.md)
 - [Prototype behavior and limits](docs/READ_ONLY_PROTOTYPE.md)
 - [Batch and user-area export review](docs/V0_2_BATCH_EXPORT_REVIEW.md)
+- [Compact toolbar and image information review](docs/V0_2_TOOLBAR_REVIEW.md)
 - [Validation evidence](docs/VALIDATION.md)
 - [Owner testing notes and backlog](docs/USER_TESTING_BACKLOG.md)
 - [Complete SIG/M filename audit, including DOS](docs/CATALOG_FILENAME_AUDIT.md)

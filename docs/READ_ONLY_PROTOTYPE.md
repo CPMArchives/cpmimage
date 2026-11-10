@@ -1,6 +1,6 @@
 # Read-only prototype
 
-The merged v0.1 prototype is the baseline. v0.2 adds user-area navigation, multiple selection and configurable filename translations. The local batch-export review adds selected-file batches and whole-user-area export; see [the review and validation scope](V0_2_BATCH_EXPORT_REVIEW.md).
+The merged v0.1 prototype is the baseline. v0.2 adds user-area navigation, multiple selection and configurable filename translations. Batch and whole-user-area export are now merged. The local toolbar review compacts the controls and moves technical details into Image information; see [the review and validation scope](V0_2_TOOLBAR_REVIEW.md).
 
 ## Runtime boundary
 
@@ -34,6 +34,10 @@ This does not add general geometry detection or settle a long-term public backen
 ## Browsing and export
 
 The v0.2 UI supports one image, a resizable left pane containing all user areas 0–15, and a sortable Name/Bytes/Attributes table filtered to the selected area. Populated areas have a centered plus on their folder icon. Selection count/byte totals are visible. Changing layout clears the session, listing, selection and populated markers.
+
+The primary toolbar contains Open image, Export selected and Export user area, with a Read-only indicator. The layout selector and Image information button occupy a separate row. The filename appears above the browser and in the window title; the full path is also available as its tooltip. Cancel appears only during an operation, batch progress appears during transfer, and Export report is shown when a report is available.
+
+**Image information…**, also available from File, contains the full source path, selected layout and identifiers, container, total file/populated-area counts, snapshot SHA-256, temporary E5-tail normalization note, read-only/manual-format/record-padding details and the last completed export's byte count and hash. The dialog is selectable plain text, unavailable until an image is open and while operations run. Image reset clears its cached snapshot/export details. Technical hashes and normalization details no longer occupy the everyday browser or export-success status.
 
 CP/M names remain uppercase. Single-file export suggests the displayed filename without a user-area prefix. Configurable translations default to `/ → _`, `: → ~` and `\ → ^` on every host OS. Source names are displayed unchanged; translation applies only to export suggestions. No reverse import mapping is implemented. See [filename policy](FILENAME_POLICY_NOTES.md).
 
