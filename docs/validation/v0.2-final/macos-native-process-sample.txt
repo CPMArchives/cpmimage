@@ -1,0 +1,53 @@
+Analysis of sampling cpmimage-review (pid 99682) every 1 millisecond
+Process:         cpmimage-review [99682]
+Path:            /private/tmp/*/CPMImage.app/Contents/MacOS/cpmimage-review
+Load Address:    0x100a60000
+Identifier:      org.cpmarchives.cpmimage.packagereview
+Version:         ??? (???)
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  launchd [1]
+Target Type:     live task
+
+Date/Time:       2026-11-11 00:28:02.289 +0800
+Launch Time:     2026-11-11 00:26:01.885 +0800
+OS Version:      macOS 27.2 (26B118)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+
+Physical footprint:         68.6M
+Physical footprint (peak):  77.2M
+Idle exit:                  untracked
+----
+
+Call graph:
+    867 Thread_4360244   DispatchQueue_1: com.apple.main-thread  (serial)
+    + 867 start  (in dyld) + 6652  [0x19bf4cd7c]
+    +   867 main  (in cpmimage-review) + 5696  [0x100a654d8]
+    +     867 QCoreApplication::exec()  (in QtCore) + 228  [0x103213524]
+    +       867 QEventLoop::exec(QFlags<QEventLoop::ProcessEventsFlag>)  (in QtCore) + 576  [0x10321cae0]
+    +         867 QCocoaEventDispatcher::processEvents(QFlags<QEventLoop::ProcessEventsFlag>)  (in libqcocoa.dylib) + 2172  [0x10150d940]
+    +           867 -[NSApplication run]  (in AppKit) + 396  [0x1a5e82920]
+    +             867 -[NSApplication(NSEventRouting) nextEventMatchingMask:untilDate:inMode:dequeue:]  (in AppKit) + 344  [0x1a66260e8]
+    +               867 -[NSApplication(NSEventRouting) _nextEventMatchingEventMask:untilDate:inMode:dequeue:]  (in AppKit) + 832  [0x1a66265f8]
+    +                 867 _DPSNextEvent  (in AppKit) + 576  [0x1a5e8f59c]
+    +                   867 _DPSBlockUntilNextEventMatchingListInMode  (in AppKit) + 292  [0x1a61d08c0]
+    +                     867 _BlockUntilNextEventMatchingListInMode  (in HIToolbox) + 48  [0x1aab25db8]
+    +                       867 ReceiveNextEventCommon  (in HIToolbox) + 492  [0x1aa99f96c]
+    +                         867 RunCurrentEventLoopInMode  (in HIToolbox) + 320  [0x1aa99c5e0]
+    +                           867 _CFRunLoopRunSpecificWithOptions  (in CoreFoundation) + 536  [0x1a02bec10]
+    +                             867 __CFRunLoopRun  (in CoreFoundation) + 1172  [0x1a01e4310]
+    +                               867 __CFRunLoopServiceMachPort  (in CoreFoundation) + 160  [0x1a01e5ac8]
+    +                                 867 mach_msg  (in libsystem_kernel.dylib) + 24  [0x19bfdbfac]
+    +                                   867 mach_msg_overwrite  (in libsystem_kernel.dylib) + 480  [0x19bfe4a28]
+    +                                     867 mach_msg2_internal  (in libsystem_kernel.dylib) + 76  [0x19bfee8e0]
+    +                                       867 mach_msg2_trap  (in libsystem_kernel.dylib) + 8  [0x19bfdbc20]
+    867 Thread_4360292: com.apple.NSEventThread
+    + 867 thread_start  (in libsystem_pthread.dylib) + 8  [0x19c01bcd0]
+    +   867 _pthread_start  (in libsystem_pthread.dylib) + 136  [0x19c020ce4]
+    +     867 _NSEventThread  (in AppKit) + 152  [0x1a5fb3554]
+    +       867 _CFRunLoopRunSpecificWithOptions  (in CoreFoundation) + 536  [0x1a02bec10]
+    +         867 __CFRunLoopRun  (in CoreFoundation) + 1172  [0x1a01e4310]
+    +           867 __CFRunLoopServiceMachPort  (in CoreFoundation) + 160  [0x1a01e5ac8]
+    +             867 mach_msg  (in libsystem_kernel.dylib) + 24  [0x19bfdbfac]
+[Sample excerpt ends.]

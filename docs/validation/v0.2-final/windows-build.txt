@@ -1,0 +1,37 @@
+[  0%] Built target cpmimage-review_autogen_timestamp_deps
+[  5%] Automatic MOC for target cpmimage-review
+[  5%] Built target cpmimage-review_autogen
+[ 11%] Automatic RCC for resources/icons.qrc
+[ 17%] Building CXX object CMakeFiles/cpmimage-review.dir/cpmimage-review_autogen/mocs_compilation.cpp.obj
+mocs_compilation.cpp
+[ 23%] Building CXX object CMakeFiles/cpmimage-review.dir/src/main.cpp.obj
+main.cpp
+[ 29%] Building CXX object CMakeFiles/cpmimage-review.dir/src/window.cpp.obj
+window.cpp
+[ 35%] Building CXX object CMakeFiles/cpmimage-review.dir/src/filename_policy.cpp.obj
+filename_policy.cpp
+[ 41%] Building CXX object CMakeFiles/cpmimage-review.dir/src/export_plan.cpp.obj
+export_plan.cpp
+[ 47%] Building RC object CMakeFiles/cpmimage-review.dir/resources/cpmimage.rc.res
+Microsoft (R) Windows (R) Resource Compiler Version 10.0.10011.16384
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+[ 52%] Building CXX object CMakeFiles/cpmimage-review.dir/cpmimage-review_autogen/3YJK5W5UP7/qrc_icons.cpp.obj
+qrc_icons.cpp
+[ 58%] Linking CXX executable cpmimage-review.exe
+[ 58%] Built target cpmimage-review
+[ 58%] Built target gui-check_autogen_timestamp_deps
+[ 64%] Automatic MOC for target gui-check
+[ 64%] Built target gui-check_autogen
+[ 70%] Building CXX object CMakeFiles/gui-check.dir/gui-check_autogen/mocs_compilation.cpp.obj
+mocs_compilation.cpp
+[ 76%] Building CXX object CMakeFiles/gui-check.dir/tests/gui_check.cpp.obj
+gui_check.cpp
+[ 82%] Building CXX object CMakeFiles/gui-check.dir/src/window.cpp.obj
+window.cpp
+[ 88%] Building CXX object CMakeFiles/gui-check.dir/src/filename_policy.cpp.obj
+filename_policy.cpp
+[ 94%] Building CXX object CMakeFiles/gui-check.dir/src/export_plan.cpp.obj
+export_plan.cpp
+[100%] Linking CXX executable gui-check.exe
+[100%] Built target gui-check

@@ -1,0 +1,109 @@
+UpdateCTestConfiguration  from :/Users/nathanael/.codex/.chatgpt-projects/g-p-6a682f002be881918281554d644daf48/cpmimage-review/packaging/app-macos/DartConfiguration.tcl
+Parse Config file:/Users/nathanael/.codex/.chatgpt-projects/g-p-6a682f002be881918281554d644daf48/cpmimage-review/packaging/app-macos/DartConfiguration.tcl
+Test project /Users/nathanael/.codex/.chatgpt-projects/g-p-6a682f002be881918281554d644daf48/cpmimage-review/packaging/app-macos
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+    Start 1: gui-check
+
+1: Test command: /Users/nathanael/.codex/.chatgpt-projects/g-p-6a682f002be881918281554d644daf48/cpmimage-review/packaging/app-macos/gui-check
+1: Working Directory: /Users/nathanael/.codex/.chatgpt-projects/g-p-6a682f002be881918281554d644daf48/cpmimage-review/packaging/app-macos
+1: Environment variables: 
+1:  QT_QPA_PLATFORM=offscreen
+1: Test timeout computed to be: 90
+1: ********* Start testing of GuiCheck *********
+1: Config: Using QtTest library 6.12.0, Qt 6.12.0 (arm64-little_endian-lp64 shared (dynamic) release build; by Apple LLVM 21.0.0 (clang-2100.3.34.2)), macos 27.2.0
+1: PASS   : GuiCheck::initTestCase()
+1: QWARN  : GuiCheck::compactToolbarAndImageInformation() qt.qpa.fonts: Populating font family aliases took 21 ms. Replace uses of missing font family "Sans Serif" with one that exists to avoid this cost. 
+1: QWARN  : GuiCheck::compactToolbarAndImageInformation() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::compactToolbarAndImageInformation() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::compactToolbarAndImageInformation() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::compactToolbarAndImageInformation() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::compactToolbarAndImageInformation() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::compactToolbarAndImageInformation() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::compactToolbarAndImageInformation() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::compactToolbarAndImageInformation() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::compactToolbarAndImageInformation() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::compactToolbarAndImageInformation() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::compactToolbarAndImageInformation() This plugin does not support propagateSizeHints()
+1: PASS   : GuiCheck::compactToolbarAndImageInformation()
+1: PASS   : GuiCheck::exportPlanning()
+1: PASS   : GuiCheck::batchExportWorkflows()
+1: PASS   : GuiCheck::batchCancellationAndFailure()
+1: QWARN  : GuiCheck::batchCancelDuringExtraction(cancel) This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchCancelDuringExtraction(cancel) This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchCancelDuringExtraction(cancel) This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchCancelDuringExtraction(cancel) This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchCancelDuringExtraction(cancel) This plugin does not support propagateSizeHints()
+1: PASS   : GuiCheck::batchCancelDuringExtraction(cancel)
+1: QWARN  : GuiCheck::batchCancelDuringExtraction(close-busy) This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchCancelDuringExtraction(close-busy) This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchCancelDuringExtraction(close-busy) This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchCancelDuringExtraction(close-busy) This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchCancelDuringExtraction(close-busy) This plugin does not support propagateSizeHints()
+1: PASS   : GuiCheck::batchCancelDuringExtraction(close-busy)
+1: QWARN  : GuiCheck::batchDirectoryDialog() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchDirectoryDialog() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchDirectoryDialog() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchDirectoryDialog() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchDirectoryDialog() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchDirectoryDialog() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchDirectoryDialog() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchDirectoryDialog() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchDirectoryDialog() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchDirectoryDialog() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchDirectoryDialog() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::batchDirectoryDialog() This plugin does not support propagateSizeHints()
+1: PASS   : GuiCheck::batchDirectoryDialog()
+1: PASS   : GuiCheck::filenameTranslationPolicy()
+1: QWARN  : GuiCheck::filenameSettingsDialog() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::filenameSettingsDialog() This plugin does not support propagateSizeHints()
+1: PASS   : GuiCheck::filenameSettingsDialog()
+1: QWARN  : GuiCheck::listingAndExport() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::listingAndExport() This plugin does not support propagateSizeHints()
+1: PASS   : GuiCheck::listingAndExport()
+1: QWARN  : GuiCheck::replaceSelectedImage() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::replaceSelectedImage() This plugin does not support propagateSizeHints()
+1: PASS   : GuiCheck::replaceSelectedImage()
+1: QWARN  : GuiCheck::userAreaNavigation() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::userAreaNavigation() This plugin does not support propagateSizeHints()
+1: PASS   : GuiCheck::userAreaNavigation()
+1: QWARN  : GuiCheck::multipleSelectionAndSorting() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::multipleSelectionAndSorting() This plugin does not support propagateSizeHints()
+1: PASS   : GuiCheck::multipleSelectionAndSorting()
+1: QWARN  : GuiCheck::qtDialogFlow() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::qtDialogFlow() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::qtDialogFlow() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::qtDialogFlow() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::qtDialogFlow() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::qtDialogFlow() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::qtDialogFlow() This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::qtDialogFlow() This plugin does not support propagateSizeHints()
+1: PASS   : GuiCheck::qtDialogFlow()
+1: PASS   : GuiCheck::readerFailures(crash)
+1: PASS   : GuiCheck::readerFailures(truncated)
+1: PASS   : GuiCheck::readerFailures(bad-json)
+1: PASS   : GuiCheck::readerFailures(overflow)
+1: PASS   : GuiCheck::readerFailures(bad-schema)
+1: PASS   : GuiCheck::readerFailures(wrong-size-type)
+1: PASS   : GuiCheck::readerFailures(unresponsive)
+1: QWARN  : GuiCheck::processTreeTermination(deadline) This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::processTreeTermination(deadline) This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::processTreeTermination(deadline) This plugin does not support propagateSizeHints()
+1: PASS   : GuiCheck::processTreeTermination(deadline)
+1: QWARN  : GuiCheck::processTreeTermination(close-busy) This plugin does not support propagateSizeHints()
+1: QWARN  : GuiCheck::processTreeTermination(close-busy) This plugin does not support propagateSizeHints()
+1: PASS   : GuiCheck::processTreeTermination(close-busy)
+1: PASS   : GuiCheck::missingReader()
+1: PASS   : GuiCheck::cleanupTestCase()
+1: Totals: 26 passed, 0 failed, 0 skipped, 0 blacklisted, 22432ms
+1: ********* Finished testing of GuiCheck *********
+1/1 Test #1: gui-check ........................   Passed   25.61 sec
+
+100% tests passed out of 1
+
+Total Test time (real) =  25.61 sec
