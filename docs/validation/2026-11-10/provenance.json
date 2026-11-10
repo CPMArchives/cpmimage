@@ -1,0 +1,146 @@
+[
+  {
+    "file": "final-track-macos-before.json",
+    "original_sha256": "c57c4d4045a959f6784107d4b4449cb0bab0dccc9b429c838e070a26210e6e21",
+    "committed_sha256": "c57c4d4045a959f6784107d4b4449cb0bab0dccc9b429c838e070a26210e6e21",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-macos-after.json",
+    "original_sha256": "2e24a5f766db06eeeaae1dd21bbad99448721ca281adb33cabe3bc3f1d3fdfdc",
+    "committed_sha256": "2e24a5f766db06eeeaae1dd21bbad99448721ca281adb33cabe3bc3f1d3fdfdc",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-windows-before.json",
+    "original_sha256": "a5d11426fb0cd1829f845b244d3a058b492e05b534d892c8d54a3e4f5ed308b9",
+    "committed_sha256": "aa5ffc514a866695d4806097fa85a88e14dcfe889c855be847fe28b883b77087",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-windows-after.json",
+    "original_sha256": "7636b81fbbf6473187cc4a3bb499cff97fe6489d1056187a6e468acf29b82c91",
+    "committed_sha256": "5f4e40289f3acc1074b5d2d21051a4ea7e88af590ad157e185880db6474f205e",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-linux-before.json",
+    "original_sha256": "2cf9493f55c11c92363e586810600a8dadb35b8cdbd329e81525bad9d2fe3744",
+    "committed_sha256": "2cf9493f55c11c92363e586810600a8dadb35b8cdbd329e81525bad9d2fe3744",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-linux-after.json",
+    "original_sha256": "dbd383d7d7e72e1976749b3aeb8852c868b277061320b5b4da8e055897538ff9",
+    "committed_sha256": "dbd383d7d7e72e1976749b3aeb8852c868b277061320b5b4da8e055897538ff9",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-macos-broker.txt",
+    "original_sha256": "e7bf697ee1a47bbd461f37b42daa330dfd62bbf76286b80076265fea66a93fdb",
+    "committed_sha256": "e7bf697ee1a47bbd461f37b42daa330dfd62bbf76286b80076265fea66a93fdb",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-windows-broker.txt",
+    "original_sha256": "5e07de77f525d7fdb4208fd661ae8f96e3ad52bb2fbf0a283a71f6603bab9040",
+    "committed_sha256": "73c62f5bdb3c39a35bd2f3c5d330e357ba8890e277b339cc7cbd075e0854f12c",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-linux-broker.txt",
+    "original_sha256": "6c58c45172686f330f0d463507dd14a8f038c3e9ca84d73f4ce01820fae00029",
+    "committed_sha256": "6c58c45172686f330f0d463507dd14a8f038c3e9ca84d73f4ce01820fae00029",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-macos-qt.txt",
+    "original_sha256": "966cb5c06e9f709908b0099af508906b505626222e3502ca98a772825244b2d0",
+    "committed_sha256": "37f92d172b677198ecee1ef53c3e91fabdd7dc2f053f19d65d6c56cccdca6afd",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-windows-qt.txt",
+    "original_sha256": "f22fc9fe2204a2d87f57ea4c9b6c31fff96e375e523012bb141a515bc807a4fb",
+    "committed_sha256": "df3a7d9ca1da202a4d507df95bd1c8e178d6165788f3c391e6a65f5d8506035c",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-linux-qt.txt",
+    "original_sha256": "489a6277faf4d1d9eafa06d901717a61fb74e369e43059335b9aa91102695811",
+    "committed_sha256": "a73a109d013c1b561adde7bb13d576435325069771705676ff782ada47f3e537",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-macos-package.json",
+    "original_sha256": "8eab815363feac6a46e8d3493fd7d2f724f7e3106211596c30687d6a31c0e3ec",
+    "committed_sha256": "8eab815363feac6a46e8d3493fd7d2f724f7e3106211596c30687d6a31c0e3ec",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-windows-package-1.json",
+    "original_sha256": "05fe45745774c33b60f3e697c71756ec321284f33cfb0955cf5fd64f6dee5be2",
+    "committed_sha256": "93c9f3dce103372089ed1da725c10ba2e644b3a2e33d9b7a84da929b2eaf89f4",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-windows-package-2.json",
+    "original_sha256": "0c9756fc22f49361dea9dbd04ff20c629b8a801b575c8bc9475bbc809da66a15",
+    "committed_sha256": "ef9a82f1df85b7ef2b7a0c428143d2fe1a13999e61f2a12f33698c2bcda3d718",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-linux-package-1.json",
+    "original_sha256": "7bcb64026a9065a9ade2a80f88f67a2deafb63bba75fccb3cf7fd2350c5977d3",
+    "committed_sha256": "7bcb64026a9065a9ade2a80f88f67a2deafb63bba75fccb3cf7fd2350c5977d3",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-linux-package-2.json",
+    "original_sha256": "41a1b3f1db3ad84b786e6a3bf8b44aeeb62729ad49b1cc3e5dcdff02a730c23c",
+    "committed_sha256": "41a1b3f1db3ad84b786e6a3bf8b44aeeb62729ad49b1cc3e5dcdff02a730c23c",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-corpus.json",
+    "original_sha256": "a43ec8cfe5b73b76e69eb2f272bf5388c2081a6ebfdce7bbd6eb0ecbbfb5e915",
+    "committed_sha256": "a43ec8cfe5b73b76e69eb2f272bf5388c2081a6ebfdce7bbd6eb0ecbbfb5e915",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-geometry-after.txt",
+    "original_sha256": "c4f6582c038d573d58110db334846b57213954b21f15e1db46e589a238c93c61",
+    "committed_sha256": "c4f6582c038d573d58110db334846b57213954b21f15e1db46e589a238c93c61",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-audit-macos.txt",
+    "original_sha256": "d764657a62e9604e5d75c4a1155935c39c87fd7156010dcd2989a5544df07a3b",
+    "committed_sha256": "d764657a62e9604e5d75c4a1155935c39c87fd7156010dcd2989a5544df07a3b",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "final-track-audit-windows.txt",
+    "original_sha256": "e22a7b800697cf8e2251606f6865d2331a6ecc58124c4e46ab402961fe82e67c",
+    "committed_sha256": "e22a7b800697cf8e2251606f6865d2331a6ecc58124c4e46ab402961fe82e67c",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "linux-binary-audit.json",
+    "original_sha256": "c65c6ad68ebaee204e8859e3d60a4848bf48d42994b9780e3a1b554dd1345eee",
+    "committed_sha256": "f5e43e0ec4b39222b4a131f9e23022a6436dad3c8e75fa42a571baf4b989dec0",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "macos-binary-audit.json",
+    "original_sha256": "80ec0d67fdbae406f278608a1d2001c6f23fd6dd8ee599ac965d57590dbb5656",
+    "committed_sha256": "80ec0d67fdbae406f278608a1d2001c6f23fd6dd8ee599ac965d57590dbb5656",
+    "developer_paths_normalized": true
+  },
+  {
+    "file": "windows-binary-audit.json",
+    "original_sha256": "ed20747e082f9ae655e360f88648182e9d11286d5872184d906976b22d372ff0",
+    "committed_sha256": "ed20747e082f9ae655e360f88648182e9d11286d5872184d906976b22d372ff0",
+    "developer_paths_normalized": true
+  }
+]

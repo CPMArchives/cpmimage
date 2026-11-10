@@ -1,0 +1,65 @@
+{
+  "diagnostics": {
+    "architecture": "arm64",
+    "compiler": "Apple LLVM 21.0.0 (clang-2100.3.34.2)",
+    "complete": true,
+    "helper": "/private/tmp/cpmimage final-track moved \u00fc/CPMImage.app/Contents/MacOS/../Helpers/cpmimage-helper",
+    "notices": "/private/tmp/cpmimage final-track moved \u00fc/CPMImage.app/Contents/MacOS/../Resources/notices",
+    "python": "/private/tmp/cpmimage final-track moved \u00fc/CPMImage.app/Contents/MacOS/../Resources/runtime/bin/python3.13",
+    "qt": "6.12.0",
+    "root": "/private/tmp/cpmimage final-track moved \u00fc/CPMImage.app/Contents/MacOS/../Resources/cpmimage"
+  },
+  "exports": [
+    {
+      "name": "00binary.bin",
+      "size": 512,
+      "sha256": "110009dcee21620b166f3abfecb5eff7a873be729d1c2d53822e7acc5f34eb9b"
+    },
+    {
+      "name": "07binary.bin",
+      "size": 256,
+      "sha256": "cd6816b77f68d70001fc3eaa4d42bdd67cb5973b3151cc5292ecc02a3daac6ab"
+    },
+    {
+      "name": "15tail.bin",
+      "size": 256,
+      "sha256": "e92de1c61e03ecf17afd276aa6bad358b8b2cad5fe4e607a42152df1befd5a6f"
+    }
+  ],
+  "rapid_exports": 20,
+  "final_track_cases": [
+    {
+      "fixture": "ibm3740-final-track.raw",
+      "sha256": "a7b130aa505c9054c1afb6a87bb5fcbd37b9e4dc3143e5b3e1451c08204014e8",
+      "source_unchanged": true
+    },
+    {
+      "fixture": "ibm3740-final-track-short.raw",
+      "sha256": "a7b130aa505c9054c1afb6a87bb5fcbd37b9e4dc3143e5b3e1451c08204014e8",
+      "source_unchanged": true
+    },
+    {
+      "fixture": "final-track-bettercpm-default.raw",
+      "sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+      "source_unchanged": true
+    },
+    {
+      "fixture": "final-track-bcm2ss.raw",
+      "sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+      "source_unchanged": true
+    },
+    {
+      "fixture": "final-track-bettercpm-mm-80t-ds-data.raw",
+      "sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+      "source_unchanged": true
+    },
+    {
+      "fixture": "final-track-bettercpm-ampro-little-board.raw",
+      "sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+      "source_unchanged": true
+    }
+  ],
+  "source_unchanged": true,
+  "package_unchanged": true,
+  "python_environment_ignored": true
+}

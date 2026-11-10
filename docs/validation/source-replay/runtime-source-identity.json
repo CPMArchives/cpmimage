@@ -1,0 +1,52 @@
+[
+  {
+    "file": "prototype/src/runtime_paths.h",
+    "sha256": "c636c826c5d9d84d552b50a30799611ffc10d09c88a9abfe46a9eb66fa710319",
+    "matches_qualified_runtime": true
+  },
+  {
+    "file": "prototype/src/window.cpp",
+    "sha256": "52217f2a0ae68e7cd44336f44416a9aaa0640ffa2c0dac7358eba1312e8094e7",
+    "matches_qualified_runtime": true
+  },
+  {
+    "file": "prototype/src/window.h",
+    "sha256": "557d2ba53809d1711d468c3491a96e580a72ca19f68f3d44264158a6714fd6cc",
+    "matches_qualified_runtime": true
+  },
+  {
+    "file": "prototype/src/main.cpp",
+    "sha256": "2d11ebf90f51dd3fc2cab5e81e67976da2522a531c6edb1e6d208496aa51cf59",
+    "matches_qualified_runtime": true
+  },
+  {
+    "file": "prototype/broker.py",
+    "sha256": "4309874efc45e32d436910041dcfa80a0a2b81636408594c15385343cc879b11",
+    "matches_qualified_runtime": true
+  },
+  {
+    "file": "prototype/helper_guard.py",
+    "sha256": "960e255fb4d4d16c3242e70dca3e511a5dd09218623626adca76f6e86729ffe5",
+    "matches_qualified_runtime": true
+  },
+  {
+    "file": "experiments/process-comparison/adapters.py",
+    "sha256": "a1a7a2869f96b7126a1fb0e8d9ec95dc37f51949e38ec4af23deba2dc1f7bf30",
+    "matches_qualified_runtime": true
+  },
+  {
+    "file": "experiments/process-comparison/helper.c",
+    "sha256": "347c56e331615811b4a1b0390c09aaf0f485a7a22942fe32d2c0aebddf5e1bbf",
+    "matches_qualified_runtime": true
+  },
+  {
+    "file": "experiments/process-comparison/windows_supervisor.py",
+    "sha256": "cec29382585e1ae0365ccd56e42460e2caaa1d8b920a77e0a2e4be4175d48d26",
+    "matches_qualified_runtime": true
+  },
+  {
+    "file": "packaging/source/cpmtools-2.23-odd-tracks-libdsk.patch",
+    "sha256": "2d1367b8d5e16adbaf9c577596b5a9f3e8ce20873b32d67ef7bb4ac8d00b3563",
+    "matches_qualified_runtime": true
+  }
+]

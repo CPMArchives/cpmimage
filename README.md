@@ -1,25 +1,27 @@
 # cpmimage
 
-A proposed open-source, cross-platform graphical disk-image manager specializing in CP/M filesystems, targeting macOS, Windows, and Linux.
+A cross-platform CP/M disk-image GUI for macOS, Windows and Linux.
 
-## Project status
+## Current status
 
-Proposal and feasibility planning. No application implementation or release is available yet.
+This repository contains the **validated read-only prototype**, not a public binary release. It lists files and attributes and exports selected files from explicitly supported image layouts. It does not import, rename, delete, create, or save modified images.
 
-Read the [initial project proposal](docs/PROJECT_PROPOSAL.md) for objectives, feature priorities, proposed architecture, development phases, and open engineering questions.
+The prototype uses Qt 6 Widgets/C++17, a separate Python broker, and a read-only C helper built from pinned cpmtools 2.23 and libdsk 1.4.2 sources. This is the evaluated implementation for this milestone; the broader product architecture remains open for review.
 
-## Proposed direction
+- [Build and run](docs/BUILDING.md)
+- [Prototype behavior and limits](docs/READ_ONLY_PROTOTYPE.md)
+- [Validation evidence](docs/VALIDATION.md)
+- [Owner testing notes and backlog](docs/USER_TESTING_BACKLOG.md)
+- [Complete SIG/M filename audit, including DOS](docs/CATALOG_FILENAME_AUDIT.md)
+- [Licensing and third-party notices](docs/LICENSING.md)
+- [Initial project proposal](docs/PROJECT_PROPOSAL.md) (historical goals, not implemented scope)
 
-- WinImage-style image-management workflows for CP/M users.
-- Qt 6 Widgets, C++17 or C++20, and CMake.
-- cpmtools as the proposed filesystem backend; libdsk as a candidate for additional image containers.
-- Format selection from diskdefs, with automatic candidate detection and manual override.
-- Reliable file operations and safe image saving for explicitly validated formats.
+## Verified milestone
 
-Backend integration and the initial format-support matrix remain provisional pending feasibility testing. An engineering specification will follow that investigation.
+Native ARM64 macOS, Windows 11 and Debian 13 validation covers listing/export, cancellation and reader failures, source-image preservation, and portable runtime packaging. The cpmtools/libdsk geometry bridge is patched to preserve odd track counts: its old fallback silently reduced 77 tracks to 76. Final-track exports pass on all three platforms.
 
-cpmimage is independent of BetterCP/M. BetterCP/M images will serve as useful initial compatibility cases alongside images from other CP/M systems.
+The committed fixtures are independently generated test data. SIG/M images, BetterCP/M system images, downloaded dependencies, private VM state, toolchain binaries and generated application packages are excluded from Git. Dependency downloads are pinned by SHA-256. Creating a redistributable binary package also requires its corresponding-source companion and third-party notices; source links alone are not the proposed distribution method.
 
-## Licensing
+## License
 
-The project is intended to be open source. License selection is pending review of the chosen dependencies and integration approach; no license has been granted yet.
+New project code is **GPL-3.0-or-later**, as approved by the owner. See [LICENSE](LICENSE). Third-party code and documentation retain their own licenses; see [licenses/third-party](licenses/third-party).

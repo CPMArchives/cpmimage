@@ -1,0 +1,92 @@
+[
+  {
+    "file": "ibm3740-independent.raw",
+    "sha256": "1829cb81ca7cb73cf72591458ba8da9fc3582dfe53fb077adf29c15523f0585f",
+    "size": 256256,
+    "format": "ibm-3740",
+    "origin": "Synthetic fixture; reproducible with prototype/tests/make_independent_fixtures.py",
+    "expected": {
+      "00binary.bin": {
+        "payload_size": 512,
+        "export_size": 512,
+        "export_sha256": "110009dcee21620b166f3abfecb5eff7a873be729d1c2d53822e7acc5f34eb9b",
+        "payload_sha256": "110009dcee21620b166f3abfecb5eff7a873be729d1c2d53822e7acc5f34eb9b"
+      },
+      "07binary.bin": {
+        "payload_size": 256,
+        "export_size": 256,
+        "export_sha256": "cd6816b77f68d70001fc3eaa4d42bdd67cb5973b3151cc5292ecc02a3daac6ab",
+        "payload_sha256": "cd6816b77f68d70001fc3eaa4d42bdd67cb5973b3151cc5292ecc02a3daac6ab"
+      },
+      "15tail.bin": {
+        "payload_size": 129,
+        "export_size": 256,
+        "export_sha256": "e92de1c61e03ecf17afd276aa6bad358b8b2cad5fe4e607a42152df1befd5a6f",
+        "payload_sha256": "a1253e220a0a60177ba22d6f1ae079f6b8f0b8fa598b0adc1390b0d7c81756fa"
+      }
+    },
+    "kind": "valid",
+    "listing": {
+      "raw-cli": 0,
+      "libdsk-cli": 0
+    }
+  },
+  {
+    "file": "ibm3740-empty.raw",
+    "sha256": "5282acacf2a071353d5955eed018e6d24ab7b7690ddf61b8dc1ea408e1d7f9da",
+    "size": 256256,
+    "format": "ibm-3740",
+    "origin": "Synthetic fixture; reproducible with prototype/tests/make_independent_fixtures.py",
+    "expected": null,
+    "kind": "ambiguous-empty",
+    "listing": {
+      "raw-cli": 0,
+      "libdsk-cli": 0
+    }
+  },
+  {
+    "file": "ibm3740-truncated.raw",
+    "sha256": "20983ec545e518345e188b7d31032017275973caa963bc4d85395790edb1afbc",
+    "size": 6784,
+    "format": "ibm-3740",
+    "origin": "Synthetic fixture; reproducible with prototype/tests/make_independent_fixtures.py",
+    "expected": null,
+    "kind": "invalid-truncated",
+    "listing": {
+      "raw-cli": 0,
+      "libdsk-cli": 1
+    }
+  },
+  {
+    "file": "ampro200-independent.dsk",
+    "sha256": "e350ef961f23579fdfdfd1515744a3567af2d3667142d9bc1e1ea0352cda2f0e",
+    "size": 215296,
+    "format": "bettercpm-ampro-little-board",
+    "origin": "Synthetic fixture; reproducible with prototype/tests/make_independent_fixtures.py",
+    "expected": {
+      "00binary.bin": {
+        "payload_size": 512,
+        "export_size": 512,
+        "export_sha256": "110009dcee21620b166f3abfecb5eff7a873be729d1c2d53822e7acc5f34eb9b",
+        "payload_sha256": "110009dcee21620b166f3abfecb5eff7a873be729d1c2d53822e7acc5f34eb9b"
+      },
+      "07binary.bin": {
+        "payload_size": 256,
+        "export_size": 256,
+        "export_sha256": "cd6816b77f68d70001fc3eaa4d42bdd67cb5973b3151cc5292ecc02a3daac6ab",
+        "payload_sha256": "cd6816b77f68d70001fc3eaa4d42bdd67cb5973b3151cc5292ecc02a3daac6ab"
+      },
+      "15tail.bin": {
+        "payload_size": 129,
+        "export_size": 256,
+        "export_sha256": "e92de1c61e03ecf17afd276aa6bad358b8b2cad5fe4e607a42152df1befd5a6f",
+        "payload_sha256": "a1253e220a0a60177ba22d6f1ae079f6b8f0b8fa598b0adc1390b0d7c81756fa"
+      }
+    },
+    "kind": "valid-container",
+    "listing": {
+      "raw-cli": 0,
+      "libdsk-cli": 0
+    }
+  }
+]

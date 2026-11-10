@@ -1,0 +1,18 @@
+--- a/device_libdsk.c
++++ b/device_libdsk.c
+@@ -89,9 +89,12 @@
+   this->geom.dg_sectors   = sectrk;
+   /* Did the autoprobe guess right about the number of sectors & cylinders? */
+   if (this->geom.dg_cylinders * this->geom.dg_heads == tracks) return NULL;
+-  /* Otherwise we guess: <= 43 tracks: single-sided. Else double. This
+-   * fails for 80-track single-sided if there are any such beasts */
+-  if (tracks <= 43) 
++  /* CPMImage local modification, 2026-11-10: preserve every logical track.
++   * An odd track count cannot be represented by two heads without truncation
++   * (notably IBM 3740: 77 tracks). Keep those layouts single-sided.
++   * The historical fallback for even counts remains unchanged; explicit
++   * libdsk geometries and successful probes above still take precedence. */
++  if (tracks <= 43 || (tracks % 2) != 0) 
+   {
+     this->geom.dg_cylinders = tracks;
+     this->geom.dg_heads     = 1; 

@@ -1,0 +1,7 @@
+Test project <source-checkout>/build/gui
+    Start 1: gui-check
+1/1 Test #1: gui-check ........................   Passed   12.51 sec
+
+100% tests passed out of 1
+
+Total Test time (real) =  12.51 sec

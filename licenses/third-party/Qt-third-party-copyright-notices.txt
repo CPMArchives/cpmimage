@@ -1,0 +1,570 @@
+extra-cmake-modules
+Copyright © 2011-2018 The KDE community
+License: BSD-3-Clause
+Source notice: cmake/3rdparty/extra-cmake-modules/qt_attribution.json
+
+KWin
+Copyright 2014 Alex Merry <alex.merry@kde.org>
+Copyright 2014 Martin Gräßlin <mgraesslin@kde.org>
+Copyright (c) 2006,2007 Laurent Montel, <montel@kde.org>
+License: BSD 3-Clause "New" or "Revised" License
+Source notice: cmake/3rdparty/kwin/qt_attribution.json
+
+D3D12 Memory Allocator
+Copyright (c) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
+License: MIT License
+Source notice: src/3rdparty/D3D12MemoryAllocator/qt_attribution.json
+
+Vulkan Memory Allocator
+Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
+License: MIT License
+Source notice: src/3rdparty/VulkanMemoryAllocator/qt_attribution.json
+
+Native Style for Android
+Copyright (C) 2005 The Android Open Source Project
+License: Apache License 2.0
+Source notice: src/3rdparty/android/qt_attribution.json
+
+BLAKE2 (reference implementation)
+Copyright 2012, Samuel Neves <sneves@dei.uc.pt>
+License: Creative Commons Zero v1.0 Universal or Apache License 2.0
+Source notice: src/3rdparty/blake2/qt_attribution.json
+
+Efficient Binary-Decimal and Decimal-Binary Conversion Routines for IEEE Doubles
+Copyright 2006-2012, the V8 project authors
+License: BSD 3-clause "New" or "Revised" License
+Source notice: src/3rdparty/double-conversion/qt_attribution.json
+
+Easing Equations by Robert Penner
+Copyright (c) 2001 Robert Penner
+License: BSD 3-clause "New" or "Revised" License
+Source notice: src/3rdparty/easing/qt_attribution.json
+
+Emoji Segmenter
+Copyright 2019 Google LLC
+License: Apache License 2.0
+Source notice: src/3rdparty/emoji-segmenter/qt_attribution.json
+
+forkfd
+Copyright (C) 2016 Intel Corporation
+Copyright (C) 2015 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com
+License: MIT License
+Source notice: src/3rdparty/forkfd/qt_attribution.json
+
+Freetype 2
+Copyright (c) 2007-2014 Adobe Systems Incorporated
+Copyright (c) 2004-2026 Albert Chin-A-Young
+Copyright (c) 2018-2026 Armin Hasitzka, David Turner, Robert Wilhelm, and Werner Lemberg
+Copyright (c) 2000 Computing Research Labs, New Mexico State University
+Copyright (c) 1996-2026 David Turner, Robert Wilhelm, Dominik Röttsches, and Werner Lemberg
+Copyright (c) 2004-2026 David Turner, Robert Wilhelm, Werner Lemberg and George Williams
+Copyright (c) 2022-2026 David Turner, Robert Wilhelm, Werner Lemberg, and Moazin Khatti
+Copyright (c) 2008-2026 David Turner, Robert Wilhelm, Werner Lemberg, and suzuki toshiya
+Copyright (c) 2003-2026 David Turner, Robert Wilhelm, and Werner Lemberg
+Copyright (c) 2005-2026 David Turner
+Copyright (c) 2007-2026 Derek Clegg and Michael Toftdal
+Copyright (c) 2007 Dmitry Timoshkov for Codeweavers
+Copyright (c) 2001-2015 Francesco Zappa Nardelli
+Copyright (c) 2005, 2007, 2008, 2013 George Williams
+Copyright (c) 2013-2026 Google, Inc. Google Author(s) Behdad Esfahbod and Stuart Gill
+Copyright (c) 2013-2022 Google, Inc.
+Copyright (c) 2003 Huw D M Davies for Codeweavers
+Copyright (c) 2010-2026 Joel Klinghed
+Copyright (c) 1996-2026 Just van Rossum, David Turner, Robert Wilhelm, and Werner Lemberg
+Copyright (c) 2003-2026 Masatake YAMATO and Redhat K.K.
+Copyright (c) 2004-2026 Masatake YAMATO, Redhat K.K, David Turner, Robert Wilhelm, and Werner Lemberg
+Copyright (c) 2019-2026 Nikhil Ramakrishnan, David Turner, Robert Wilhelm, and Werner Lemberg
+Copyright (c) 2009-2026 Oran Agra and Mickey Gabel
+Copyright (c) 2007-2026 Rahul Bhalerao <rahul.bhalerao@redhat.com>
+Copyright (c) 2002-2026 Roberto Alameda
+Copyright (c) 2015-2026 Werner Lemberg
+Copyright (c) 2004-2026 suzuki toshiya, Masatake YAMATO, Red Hat K.K., David Turner, Robert Wilhelm, and Werner Lemberg
+Copyright (c) 2019 nyorain
+Copyright (c) 2022-2026 David Turner, Robert Wilhelm, Werner Lemberg, George Williams, and Dominik Röttsches
+Copyright (C) 2009, 2023  Red Hat, Inc.
+License: Freetype Project License or GNU General Public License v2.0 only
+Source notice: src/3rdparty/freetype/qt_attribution.json
+
+Freetype 2 - zlib
+Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler
+License: zlib License
+Source notice: src/3rdparty/freetype/qt_attribution.json
+
+Freetype 2 - Bitmap Distribution Format (BDF) support
+Copyright (c) 2000 Computing Research Labs, New Mexico State University
+Copyright (c) 2001-2014 Francesco Zappa Nardelli
+License: MIT License
+Source notice: src/3rdparty/freetype/qt_attribution.json
+
+Freetype 2 - Portable Compiled Format (PCF) support
+Copyright (c) 2001, 2012 David Turner, Robert Wilhelm, and Werner Lemberg
+Copyright (c) 2000-2014 Francesco Zappa Nardelli
+Copyright (c) 1990, 1994, 1998 The Open Group
+License: MIT License and MIT Open Group variant
+Source notice: src/3rdparty/freetype/qt_attribution.json
+
+Gradle wrapper
+Copyright (C) 2025 Gradle Inc.
+License: Apache License 2.0
+Source notice: src/3rdparty/gradle/qt_attribution.json
+
+HarfBuzz-NG
+Copyright © 2010-2022  Google, Inc.
+Copyright © 2015-2020  Ebrahim Byagowi
+Copyright © 2019,2020  Facebook, Inc.
+Copyright © 2012,2015  Mozilla Foundation
+Copyright © 2011  Codethink Limited
+Copyright © 2008,2010  Nokia Corporation and/or its subsidiary(-ies)
+Copyright © 2009  Keith Stribley
+Copyright © 2011  Martin Hosken and SIL International
+Copyright © 2007  Chris Wilson
+Copyright © 2005,2006,2020,2021,2022,2023  Behdad Esfahbod
+Copyright © 2004,2007,2008,2009,2010,2013,2021,2022,2023  Red Hat, Inc.
+Copyright © 1998-2005  David Turner and Werner Lemberg
+Copyright © 2016  Igalia S.L.
+Copyright © 2022  Matthias Clasen
+Copyright © 2018,2021  Khaled Hosny
+Copyright © 2018,2019,2020  Adobe, Inc
+Copyright © 2013-2015  Alexei Podtelezhnikov
+License: MIT License
+Source notice: src/3rdparty/harfbuzz-ng/qt_attribution.json
+
+sRGB color profile icc file
+Copyright International Color Consortium, 2015
+License: International Color Consortium License
+Source notice: src/3rdparty/icc/qt_attribution.json
+
+LibJPEG-turbo
+
+License: Independent JPEG Group License and BSD 3-Clause "New" or "Revised" License
+Source notice: src/3rdparty/libjpeg/qt_attribution.json
+
+LibPNG
+Copyright (c) 1995-2026 The PNG Reference Library Authors
+Copyright (c) 2000-2026 Cosmin Truta
+Copyright (c) 1998-2018 Glenn Randers-Pehrson
+Copyright (c) 1996-1997 Andreas Dilger
+Copyright (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc.
+Copyright (c) 2000-2017 Simon-Pierre Cadieux
+Copyright (c) 2000-2017 Eric S. Raymond
+Copyright (c) 2000-2017 Mans Rullgard
+Copyright (c) 2000-2017 Gilles Vollant
+Copyright (c) 2000-2017 James Yu
+Copyright (c) 2000-2017 Mandar Sahastrabuddhe
+Copyright (c) 1998-2000 Tom Lane
+Copyright (c) 1998-2000 Willem van Schaik
+Copyright (c) 1996-1997 John Bowler
+Copyright (c) 1996-1997 Kevin Bracey
+Copyright (c) 1996-1997 Sam Bushell
+Copyright (c) 1996-1997 Magnus Holmgren
+Copyright (c) 1996-1997 Greg Roelofs
+Copyright (c) 1996-1997 Tom Tanner
+Copyright (c) 1995-1996 Dave Martindale
+Copyright (c) 1995-1996 Paul Schmidt
+Copyright (c) 1995-1996 Tim Wegner
+License: libpng License and PNG Reference Library version 2
+Source notice: src/3rdparty/libpng/qt_attribution.json
+
+The Public Suffix List
+The list was originally provided by Jo Hermans <jo.hermans@gmail.com>.
+It is now maintained on github (https://github.com/publicsuffix/list).
+License: Mozilla Public License 2.0
+Source notice: src/3rdparty/libpsl/qt_attribution.json
+
+libpsl - C library to handle the Public Suffix List
+Copyright 2014-2016 The Chromium Authors. All rights reserved.
+License: BSD 3-clause "New" or "Revised" License
+Source notice: src/3rdparty/libpsl/qt_attribution.json
+
+MD4
+Written by Alexander Peslyak - better known as Solar Designer <solar@openwall.com> - in 2001, and placed in the public domain. There's absolutely no warranty.
+License: Public Domain
+Source notice: src/3rdparty/md4/qt_attribution.json
+
+MD4C
+Copyright © 2016-2024 Martin Mitáš
+License: MIT License
+Source notice: src/3rdparty/md4c/qt_attribution.json
+
+MD5
+Written by Colin Plumb in 1993, no copyright is claimed. Ian Jackson <ian@chiark.greenend.org.uk>.
+License: Public Domain
+Source notice: src/3rdparty/md5/qt_attribution.json
+
+PCRE2
+Copyright (c) 1997-2007 University of Cambridge
+Copyright (c) 2007-2024 Philip Hazel
+Copyright (c) 2010-2024 Zoltan Herczeg
+License: BSD 3-clause "New" or "Revised" License with PCRE2 binary-like Packages Exception
+Source notice: src/3rdparty/pcre2/qt_attribution.json
+
+PCRE2 - Stack-less Just-In-Time Compiler
+Copyright Zoltan Herczeg
+License: BSD 2-clause "Simplified" License
+Source notice: src/3rdparty/pcre2/qt_attribution.json
+
+Pixman
+Copyright © 2009 Nokia Corporation
+License: MIT License
+Source notice: src/3rdparty/pixman/qt_attribution.json
+
+Secure Hash Algorithms SHA-384 and SHA-512
+Copyright (c) 2011 IETF Trust and the persons identified as authors of the code.
+License: BSD 3-clause "New" or "Revised" License
+Source notice: src/3rdparty/rfc6234/qt_attribution.json
+
+Secure Hash Algorithm SHA-1
+Copyright (C) Dominik Reichl <dominik.reichl@t-online.de>
+Copyright (C) 2016 The Qt Company Ltd
+License: Public Domain
+Source notice: src/3rdparty/sha1/qt_attribution.json
+
+Secure Hash Algorithm SHA-3 - brg_endian
+Copyright (c) 1998-2013, Brian Gladman, Worcester, UK. All rights reserved.
+License: BSD 2-clause "Simplified" License
+Source notice: src/3rdparty/sha3/qt_attribution.json
+
+Secure Hash Algorithm SHA-3 - Keccak
+Guido Bertoni, Joan Daemen, Michaël Peeters and Gilles Van Assche.
+To the extent possible under law, the implementers have waived all copyright
+and related or neighboring rights to the source code in this file.
+License: Creative Commons Zero v1.0 Universal
+Source notice: src/3rdparty/sha3/qt_attribution.json
+
+SipHash Algorithm
+Copyright (C) 2012-2014 Jean-Philippe Aumasson
+Copyright (C) 2012-2014 Daniel J. Bernstein <djb@cr.yp.to>
+Copyright (C) 2016 Intel Corporation
+License: Creative Commons Zero v1.0 Universal
+Source notice: src/3rdparty/siphash/qt_attribution.json
+
+SQLite
+The authors disclaim copyright to the source code. However, a license can be obtained if needed.
+License: SQLite Blessing
+Source notice: src/3rdparty/sqlite/qt_attribution.json
+
+TinyCBOR
+Copyright (C) 2015-2025 Intel Corporation
+License: MIT License
+Source notice: src/3rdparty/tinycbor/qt_attribution.json
+
+DejaVu Fonts
+Copyright (c) 2003 by Bitstream, Inc
+Copyright (c) 2006 by Tavmjong Bah
+(c) American Mathematical Society
+License: Bitstream Vera Font License
+Source notice: src/3rdparty/wasm/qt_attribution.json
+
+Wayland KDE DBus Menu Protocol
+Copyright 2017 David Edmundson
+License: GNU Lesser General Public License 2.1 or later
+Source notice: src/3rdparty/wayland/protocols/appmenu/qt_attribution.json
+
+Wayland Color Management Protocol
+Copyright 2019 Sebastian Wick
+Copyright 2019 Erwin Burema
+Copyright 2020 AMD
+Copyright 2020-2024 Collabora, Ltd.
+Copyright 2024 Xaver Hugl
+Copyright 2022-2025 Red Hat, Inc.
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/color-management/qt_attribution.json
+
+Wayland Fractional Scale Protocol
+Copyright © 2022 Kenny Levinsen
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/fractional-scale/qt_attribution.json
+
+Wayland Fullscreen Shell Protocol
+Copyright © 2016 Yong Bakos
+Copyright © 2015 Jason Ekstrand
+Copyright © 2015 Jonas Ådahl
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/fullscreen-shell/qt_attribution.json
+
+Wayland Linux Dmabuf V1 Protocol
+Copyright © 2014, 2015 Collabora, Ltd.
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/linux-dmabuf/qt_attribution.json
+
+Wayland Linux Dmabuf Unstable V1 Protocol
+Copyright © 2014, 2015 Collabora, Ltd.
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/linux-dmabuf/qt_attribution.json
+
+Wayland Pointer Gestures Protocol
+Copyright © 2015, 2016 Red Hat
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/pointer-gestures/qt_attribution.json
+
+Wayland Pointer Warp Protocol
+Copyright © 2024 Neal Gompa
+Copyright © 2024 Xaver Hugl
+Copyright © 2024 Matthias Klumpp
+Copyright © 2024 Vlad Zahorodnii
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/pointer-warp/qt_attribution.json
+
+Presentation Time Protocol
+Copyright © 2013, 2014 Collabora, Ltd.
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/presentation-time/qt_attribution.json
+
+Wayland Scaler Protocol
+Copyright © 2013-2014 Collabora, Ltd.
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/scaler/qt_attribution.json
+
+Wayland Session Management Protocol
+Copyright 2018 Mike Blumenkrantz
+Copyright 2018 Samsung Electronics Co., Ltd
+Copyright 2018 Red Hat Inc.
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/session-management/qt_attribution.json
+
+Wayland Tablet Protocol
+Copyright 2014 © Stephen "Lyude" Chandler Paul
+Copyright 2015-2016 © Red Hat, Inc.
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/tablet/qt_attribution.json
+
+Wayland Text Input Protocol v1
+Copyright © 2012, 2013 Intel Corporation
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/text-input/v1/qt_attribution.json
+
+Wayland Text Input Protocol v2
+Copyright © 2012, 2013 Intel Corporation
+Copyright © 2015, 2016 Jan Arne Petersen
+License: HPND License
+Source notice: src/3rdparty/wayland/protocols/text-input/v2/qt_attribution.json
+
+Wayland Text Input Protocol
+Copyright © 2012, 2013 Intel Corporation
+Copyright © 2015, 2016 Jan Arne Petersen
+Copyright © 2017, 2018 Red Hat, Inc.
+Copyright © 2018       Purism SPC
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/text-input/v3/qt_attribution.json
+
+Wayland Viewporter Protocol
+Copyright © 2013-2016 Collabora, Ltd.
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/viewporter/qt_attribution.json
+
+Wayland Protocol
+Copyright © 2008-2011 Kristian Høgsberg
+Copyright © 2010-2011 Intel Corporation
+Copyright © 2012-2013 Collabora, Ltd.
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/wayland/qt_attribution.json
+
+Wayland EGLStream Controller Protocol
+Copyright (c) 2017, NVIDIA CORPORATION. All rights reserved.
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/wl-eglstream/qt_attribution.json
+
+Wlr Data Control Unstable V1 Protocol
+Copyright © 2018 Simon Ser
+Copyright © 2019 Ivan Molodetskikht
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/wlr-data-control/qt_attribution.json
+
+Wayland Primary Selection Protocol
+Copyright © 2015, 2016 Red Hat
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/wp-primary-selection/qt_attribution.json
+
+Wayland xdg-activation Protocol
+Copyright © 2020 Aleix Pol Gonzalez &lt;aleixpol@kde.org&gt;
+Copyright © 2020 Carlos Garnacho &lt;carlosg@gnome.org&gt;
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/xdg-activation/qt_attribution.json
+
+Wayland xdg-decoration Protocol
+Copyright © 2018 Simon Ser
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/xdg-decoration/qt_attribution.json
+
+Wayland Dialog Protocol
+Copyright © 2023 Carlos Garnacho
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/xdg-dialog/qt_attribution.json
+
+Wayland XDG Foreign Protocol
+Copyright © 2015-2016 Red Hat Inc.
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/xdg-foreign/qt_attribution.json
+
+Wayland XDG Output Protocol
+Copyright © 2017 Red Hat Inc.
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/xdg-output/qt_attribution.json
+
+Wayland XDG Shell Protocol
+Copyright © 2008-2013 Kristian Høgsberg
+Copyright © 2013      Rafael Antognolli
+Copyright © 2013      Jasper St. Pierre
+Copyright © 2010-2013 Intel Corporation
+Copyright © 2015-2017 Samsung Electronics Co., Ltd
+Copyright © 2015-2017 Red Hat Inc.
+
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/xdg-shell/qt_attribution.json
+
+Wayland XDG System Bell Protocol
+Copyright © 2016, 2023 Red Hat
+
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/xdg-system-bell/qt_attribution.json
+
+Wayland xdg-toplevel-icon Protocol
+Copyright © 2024 Matthias Klumpp 2024 David Edmundson
+License: MIT License
+Source notice: src/3rdparty/wayland/protocols/xdg-toplevel-icon/qt_attribution.json
+
+Wintab API
+Copyright 1991-1998 by LCS/Telegraphics.
+License: LCS-Telegraphics License
+Source notice: src/3rdparty/wintab/qt_attribution.json
+
+XCB-XInput
+Copyright (C) 2001-2006 Bart Massey, Jamey Sharp, and Josh Triplett.
+Copyright (C) 2006 Peter Hutterer
+Copyright (C) 2013 Daniel Martin
+License: MIT License
+Source notice: src/3rdparty/xcb/qt_attribution.json
+
+Data Compression Library (zlib)
+(C) 1995-2026 Jean-loup Gailly and Mark Adler
+License: zlib License
+Source notice: src/3rdparty/zlib/qt_attribution.json
+
+tl::expected
+To the extent possible under law, Sy Brand has waived all copyright and related or neighboring rights to the expected library. This work is published from: United Kingdom.
+License: Creative Commons Zero v1.0 Universal
+Source notice: src/corelib/global/qt_attribution.json
+
+QEventDispatcher on macOS
+Copyright (c) 2007-2008, Apple, Inc.
+License: BSD 3-clause "New" or "Revised" License
+Source notice: src/corelib/kernel/qt_attribution.json
+
+Apache Tika MimeType Definitions
+Copyright 2026 The Apache Software Foundation
+License: Apache License 2.0
+Source notice: src/corelib/mimetypes/3rdparty/qt_attribution.json
+
+Unicode Character Database (UCD)
+Copyright (C) 1991-2025 Unicode, Inc.
+License: Unicode License Agreement - Data Files and Software (2016)
+Source notice: src/corelib/text/qt_attribution.json
+
+Unicode Common Locale Data Repository (CLDR)
+Copyright (C) 2004-2025 Unicode, Inc.
+License: Unicode License v3
+Source notice: src/corelib/text/qt_attribution.json
+
+libdbus-1 headers
+Copyright (C) 2002, 2003 CodeFactory AB
+Copyright (C) 2004, 2005 Red Hat, Inc.
+License: Academic Free License v2.1, or GNU General Public License v2.0 or later
+Source notice: src/dbus/qt_attribution.json
+
+OpenGL Headers
+Copyright (c) 2013-2014 The Khronos Group Inc.
+License: MIT License
+Source notice: src/gui/opengl/qt_attribution.json
+
+OpenGL ES 2 Headers
+Copyright (c) 2013-2014 The Khronos Group Inc.
+License: MIT License
+Source notice: src/gui/opengl/qt_attribution.json
+
+Anti-aliasing rasterizer from FreeType 2
+Copyright 2000-2016 by David Turner, Robert Wilhelm, and Werner Lemberg.
+License: Freetype Project License or GNU General Public License v2.0 only
+Source notice: src/gui/painting/qt_attribution.json
+
+Smooth Scaling Algorithm
+Copyright (C) 2004, 2005 Daniel M. Duley.
+(C) Carsten Haitzler and various contributors.
+(C) Willem Monsuwe <willem@stack.nl>
+License: BSD 2-clause "Simplified" License and Imlib2 License
+Source notice: src/gui/painting/qt_attribution.json
+
+X Server helper
+Copyright (c) 1987, 1988 X Consortium
+Copyright 1987, 1988 by Digital Equipment Corporation, Maynard, Massachusetts.
+License: X11 License and Historical Permission Notice and Disclaimer
+Source notice: src/gui/painting/qt_attribution.json
+
+Mipmap generator for D3D12
+Copyright (c) 2015 Microsoft
+License: MIT License
+Source notice: src/gui/rhi/qt_attribution.json
+
+Adobe Glyph List For New Fonts
+Copyright 2002, 2003, 2005, 2006, 2008, 2010, 2015 Adobe Systems
+License: BSD 3-Clause "New" or "Revised" License
+Source notice: src/gui/text/qt_attribution.json
+
+XSVG
+Copyright 2002 USC/Information Sciences Institute
+License: Historical Permission Notice and Disclaimer - sell variant
+Source notice: src/gui/util/qt_attribution.json
+
+Vulkan API Registry
+Copyright (c) 2015-2025 The Khronos Group Inc.
+License: Apache License 2.0 or MIT License
+Source notice: src/gui/vulkan/qt_attribution.json
+
+Cocoa Platform Plugin
+Copyright (c) 2007-2008, Apple, Inc.
+License: BSD 3-clause "New" or "Revised" License
+Source notice: src/plugins/platforms/cocoa/qt_attribution.json
+
+cmake-runcmake-test-modules
+Copyright © 2000-2024 Kitware, Inc. and Contributors
+License: BSD 3-Clause "New" or "Revised" License
+Source notice: src/testinternal/3rdparty/cmake/qt_attribution.json
+
+Catch2
+Copyright (c) 2022 Two Blue Cubes Ltd. All rights reserved.
+License: Boost Software License 1.0
+Source notice: src/testlib/3rdparty/catch2/qt_attribution.json
+
+Cycle
+Copyright (c) 2003, 2007-14 Matteo Frigo
+Copyright (c) 2003, 2007-14 Massachusetts Institute of Technology
+License: MIT License
+Source notice: src/testlib/3rdparty/cycle/qt_attribution.json
+
+Linux Performance Events
+Copyright (C) 2008-2009, Linutronix GmbH, Thomas Gleixner <tglx@kernel.org>
+Copyright (C) 2008-2011, Red Hat, Inc., Ingo Molnar
+Copyright (C) 2008-2011, Red Hat, Inc., Peter Zijlstra
+License: GNU General Public License v2.0 only with Linux Syscall Note
+Source notice: src/testlib/3rdparty/linux/qt_attribution.json
+
+Valgrind
+Copyright (C) 2000-2017 Julian Seward
+Copyright (C) 2003-2017 Josef Weidendorfer.
+License: BSD 4-clause "Original" or "Old" License
+Source notice: src/testlib/3rdparty/valgrind/qt_attribution.json
+
+Sbom Test Parent
+Copyright (C) 2026 Sbom Test Parent Authors
+Copyright (C) 2026 Sbom Test Parent Contributors
+License: MIT License
+Source notice: tests/auto/cmake/RunCMake/Sbom/attributions/multi_entry/qt_attribution.json
+
+Sbom Test Child
+Copyright (C) 2026 Sbom Test Child Authors
+License: BSD 3-Clause New or Revised License
+Source notice: tests/auto/cmake/RunCMake/Sbom/attributions/multi_entry/qt_attribution.json
+
+WebGradients
+Copyright (c) 2017 itmeo
+License: MIT License
+Source notice: util/gradientgen/qt_attribution.json

@@ -1,0 +1,80 @@
+{
+  "platform": "Linux-6.12.116+deb13-arm64-aarch64-with-glibc2.41",
+  "python": "3.13.5 (main, Aug 10 2026, 12:06:59) [GCC 14.2.0]",
+  "helper_sha256": "39db247777eaa8e015ddd2324069f12f19c167c7087234af5134924696424c6a",
+  "expected_failure": true,
+  "cases": [
+    {
+      "fixture": "ibm3740-final-track.raw",
+      "helper_success": false,
+      "response": {
+        "v": 1,
+        "ok": false,
+        "error": "export",
+        "message": "read/write/close failed"
+      },
+      "expected_sha256": "a7b130aa505c9054c1afb6a87bb5fcbd37b9e4dc3143e5b3e1451c08204014e8",
+      "source_unchanged": true,
+      "broker_passed": false
+    },
+    {
+      "fixture": "ibm3740-final-track-short.raw",
+      "helper_success": false,
+      "response": {
+        "v": 1,
+        "ok": false,
+        "error": "export",
+        "message": "read/write/close failed"
+      },
+      "expected_sha256": "a7b130aa505c9054c1afb6a87bb5fcbd37b9e4dc3143e5b3e1451c08204014e8",
+      "source_unchanged": true,
+      "broker_passed": false
+    },
+    {
+      "fixture": "final-track-bettercpm-default.raw",
+      "helper_success": true,
+      "response": {
+        "v": 1,
+        "ok": true
+      },
+      "expected_sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+      "source_unchanged": true,
+      "broker_passed": false
+    },
+    {
+      "fixture": "final-track-bcm2ss.raw",
+      "helper_success": false,
+      "response": {
+        "v": 1,
+        "ok": false,
+        "error": "export",
+        "message": "read/write/close failed"
+      },
+      "expected_sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+      "source_unchanged": true,
+      "broker_passed": false
+    },
+    {
+      "fixture": "final-track-bettercpm-mm-80t-ds-data.raw",
+      "helper_success": true,
+      "response": {
+        "v": 1,
+        "ok": true
+      },
+      "expected_sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+      "source_unchanged": true,
+      "broker_passed": false
+    },
+    {
+      "fixture": "final-track-bettercpm-ampro-little-board.raw",
+      "helper_success": true,
+      "response": {
+        "v": 1,
+        "ok": true
+      },
+      "expected_sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+      "source_unchanged": true,
+      "broker_passed": false
+    }
+  ]
+}

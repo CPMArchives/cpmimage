@@ -1,0 +1,16 @@
+test_broker_death_reaps_orphan_helper (__main__.BrokerCheck.test_broker_death_reaps_orphan_helper) ... skipped 'POSIX orphan guard; Windows uses Job Objects'
+test_cancel_reaps_helper_and_recovers (__main__.BrokerCheck.test_cancel_reaps_helper_and_recovers) ... skipped 'POSIX script fixture; Windows process trees covered by Qt Job Object tests'
+test_export_padding_and_no_clobber (__main__.BrokerCheck.test_export_padding_and_no_clobber) ... ok
+test_failed_open_invalidates_listing (__main__.BrokerCheck.test_failed_open_invalidates_listing) ... ok
+test_missing_allocated_sector_rejected (__main__.BrokerCheck.test_missing_allocated_sector_rejected) ... ok
+test_mutations_rejected (__main__.BrokerCheck.test_mutations_rejected) ... ok
+test_partial_sector_and_oversize_rejected (__main__.BrokerCheck.test_partial_sector_and_oversize_rejected) ... ok
+test_read_only_cpm_slash_and_plus_names (__main__.BrokerCheck.test_read_only_cpm_slash_and_plus_names) ... ok
+test_sequential_requests_never_report_busy (__main__.BrokerCheck.test_sequential_requests_never_report_busy) ... ok
+test_source_change_and_stale_session (__main__.BrokerCheck.test_source_change_and_stale_session) ... ok
+test_trimmed_unused_tail_export_and_source_fingerprint (__main__.BrokerCheck.test_trimmed_unused_tail_export_and_source_fingerprint) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 3.147s
+
+OK (skipped=2)

@@ -1,0 +1,8 @@
+Internal ctest changing into directory: <linux-validation-workspace>/packaging/app-linux
+Test project <linux-validation-workspace>/packaging/app-linux
+    Start 1: gui-check
+1/1 Test #1: gui-check ........................   Passed    9.87 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =   9.87 sec
