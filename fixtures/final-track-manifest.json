@@ -1,0 +1,74 @@
+[
+  {
+    "file": "ibm3740-final-track.raw",
+    "size": 256256,
+    "sha256": "c5fc113226d3d72556527c56107cd4ad0d386bc592f80334d3b286e8de88f541",
+    "file_name": "00last.bin",
+    "export_sha256": "a7b130aa505c9054c1afb6a87bb5fcbd37b9e4dc3143e5b3e1451c08204014e8",
+    "export_bytes": 1024,
+    "block": 242,
+    "format": "ibm-3740",
+    "trimmed": false,
+    "expected_before_success": false
+  },
+  {
+    "file": "ibm3740-final-track-short.raw",
+    "size": 256128,
+    "sha256": "65cb33f26ab407e2c83398a103cebbf7ccd3006f8029831ad14aa31d7e7aba39",
+    "file_name": "00last.bin",
+    "export_sha256": "a7b130aa505c9054c1afb6a87bb5fcbd37b9e4dc3143e5b3e1451c08204014e8",
+    "export_bytes": 1024,
+    "block": 241,
+    "format": "ibm-3740",
+    "trimmed": true,
+    "expected_before_success": false
+  },
+  {
+    "file": "final-track-bettercpm-default.raw",
+    "size": 368640,
+    "sha256": "2dfe3b3030552fe3346d973f456e473c5c2eaa06b421e6de07c5d0ce7c0e5daa",
+    "file_name": "00last.bin",
+    "export_sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+    "export_bytes": 2048,
+    "block": 165,
+    "format": "bettercpm-default",
+    "trimmed": false,
+    "expected_before_success": true
+  },
+  {
+    "file": "final-track-bcm2ss.raw",
+    "size": 630784,
+    "sha256": "ca87f02ec325522670c280188aa113bafc204538df342f67e0e80cec6396f6eb",
+    "file_name": "00last.bin",
+    "export_sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+    "export_bytes": 2048,
+    "block": 291,
+    "format": "bcm2ss",
+    "trimmed": false,
+    "expected_before_success": false
+  },
+  {
+    "file": "final-track-bettercpm-mm-80t-ds-data.raw",
+    "size": 819200,
+    "sha256": "195573d85cf8ca614c48a08b856bcf81bad50e39ec67f420ef9e6ce73887d241",
+    "file_name": "00last.bin",
+    "export_sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+    "export_bytes": 2048,
+    "block": 399,
+    "format": "bettercpm-mm-80t-ds-data",
+    "trimmed": false,
+    "expected_before_success": true
+  },
+  {
+    "file": "final-track-bettercpm-ampro-little-board.raw",
+    "size": 204800,
+    "sha256": "9058281fd39b40427be0b7be5aec98e10119f8d3b31c97b9f952fe679f4fbc29",
+    "file_name": "00last.bin",
+    "export_sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+    "export_bytes": 2048,
+    "block": 94,
+    "format": "bettercpm-ampro-little-board",
+    "trimmed": false,
+    "expected_before_success": true
+  }
+]

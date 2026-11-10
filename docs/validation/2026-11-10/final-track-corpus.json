@@ -1,0 +1,640 @@
+{
+  "images_scanned": 310,
+  "affected_images": 64,
+  "files_checked": 70,
+  "before_failures": 70,
+  "all_match_posix_oracle": true,
+  "images_unchanged": true,
+  "cases": [
+    {
+      "image": "SIGMV006.DSK",
+      "name": "00zxtab4.doc",
+      "bytes": 1792,
+      "sha256": "820b56499c7717fc93b4628458084c595f3c3cc12654f015ea44e03a1c838fb0",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV008.DSK",
+      "name": "00xmodem38.asm",
+      "bytes": 23808,
+      "sha256": "ac9d197396635820353387fa9233713c433d4cb23f28a72aee41cc78c1db8b46",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV019.DSK",
+      "name": "00zmnemons.doc",
+      "bytes": 12544,
+      "sha256": "47e69f035bce7c7029a6aa05c32ec20e305b1917b90c59dbf6c535e05c96c9ee",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV021.DSK",
+      "name": "00wumpus.pas",
+      "bytes": 11648,
+      "sha256": "202c4a301a5626784b076c4a5d183d63d29a77e078966e208ff3e0b452055e70",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV025.DSK",
+      "name": "00w3ua.lib",
+      "bytes": 5760,
+      "sha256": "0b06827b1e5010e4f4b7bead45551661355ca7df2ed76003deffd81e57eea012",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV029.DSK",
+      "name": "00sigmlog.010",
+      "bytes": 8704,
+      "sha256": "ac7e571c35e1327d14e5f9b6bcfc0eaf732c6038396e3182f6b2125b2ef075ad",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV029.DSK",
+      "name": "00sigmlog.011",
+      "bytes": 1024,
+      "sha256": "11eb39985889d4df7782baf3158d87f5e0710c726def241f8411d50cb582e1a3",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV030.DSK",
+      "name": "00sigmlog.028",
+      "bytes": 24576,
+      "sha256": "fd02f216cdc37973c0b2e4e1ebbcb9e50ff2193a985c8e11e9b9b67e1f62db67",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV032.DSK",
+      "name": "00star2.dat",
+      "bytes": 239744,
+      "sha256": "dd9bb1ffc4012ae4b1f33886f6d3f6e0ada0c89ec86a9d37f13c60318c031aca",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV033.DSK",
+      "name": "00star3.dat",
+      "bytes": 239744,
+      "sha256": "8958c5589edafc19bf89ce4096016276f715fc6bc5d49253163782c4d5a15999",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV034.DSK",
+      "name": "00star4.dat",
+      "bytes": 239744,
+      "sha256": "09dfc7166d6d92ef0c94720aeb9a56856b2f7f659bde3a91a40bbd04594b8cdd",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV035.DSK",
+      "name": "00star5.dat",
+      "bytes": 239744,
+      "sha256": "6c333526a369f0100306934ea041ef8b559541da5648181cdaa2469bedfee167",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV036.DSK",
+      "name": "00star6.dat",
+      "bytes": 239744,
+      "sha256": "35a2a2254cc97d7c35ca700c5543639446a51cac94076b36e93ea6e2cdbfcbc3",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV037.DSK",
+      "name": "00star7.dat",
+      "bytes": 239744,
+      "sha256": "6d88da0c35887cbdd5abe7942009e35084eceac4603ecd0ecedda71a2b5ef752",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV038.DSK",
+      "name": "00star8.dat",
+      "bytes": 240000,
+      "sha256": "af047b71a6edd29d8a6100dd85d49bd1fe6e25bfaaec7c4432fd636152346c21",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV045.DSK",
+      "name": "00verbs.ftn",
+      "bytes": 21120,
+      "sha256": "116a13e6ffbe760f9de9d442dbf221dc58b17c869bd340b5c85976862b4892e2",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV046.DSK",
+      "name": "00vmscmp.com",
+      "bytes": 1664,
+      "sha256": "55519d97b665747da41ce35802ebfdd9d1abd6c05432b2a3f32623d45d8f8e1e",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV047.DSK",
+      "name": "00villns.for",
+      "bytes": 18816,
+      "sha256": "d845c150f2f260ef53e9320112cc19d7a05556b0cbeb626a463dfd5745217324",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV047.DSK",
+      "name": "00vmstim.for",
+      "bytes": 512,
+      "sha256": "40be3002f0cd83c33c9179aac2d52c2f726f52b85437884264ffd2a25d23917c",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV048.DSK",
+      "name": "00xmodem46.asm",
+      "bytes": 39936,
+      "sha256": "8e236dae1b7d36c12507f5b1c5cad01619d3aacf95a711da14932064604cdf1a",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV067.DSK",
+      "name": "00whodere2.asm",
+      "bytes": 8192,
+      "sha256": "526a80ff73eda5cba0126a9ac6287df4390b2176ce55335866eb113b044e253e",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV068.DSK",
+      "name": "00zesource.doc",
+      "bytes": 2688,
+      "sha256": "651aab67ca645e430fa1d11183d512412230b7d3a9407777faac9ad7bc15d451",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV069.DSK",
+      "name": "00util.pas",
+      "bytes": 1792,
+      "sha256": "37d0a2b99568b0d635646a46517767a44a7df190ebf7ab8c5dce7a6654490567",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV071.DSK",
+      "name": "00tree4.pas",
+      "bytes": 8192,
+      "sha256": "3375b24b352dbb2acd93a0d4c9806a5c60ad6ed26371fc582c1c4959c725e451",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV081.DSK",
+      "name": "00xref.pas",
+      "bytes": 5888,
+      "sha256": "a3cca585c76388deb9f67b17d9e712d00f97369deda88cb5c09937c9bd4d49c0",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV081.DSK",
+      "name": "00xref.sub",
+      "bytes": 256,
+      "sha256": "8f4b4990fe380c20d7f831b6b3e865182cfdc4cde55012101618531e862b38a6",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV095.DSK",
+      "name": "00rez7/31.doc",
+      "bytes": 26368,
+      "sha256": "69f04d1805fca353f5820d487350692c3121e3535e8edebbe60cd29bc08425e7",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV097.DSK",
+      "name": "00purge.mac",
+      "bytes": 6016,
+      "sha256": "f005789da0021788deb81156b3ecb8b062127bf0cf59a44e4f993b3a095a19e1",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV097.DSK",
+      "name": "00size.src",
+      "bytes": 256,
+      "sha256": "23511f0a2b49badbde78012fda6400fac328522a3391fe517abfc8640603c86b",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV100.DSK",
+      "name": "00zcpr2.idx",
+      "bytes": 12544,
+      "sha256": "cadefe8236604d8a6487e5b9b39aa28d2b7f1e85c9546bbe54f400abad126adf",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV102.DSK",
+      "name": "00zex.com",
+      "bytes": 6144,
+      "sha256": "31cd27e51d1547aedd8481bf97b8ad45fb1b66951bd0a8029d309bd845611fc7",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV103.DSK",
+      "name": "00z2res.hlp",
+      "bytes": 6784,
+      "sha256": "b39fe2101169dd3c8f4660eac3ac520058b344320b9b427f915df32cab31f054",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV104.DSK",
+      "name": "00zcpr2.idx",
+      "bytes": 12288,
+      "sha256": "bcdbbd2994efe50c97da8026b464a0b432eb8ae2da6f224f4785f47ba3e7ac51",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV105.DSK",
+      "name": "00zcpr2.idx",
+      "bytes": 12544,
+      "sha256": "cadefe8236604d8a6487e5b9b39aa28d2b7f1e85c9546bbe54f400abad126adf",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV108.DSK",
+      "name": "00zcprhdr.lib",
+      "bytes": 13312,
+      "sha256": "675ccb4b0c53c1c43377b34b5d57bcdf9d115d5e59b0a78e22b2bb91dbaeee79",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV109.DSK",
+      "name": "00userman5.txt",
+      "bytes": 5888,
+      "sha256": "ee2a251eaf652bfb0558396d7a4474111e0003c5347d37616ab1447fe7a038ad",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV112.DSK",
+      "name": "00signon.see",
+      "bytes": 2048,
+      "sha256": "326f44ecbf77b838a43b957d6fbb2b2a504058c311308185873cb047ea23c7f3",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV119.DSK",
+      "name": "00ludef1.doc",
+      "bytes": 5120,
+      "sha256": "ed6b1e4eda9e00771ef9af0b4ca89f25358397fe8a7bfea708f1723beb55c7c2",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV121.DSK",
+      "name": "00smodm52e.lbr",
+      "bytes": 74752,
+      "sha256": "04f5f69289836662273f9bbec8b44ad110b7197adadf3116d0bd5bd287a8b44a",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV129.DSK",
+      "name": "00lu.com",
+      "bytes": 17664,
+      "sha256": "253b71f15772bd6190697a314ef7ff93ec30aafdb3ff7c57fa42e0699b967459",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV132.DSK",
+      "name": "00zdump.pas",
+      "bytes": 5888,
+      "sha256": "541cff9a52a9d8d98acd2effdb2bdbcf615660fb0f432ce1537bcbb2c5f8400c",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV134.DSK",
+      "name": "00tstan2.com",
+      "bytes": 14336,
+      "sha256": "5609131c81f5312120c0e67280be03f49a5397892845e931328a56b66e8d3352",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV134.DSK",
+      "name": "00tstan2.pas",
+      "bytes": 896,
+      "sha256": "cd4628d9852fa979950e6963f003ab317a4f37722870cb0f0b7c39e33a63b49c",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV135.DSK",
+      "name": "00wpf.obj",
+      "bytes": 5632,
+      "sha256": "139a9285b62441301707cbbbb30bcdfe1c7d9463c59acf4b8e3d34192386c0bb",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV140.DSK",
+      "name": "00z80disk.obj",
+      "bytes": 2560,
+      "sha256": "1b3019971a2ebec481d698183c637c58762bd3ce86ede476feaafa65d8888dd7",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV148.DSK",
+      "name": "00tutor.prn",
+      "bytes": 8448,
+      "sha256": "d9d18552f097ccc25f722b146e744e32b7f4524bd3d553c50ef25a9d04495a4b",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV149.DSK",
+      "name": "00xmodmfor.doc",
+      "bytes": 5632,
+      "sha256": "60e803a924c7e0908c0b39930fa91622e26452e9040b8624c1f129f93aec4727",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV164.DSK",
+      "name": "00reclib.mac",
+      "bytes": 8064,
+      "sha256": "fb630ddfd3dc94da542bc32a15051c8dd380cb42b21ba63c85083707ddaca876",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV167.DSK",
+      "name": "00vti.asm",
+      "bytes": 8960,
+      "sha256": "c6c0e7349af82a310e79115ae8cfdc805b680497c9b295142fa2f9504c02eaad",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV169.DSK",
+      "name": "00m7zb-1.aqm",
+      "bytes": 7040,
+      "sha256": "fafab46d7cc686885dee437d62c5a1e0447092476ea4f1044e480ed65137a74e",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV170.DSK",
+      "name": "00m7am-1.aqm",
+      "bytes": 7936,
+      "sha256": "fc077a5f470e117bc0eeed922353d6c425ee846d5f71dc392b7feece4979b70e",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV171.DSK",
+      "name": "00screen.com",
+      "bytes": 3584,
+      "sha256": "55fae51b2b0022eb5fd69ed10aad0ff437352e8faaac7c8a62da6b3def1e55bd",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV178.DSK",
+      "name": "00rbbs4102.lbr",
+      "bytes": 93952,
+      "sha256": "397c7549ea26c814a03b2f996084910b9d4ac527beb32423273cec84bd9ecafd",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV178.DSK",
+      "name": "00sig/m.lib",
+      "bytes": 1536,
+      "sha256": "6e1886e187044750c17b5d305f6c21429bf3b90920b4c1d3201d2e8d2a03b1a2",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV184.DSK",
+      "name": "00zcpr3.ins",
+      "bytes": 3968,
+      "sha256": "bfcb10924e1e5649d0cd1ba2d25998d76bc09017e842f117c5b59c6d1096a331",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV188.DSK",
+      "name": "00usq.com",
+      "bytes": 1920,
+      "sha256": "356af7963769747d98f691529622ed2184c417210ddd86f1d17dfae2d44f02d8",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV202.DSK",
+      "name": "00z3mac.lbr",
+      "bytes": 100864,
+      "sha256": "124ba0920d333166d112d539eae5713e197aac4690574cbf2167916f327f4e40",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV203.DSK",
+      "name": "00usq.com",
+      "bytes": 1920,
+      "sha256": "356af7963769747d98f691529622ed2184c417210ddd86f1d17dfae2d44f02d8",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV206.DSK",
+      "name": "00usq.com",
+      "bytes": 1920,
+      "sha256": "356af7963769747d98f691529622ed2184c417210ddd86f1d17dfae2d44f02d8",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV207.DSK",
+      "name": "00vfileapc.cmd",
+      "bytes": 8192,
+      "sha256": "fa9045eb436ea911c8a9ff10a080f4fc5b49ceb914c4769fec41b91bf0906a86",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV211.DSK",
+      "name": "00usq.com",
+      "bytes": 1920,
+      "sha256": "356af7963769747d98f691529622ed2184c417210ddd86f1d17dfae2d44f02d8",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV213.DSK",
+      "name": "00rec86.lbr",
+      "bytes": 96128,
+      "sha256": "29e1bb0f906420803035ccb68f7a06000b6a0dbe8e302b47fc4bd48931033eed",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV222.DSK",
+      "name": "00usq.com",
+      "bytes": 1920,
+      "sha256": "356af7963769747d98f691529622ed2184c417210ddd86f1d17dfae2d44f02d8",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV229.DSK",
+      "name": "00wc86.lbr",
+      "bytes": 8960,
+      "sha256": "76741457e482034ef2054b4bc72b7381d86b80179f455f4ea89e7ad6157c357c",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV254.DSK",
+      "name": "00print.lbr",
+      "bytes": 93568,
+      "sha256": "73308f6b1d570eb6bcbcb39d9ffbdaa3f8458f76f436695ddb304f31dc6039dd",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV260.DSK",
+      "name": "00gsxcmd.lbr",
+      "bytes": 236544,
+      "sha256": "e61c814bf7dd36c0bd7b05f4ec662523064f5beefd8f79f540b06b9068611354",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV270.DSK",
+      "name": "00update.pas",
+      "bytes": 2688,
+      "sha256": "d20aff0686d9fdca1e8d2aa7ecc1aca547d44a5fc7e23eef485d2a89aa096bca",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV274.DSK",
+      "name": "00usq.com",
+      "bytes": 1920,
+      "sha256": "356af7963769747d98f691529622ed2184c417210ddd86f1d17dfae2d44f02d8",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV280.DSK",
+      "name": "00usq.com",
+      "bytes": 1920,
+      "sha256": "356af7963769747d98f691529622ed2184c417210ddd86f1d17dfae2d44f02d8",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    },
+    {
+      "image": "SIGMV303.DSK",
+      "name": "00zpuzl11.lbr",
+      "bytes": 6016,
+      "sha256": "8b1c36458c4dac52a23ab852644f810ed40d6d9a4f97443dcf72a0689b8f5ea4",
+      "before_exit": 2,
+      "after_exit": 0,
+      "oracle_equal": true
+    }
+  ]
+}

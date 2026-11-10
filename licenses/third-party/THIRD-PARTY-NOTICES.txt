@@ -1,0 +1,51 @@
+CPMImage read-only review package — THIRD-PARTY NOTICES
+
+Application and helper integration code: GPL-3.0-or-later, as approved by the owner.
+You may copy, modify and redistribute it under that license. There is no warranty.
+The GPL does not replace the licenses of the separate third-party components below.
+
+cpmtools 2.23 — GPL-3.0-or-later. Copyright Michael Haardt and contributors.
+The helper links cpmtools internal filesystem/device code. See GPL-3.0.txt,
+cpmtools-README.txt, and the complete source/build material beside this package.
+
+libdsk 1.4.2 — GNU Library GPL v2-or-later in most files; GPL v2-or-later and
+other retained notices in included components. The combined GPL helper is
+provided under GPL-3.0-or-later. Retained texts/header notices are included.
+
+Qt 6.12.0 Core, Gui, Widgets and platform plugins — LGPL-3.0, with Qt's
+third-party components retaining their own notices. Copyright The Qt Company
+Ltd. and contributors. Complete license texts and upstream attribution records
+are included in Qt-LICENSES/ and Qt-upstream-notices/. This archive intentionally
+retains notices for upstream components beyond those enabled in this package.
+The build inventory/configuration records identify the actual shipped libraries.
+JPEG support is based in part on the work of the Independent JPEG Group.
+Portions of this software are copyright the FreeType Project (freetype.org).
+All rights reserved. Detailed years and authors are retained in the FreeType
+notice and Qt-third-party-copyright-notices.txt.
+
+You may replace or rebuild the shared Qt libraries, modify this application, and
+reverse engineer it to debug your Qt modifications as permitted by the LGPL.
+Do not interpret the package signature as a restriction on those rights. For the
+local Mac package, re-sign modified binaries/app with an ad-hoc identity as
+explained in the package README. There is no DRM or signature-check enforcement
+in the application. Corresponding Qt/application sources and build recipes are
+provided beside the binary package, not solely through an upstream web link.
+
+CPython 3.13.17 — Python Software Foundation License v2 and historical notices.
+Copyright Python Software Foundation and contributors. See CPython-LICENSE.txt
+and CPython-HACL-notices.txt, plus CPython-full-third-party-notices.txt
+(including mimalloc and other embedded-component licenses). The private interpreter is bundled; installed
+system Python is not needed. Windows also retains the upstream embedded
+Python distribution's full notice document, including unused component notices.
+
+Windows packages additionally use the Microsoft Visual C++ runtime and libffi
+through the CPython ctypes module. They retain their Microsoft and MIT terms;
+see the Microsoft terms and CPython Windows license document. The compiler/SDK
+and CMake development tools are not shipped as part of the application package.
+The isolated C helper is built using LLVM-MinGW; its relevant upstream notices
+are retained with the source materials. No LLVM C++ runtime DLL is needed by it.
+
+Operating-system components (Apple frameworks, Windows system DLLs, or the
+Linux glibc/graphics stack) are prerequisites supplied by the operating system,
+not relicensed or copied into the app by this notice. See README for the tested
+platform baseline. This review package is not a signed/notarized public release.

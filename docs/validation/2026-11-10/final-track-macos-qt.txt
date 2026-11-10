@@ -1,0 +1,7 @@
+Test project <validation-workspace>/packaging/app-macos
+    Start 1: gui-check
+1/1 Test #1: gui-check ........................   Passed   10.06 sec
+
+100% tests passed out of 1
+
+Total Test time (real) =  10.06 sec

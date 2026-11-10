@@ -1,0 +1,198 @@
+[
+  {
+    "fileName": "Microsoft.VC.14.44.17.14.CRT.ARM64.Desktop.base.vsix",
+    "sha256": "ba1aeca6d6470d2b3b318ec7bffb3e61f9a736cfb76d8a7d18e004a8e7c26651",
+    "size": 49166761,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/67cf767c-5e71-47c2-a54a-cd5631e28942/ba1aeca6d6470d2b3b318ec7bffb3e61f9a736cfb76d8a7d18e004a8e7c26651/Microsoft.VC.14.44.17.14.CRT.ARM64.Desktop.base.vsix",
+    "signer": {
+      "$ref": "1"
+    },
+    "component": "Microsoft.VC.14.44.17.14.CRT.ARM64.Desktop.base",
+    "version": "14.44.35226"
+  },
+  {
+    "fileName": "Microsoft.VC.14.44.17.14.CRT.ARM64.Store.base.vsix",
+    "sha256": "57ece91747be72fdd9ed0c39b83225011c8afba6b6f616a23ace54d0522f79e9",
+    "size": 61763419,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/67cf767c-5e71-47c2-a54a-cd5631e28942/57ece91747be72fdd9ed0c39b83225011c8afba6b6f616a23ace54d0522f79e9/Microsoft.VC.14.44.17.14.CRT.ARM64.Store.base.vsix",
+    "signer": {
+      "$ref": "1"
+    },
+    "component": "Microsoft.VC.14.44.17.14.CRT.ARM64.Store.base",
+    "version": "14.44.35226"
+  },
+  {
+    "fileName": "Microsoft.VC.14.44.17.14.CRT.Headers.base.vsix",
+    "sha256": "852382a9aa73502b7849c1bcadfb603ba7175c4e8b60e6aba03c7de711d4ece5",
+    "size": 2128977,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/c610cd8c-801b-44b8-a80a-82cc382aeb43/852382a9aa73502b7849c1bcadfb603ba7175c4e8b60e6aba03c7de711d4ece5/Microsoft.VC.14.44.17.14.CRT.Headers.base.vsix",
+    "signer": {
+      "$ref": "1"
+    },
+    "component": "Microsoft.VC.14.44.17.14.CRT.Headers.base",
+    "version": "14.44.35220"
+  },
+  {
+    "fileName": "Microsoft.VC.14.44.17.14.CRT.Redist.ARM64.base.vsix",
+    "sha256": "fc8f37250188509818258582758a3b704810c77b6d25845486d583ea99d9aa1f",
+    "size": 5067096,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/45d3b8dd-bced-4b37-9974-142f748d710c/fc8f37250188509818258582758a3b704810c77b6d25845486d583ea99d9aa1f/Microsoft.VC.14.44.17.14.CRT.Redist.ARM64.base.vsix",
+    "signer": {
+      "$ref": "1"
+    },
+    "component": "Microsoft.VC.14.44.17.14.CRT.Redist.ARM64.base",
+    "version": "14.44.35211"
+  },
+  {
+    "fileName": "Microsoft.VC.14.44.17.14.Tools.HostARM64.TargetARM64.base.vsix",
+    "sha256": "16fc2e8e645e9338e678ecc2808b0f453acb66df5eb196af74e66e182ba92ec7",
+    "size": 22572202,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/aa209763-134c-427b-9960-9ca54ccc1734/16fc2e8e645e9338e678ecc2808b0f453acb66df5eb196af74e66e182ba92ec7/Microsoft.VC.14.44.17.14.Tools.HostARM64.TargetARM64.base.vsix",
+    "signer": {
+      "$ref": "1"
+    },
+    "component": "Microsoft.VC.14.44.17.14.Tools.HostARM64.TargetARM64.base",
+    "version": "14.44.35229"
+  },
+  {
+    "fileName": "Microsoft.VC.14.44.17.14.Tools.HostARM64.TargetARM64.Res.base.enu.vsix",
+    "sha256": "291ce64f5cb22909dd7495beefdc33adee13e4b65755ffada238589a993a13be",
+    "size": 267758,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/aa209763-134c-427b-9960-9ca54ccc1734/291ce64f5cb22909dd7495beefdc33adee13e4b65755ffada238589a993a13be/Microsoft.VC.14.44.17.14.Tools.HostARM64.TargetARM64.Res.base.enu.vsix",
+    "signer": {
+      "$ref": "1"
+    },
+    "component": "Microsoft.VC.14.44.17.14.Tools.HostARM64.TargetARM64.Res.base",
+    "version": "14.44.35229"
+  },
+  {
+    "fileName": "Installers\\Universal CRT Headers Libraries and Sources-x86_en-us.msi",
+    "sha256": "F611CE8A9E576E3383917B04B6FBE5EE6BED8363C1A2A8E9D6F8335CBB422675",
+    "size": 589824,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/6452c1f1-dc1e-413c-8b19-991b61870a8b/d10da41a6ad6809f823ef4a92d4f6c56/universal%20crt%20headers%20libraries%20and%20sources-x86_en-us.msi",
+    "cache": false,
+    "signer": {
+      "$ref": "4"
+    }
+  },
+  {
+    "fileName": "Installers\\Windows SDK ARM64 Desktop Tools-x86_en-us.msi",
+    "sha256": "95EB9DC8ABAF8CE4C9C4E443862708EC8B6F2092B9A78A28928107F1B1073B36",
+    "size": 450560,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/6452c1f1-dc1e-413c-8b19-991b61870a8b/96e5c4ee1927ae57c2a5e319b6b1ec7e/windows%20sdk%20arm64%20desktop%20tools-x86_en-us.msi",
+    "cache": false,
+    "signer": {
+      "$ref": "4"
+    }
+  },
+  {
+    "fileName": "Installers\\Windows SDK Desktop Headers arm64-x86_en-us.msi",
+    "sha256": "BD2C39E59C62E9F81382F843F7DF2D47A6F2CC865EE612F7ED42D27086895552",
+    "size": 446464,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/6452c1f1-dc1e-413c-8b19-991b61870a8b/df535cbd9800eb2e513f3f8763990a50/windows%20sdk%20desktop%20headers%20arm64-x86_en-us.msi",
+    "cache": false,
+    "signer": {
+      "$ref": "4"
+    }
+  },
+  {
+    "fileName": "Installers\\Windows SDK Desktop Headers x86-x86_en-us.msi",
+    "sha256": "F1E5159FEB948CE90A81DCC6A427DDE844610230CB6ED787E35D422DE527A5F8",
+    "size": 790528,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/6452c1f1-dc1e-413c-8b19-991b61870a8b/7fad2c686fb58ea9e6dc0308a2df142f/windows%20sdk%20desktop%20headers%20x86-x86_en-us.msi",
+    "cache": false,
+    "signer": {
+      "$ref": "4"
+    }
+  },
+  {
+    "fileName": "Installers\\Windows SDK Desktop Libs arm64-x86_en-us.msi",
+    "sha256": "21F16DD88E22467AC0663520426F972F2BD1D9925AE7D8C2BAF9E5288BF9EC6C",
+    "size": 528384,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/6452c1f1-dc1e-413c-8b19-991b61870a8b/9dc0c0f35bfcc3c7ee96d61ecc818b08/windows%20sdk%20desktop%20libs%20arm64-x86_en-us.msi",
+    "cache": false,
+    "signer": {
+      "$ref": "4"
+    }
+  },
+  {
+    "fileName": "Installers\\Windows SDK Desktop Tools arm64-x86_en-us.msi",
+    "sha256": "B5C27991AB2677C39780581DDF48DE2E577E9D3687568FE35761BA20CC4F3A64",
+    "size": 471040,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/6452c1f1-dc1e-413c-8b19-991b61870a8b/100da91cd2b863ec5428a45773cfa226/windows%20sdk%20desktop%20tools%20arm64-x86_en-us.msi",
+    "cache": false,
+    "signer": {
+      "$ref": "4"
+    }
+  },
+  {
+    "fileName": "Installers\\Windows SDK EULA-x86_en-us.msi",
+    "sha256": "F3958C26326C6AEB29CB91A62E8E7F2F4347B8847313D6A8041567B12D493BB6",
+    "size": 450560,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/6452c1f1-dc1e-413c-8b19-991b61870a8b/4adaf0e5ffed56dbbdd2e1a7928a69c9/windows%20sdk%20eula-x86_en-us.msi",
+    "cache": false,
+    "signer": {
+      "$ref": "4"
+    }
+  },
+  {
+    "fileName": "Installers\\Windows SDK for Windows Store Apps Headers OnecoreUap-x86_en-us.msi",
+    "sha256": "BE5EE13CCC98B87211B4F3686972B00FA16F20F266FE9DC5572D62F001E0547C",
+    "size": 471040,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/6452c1f1-dc1e-413c-8b19-991b61870a8b/95de969f19c09fe411b779c2e2f06f0d/windows%20sdk%20for%20windows%20store%20apps%20headers%20onecoreuap-x86_en-us.msi",
+    "cache": false,
+    "signer": {
+      "$ref": "4"
+    }
+  },
+  {
+    "fileName": "Installers\\Windows SDK for Windows Store Apps Headers-x86_en-us.msi",
+    "sha256": "C9F78AE3E730EA1789A37001E204A970099D2ACC555CC537FB45EA0BB23B347C",
+    "size": 1060864,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/6452c1f1-dc1e-413c-8b19-991b61870a8b/06062c286c5533d4d2c47e613ae44793/windows%20sdk%20for%20windows%20store%20apps%20headers-x86_en-us.msi",
+    "cache": false,
+    "signer": {
+      "$ref": "4"
+    }
+  },
+  {
+    "fileName": "Installers\\Windows SDK for Windows Store Apps Libs-x86_en-us.msi",
+    "sha256": "1381535D2F6B1894A092DA67F8A8FB048A4DFE8060CE75B3275AFFA81B02586E",
+    "size": 528384,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/6452c1f1-dc1e-413c-8b19-991b61870a8b/079ca63878193e064d8aa000670f0db3/windows%20sdk%20for%20windows%20store%20apps%20libs-x86_en-us.msi",
+    "cache": false,
+    "signer": {
+      "$ref": "4"
+    }
+  },
+  {
+    "fileName": "Installers\\Windows SDK for Windows Store Apps Tools-x86_en-us.msi",
+    "sha256": "8FB00DF405939D60E50A2F1F5D068284153AB3520B6B3657C9CE3796E4A60469",
+    "size": 516096,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/6452c1f1-dc1e-413c-8b19-991b61870a8b/286d62d852247d09756ce4e5612fbe3e/windows%20sdk%20for%20windows%20store%20apps%20tools-x86_en-us.msi",
+    "cache": false,
+    "signer": {
+      "$ref": "4"
+    }
+  },
+  {
+    "fileName": "Installers\\Windows SDK Modern Non-Versioned Developer Tools-x86_en-us.msi",
+    "sha256": "82ABFE7E3F7A14A288C8FEFF3152E14D8A05E280F72CFE1F97D542B8C5EF73B2",
+    "size": 458752,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/6452c1f1-dc1e-413c-8b19-991b61870a8b/efde6057daf2466860be03c97f9846a3/windows%20sdk%20modern%20non-versioned%20developer%20tools-x86_en-us.msi",
+    "cache": false,
+    "signer": {
+      "$ref": "4"
+    }
+  },
+  {
+    "fileName": "Installers\\Windows SDK Modern Versioned Developer Tools-x86_en-us.msi",
+    "sha256": "45B528B739011F89E7E96045885AAE29E68A29667980F8EEFACFAE6ACF44D597",
+    "size": 458752,
+    "url": "https://download.visualstudio.microsoft.com/download/pr/6452c1f1-dc1e-413c-8b19-991b61870a8b/2926f303f5cdc5acbf8592eac1caed40/windows%20sdk%20modern%20versioned%20developer%20tools-x86_en-us.msi",
+    "cache": false,
+    "signer": {
+      "$ref": "4"
+    }
+  }
+]

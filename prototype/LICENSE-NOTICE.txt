@@ -1,0 +1,3 @@
+New cpmimage code is GPL-3.0-or-later, as approved by the owner on2026-11-10.
+See ../LICENSE and ../docs/LICENSING.md. Third-party components retain their
+own licenses and notices; fixture provenance is in ../fixtures/README.md.

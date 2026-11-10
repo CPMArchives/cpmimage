@@ -1,5 +1,7 @@
 # cpmimage — Project Proposal
 
+> Historical initial proposal. See [current prototype scope](READ_ONLY_PROTOTYPE.md) and [validation](VALIDATION.md) for implemented behavior and [licensing](LICENSING.md) for the owner-approved source license.
+
 Status: Initial proposal. Architecture and release scope require feasibility validation.
 
 ## Purpose and audience

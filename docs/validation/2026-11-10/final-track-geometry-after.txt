@@ -1,0 +1,2 @@
+probe cylinders=40 heads=1
+configured cylinders=77 heads=1 total_tracks=77

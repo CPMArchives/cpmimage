@@ -1,0 +1,14 @@
+* text=auto eol=lf
+*.raw binary
+*.dsk binary
+*.docx binary
+*.cmd text eol=crlf whitespace=cr-at-eol
+# Preserve upstream license texts, pinned format data and patch context verbatim.
+LICENSE -text -whitespace
+prototype/LICENSE -text -whitespace
+prototype/licenses/** -text -whitespace
+licenses/** -text -whitespace
+packaging/licenses/** -text -whitespace
+fixtures/diskdefs -text -whitespace
+packaging/source/*.patch -text -whitespace
+packaging/source/*.diff -text -whitespace

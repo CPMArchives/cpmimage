@@ -1,0 +1,58 @@
+[
+  {
+    "group": "backend",
+    "path": "vendor/cpmtools-2.23.tar.gz",
+    "url": "https://www.moria.de/~michael/cpmtools/files/cpmtools-2.23.tar.gz",
+    "sha256": "7839b19ac15ba554e1a1fc1dbe898f62cf2fd4db3dcdc126515facc6b929746f",
+    "bytes": 177636
+  },
+  {
+    "group": "backend",
+    "path": "vendor/libdsk-1.4.2.tar.gz",
+    "url": "https://www.seasip.info/Unix/LibDsk/libdsk-1.4.2.tar.gz",
+    "sha256": "71eda9d0e33ab580cea1bb507467877d33d887cea6ec042b8d969004db89901a",
+    "bytes": 1083103
+  },
+  {
+    "group": "runtime",
+    "path": "vendor/qtbase-everywhere-src-6.12.0.tar.xz",
+    "url": "https://download.qt.io/official_releases/qt/6.12/6.12.0/submodules/qtbase-everywhere-src-6.12.0.tar.xz",
+    "sha256": "a951bd163c7b80fc6b8c88d7668fb56abf91c152373e13c10666763238131307",
+    "bytes": 51220268
+  },
+  {
+    "group": "runtime",
+    "path": "packaging/downloads/Python-3.13.17.tar.xz",
+    "url": "https://www.python.org/ftp/python/3.13.17/Python-3.13.17.tar.xz",
+    "sha256": "6020bd10aff3bf4821be16f088ebb1591beb7b811dcd8fab1da8f7c22a7b27e7",
+    "bytes": 23233336
+  },
+  {
+    "group": "windows",
+    "path": "packaging/downloads/qtbase-6.12.0-msvc-arm64.7z",
+    "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_arm64_cross_compiled/qt.qt6.6120.win64_msvc2022_arm64_cross_compiled/6.12.0-0-202609280346qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-ARM64.7z",
+    "sha256": "892cf8d4f22ce1574c6b90e5ba21f6a49f06e2b96d35a75551ddbdb3cd6b4913",
+    "bytes": 36350714
+  },
+  {
+    "group": "windows",
+    "path": "packaging/downloads/cmake-4.4.5-windows-arm64.zip",
+    "url": "https://github.com/Kitware/CMake/releases/download/v4.4.5/cmake-4.4.5-windows-arm64.zip",
+    "sha256": "b0b54ebdd3e7b9f5ad733d865541d6e0a3b774182e4318b26890221432835359",
+    "bytes": 52564319
+  },
+  {
+    "group": "windows",
+    "path": "windows-runtime/python-3.13.17-embed-arm64.zip",
+    "url": "https://www.python.org/ftp/python/3.13.17/python-3.13.17-embed-arm64.zip",
+    "sha256": "7b58787a047b400edbfcb539aa3cdb4e2ed77bf0f22cae42b7c01cedd7dd6614",
+    "bytes": 10813980
+  },
+  {
+    "group": "windows",
+    "path": "windows-runtime/llvm-mingw-20261104-ucrt-macos-universal.tar.xz",
+    "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20261104/llvm-mingw-20261104-ucrt-macos-universal.tar.xz",
+    "sha256": "66cbd5178c4a71b0d473e68ede172f8eb7d15d023e67f39201d0a69e21f6bf3c",
+    "bytes": 125261696
+  }
+]

@@ -1,0 +1,74 @@
+{
+  "platform": "macOS-27.2-arm64-arm-64bit",
+  "python": "3.9.6 (default, Aug 25 2026, 21:26:21) \n[Clang 21.0.0 (clang-2100.3.34.2)]",
+  "helper_sha256": "b2a957ee386e0b2f5e86bc9818204fe2e5b133f4e25f131677142ceb9747d4c4",
+  "expected_failure": false,
+  "cases": [
+    {
+      "fixture": "ibm3740-final-track.raw",
+      "helper_success": true,
+      "response": {
+        "v": 1,
+        "ok": true
+      },
+      "expected_sha256": "a7b130aa505c9054c1afb6a87bb5fcbd37b9e4dc3143e5b3e1451c08204014e8",
+      "source_unchanged": true,
+      "broker_passed": true
+    },
+    {
+      "fixture": "ibm3740-final-track-short.raw",
+      "helper_success": true,
+      "response": {
+        "v": 1,
+        "ok": true
+      },
+      "expected_sha256": "a7b130aa505c9054c1afb6a87bb5fcbd37b9e4dc3143e5b3e1451c08204014e8",
+      "source_unchanged": true,
+      "broker_passed": true
+    },
+    {
+      "fixture": "final-track-bettercpm-default.raw",
+      "helper_success": true,
+      "response": {
+        "v": 1,
+        "ok": true
+      },
+      "expected_sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+      "source_unchanged": true,
+      "broker_passed": true
+    },
+    {
+      "fixture": "final-track-bcm2ss.raw",
+      "helper_success": true,
+      "response": {
+        "v": 1,
+        "ok": true
+      },
+      "expected_sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+      "source_unchanged": true,
+      "broker_passed": true
+    },
+    {
+      "fixture": "final-track-bettercpm-mm-80t-ds-data.raw",
+      "helper_success": true,
+      "response": {
+        "v": 1,
+        "ok": true
+      },
+      "expected_sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+      "source_unchanged": true,
+      "broker_passed": true
+    },
+    {
+      "fixture": "final-track-bettercpm-ampro-little-board.raw",
+      "helper_success": true,
+      "response": {
+        "v": 1,
+        "ok": true
+      },
+      "expected_sha256": "30d68a3cd696da93a57b9d9a1023bac83e485e3d31f5f962646f609df74cebfe",
+      "source_unchanged": true,
+      "broker_passed": true
+    }
+  ]
+}
