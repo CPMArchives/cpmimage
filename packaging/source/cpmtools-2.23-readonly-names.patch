@@ -1,0 +1,15 @@
+--- a/cpmdir.h
++++ b/cpmdir.h
+@@ -13,7 +13,12 @@
+   char pointers[16];
+ };
+ 
++/* CPMImage read-only-name qualification, 2026-11-10: colon is opaque data. */
++#ifdef CPMIMAGE_READ_ONLY_NAMES
++#define ISFILECHAR(notFirst,c) ((c)==':' || (((notFirst) || (c)!=' ') && (c)>=' ' && !((c)&~0x7f) && (c)!='<' && (c)!='>' && (c)!='.' && (c)!=',' && (c)!=';' && (c)!=':' && (c)!='=' && (c)!='?' && (c)!='*' && (c)!= '[' && (c)!=']'))
++#else
+ #define ISFILECHAR(notFirst,c) (((notFirst) || (c)!=' ') && (c)>=' ' && !((c)&~0x7f) && (c)!='<' && (c)!='>' && (c)!='.' && (c)!=',' && (c)!=';' && (c)!=':' && (c)!='=' && (c)!='?' && (c)!='*' && (c)!= '[' && (c)!=']')
++#endif
+ #define EXTENT(low,high) (((low)&0x1f)|(((high)&0x3f)<<5))
+ #define EXTENTL(extent) ((extent)&0x1f)
+ #define EXTENTH(extent) (((extent>>5))&0x3f)

@@ -28,6 +28,8 @@
 #include <QMenuBar>
 #include <QMenu>
 #include <QAction>
+#include <QSettings>
+#include <QLineEdit>
 #include <QTextEdit>
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -35,7 +37,7 @@
 #include <signal.h>
 #endif
 
-Window::Window(QString root, QString python, QString helper, int deadlineMs, int graceMs, QString noticesPath)
+Window::Window(QString root, QString python, QString helper, int deadlineMs, int graceMs, QString noticesPath, QString settingsFile)
     : root(root), python(python), helper(helper), deadlineMs(deadlineMs), graceMs(graceMs) {
 #ifndef Q_OS_WIN
     process.setUnixProcessParameters(QProcess::UnixProcessFlag::CreateNewSession);
@@ -52,6 +54,15 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         if (busy) fail("The image reader did not respond to cancellation and was stopped. Open the image again.");
     });
     setWindowTitle("cpmimage — Review prototype");
+    settings = settingsFile.isEmpty() ? new QSettings("CPMArchives", "cpmimage", this) :
+        new QSettings(settingsFile, QSettings::IniFormat, this);
+    const bool validSettings = filenamePolicy.load(*settings);
+    auto *preferences = menuBar()->addMenu("Settings");
+    auto *filenameSettings = preferences->addAction("Filename translations…");
+    filenameSettings->setObjectName("filenameSettingsAction");
+    filenameSettings->setShortcut(QKeySequence::Preferences);
+    addAction(filenameSettings);
+    connect(filenameSettings, &QAction::triggered, this, &Window::editFilenameSettings);
     auto *help = menuBar()->addMenu("Help");
     auto *licenses = help->addAction("License notices…");
     connect(licenses, &QAction::triggered, this, [this, noticesPath] {
@@ -184,6 +195,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         status->setText("Taking too long. Cancelling the operation…");
     });
     resetImage();
+    if (!validSettings) status->setText("Saved filename mappings are invalid. Defaults are in use; review Settings → Filename translations.");
 }
 
 Window::~Window() {
@@ -223,7 +235,17 @@ void Window::sendPending() {
 void Window::resetImage() {
     session.clear(); image.clear(); directoryEntries = {}; imageNote.clear();
     { QSignalBlocker block(userAreas); userAreas->setCurrentItem(nullptr); userAreas->clearSelection(); }
-    table->setRowCount(0); updateUserAreas();
+    // Selection callbacks can enter widget/accessibility code while rows are being
+    // removed. Clear selection before deleting items and notify only after reset.
+    {
+        const QSignalBlocker block(table);
+        table->clearSelection();
+        table->setCurrentItem(nullptr);
+        table->setSortingEnabled(false);
+        table->setRowCount(0);
+        table->setSortingEnabled(true);
+    }
+    updateUserAreas();
     source->setText("No image open"); setBusy(busy);
 }
 void Window::setBusy(bool value) {
@@ -313,16 +335,77 @@ void Window::updateSelectionStatus() {
         .arg(userAreas->currentItem()->data(Qt::UserRole).toInt())
         .arg(rows.size()).arg(table->rowCount()).arg(bytes).arg(imageNote));
 }
+QString Window::selectedExportName(QString *problem) const {
+    const auto selected = table->selectionModel()->selectedRows();
+    if (selected.size()!=1) return {};
+    const auto name = table->item(selected.first().row(),0)->text();
+    QStringList names;
+    for (int row=0;row<table->rowCount();++row) names<<table->item(row,0)->text();
+    *problem=filenamePolicy.problem(name,names);
+    return filenamePolicy.translate(name);
+}
+void Window::editFilenameSettings() {
+    QDialog dialog(this); dialog.setWindowTitle("Filename translations"); dialog.resize(610,440);
+    auto *layout=new QVBoxLayout(&dialog);
+    auto *description=new QLabel("Translate characters when exporting. The same mappings apply on every OS. Original CP/M names stay uppercase. Import reversal is not enabled.");
+    description->setWordWrap(true); layout->addWidget(description);
+    auto *mappings=new QTableWidget(0,2); mappings->setObjectName("filenameMappings");
+    mappings->setHorizontalHeaderLabels({"CP/M character","Exported character"});
+    mappings->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    layout->addWidget(mappings);
+    auto fill=[&](const QList<FilenameMapping> &values) {
+        const QSignalBlocker blocker(mappings); mappings->setRowCount(values.size());
+        for(int i=0;i<values.size();++i) {
+            mappings->setItem(i,0,new QTableWidgetItem(values[i].source));
+            mappings->setItem(i,1,new QTableWidgetItem(values[i].replacement));
+        }
+    };
+    fill(filenamePolicy.mappings);
+    auto *controls=new QHBoxLayout;
+    auto *add=new QPushButton("Add"); auto *remove=new QPushButton("Remove"); auto *defaults=new QPushButton("Restore defaults");
+    controls->addWidget(add);controls->addWidget(remove);controls->addWidget(defaults);layout->addLayout(controls);
+    auto *example=new QLineEdit("SIG/M.LIB");example->setObjectName("filenameExample");
+    auto *preview=new QLabel; preview->setObjectName("filenamePreview");preview->setWordWrap(true);
+    layout->addWidget(new QLabel("Example CP/M filename:"));layout->addWidget(example);layout->addWidget(preview);
+    auto *buttons=new QDialogButtonBox(QDialogButtonBox::Save|QDialogButtonBox::Cancel);layout->addWidget(buttons);
+    auto read=[&] {
+        QList<FilenameMapping> values;
+        for(int row=0;row<mappings->rowCount();++row)
+            values.append({mappings->item(row,0)?mappings->item(row,0)->text():QString(),
+                           mappings->item(row,1)?mappings->item(row,1)->text():QString()});
+        return values;
+    };
+    auto refresh=[&] {
+        FilenamePolicy candidate;candidate.mappings=read();
+        const auto error=FilenamePolicy::validateMappings(candidate.mappings);
+        buttons->button(QDialogButtonBox::Save)->setEnabled(error.isEmpty());
+        const auto translated=candidate.translate(example->text());
+        const auto invalid=FilenamePolicy::validateHostName(translated);
+        preview->setText(!error.isEmpty()?error:example->text()+" → "+translated+
+            (invalid.isEmpty()?QString():"\n"+invalid));
+    };
+    connect(mappings,&QTableWidget::itemChanged,&dialog,[&]{refresh();});
+    connect(example,&QLineEdit::textChanged,&dialog,[&]{refresh();});
+    connect(add,&QPushButton::clicked,&dialog,[&]{mappings->insertRow(mappings->rowCount());refresh();});
+    connect(remove,&QPushButton::clicked,&dialog,[&]{if(mappings->currentRow()>=0)mappings->removeRow(mappings->currentRow());refresh();});
+    connect(defaults,&QPushButton::clicked,&dialog,[&]{fill(FilenamePolicy::defaults());refresh();});
+    connect(buttons,&QDialogButtonBox::accepted,&dialog,[&]{
+        FilenamePolicy candidate;candidate.mappings=read();
+        if(!candidate.save(*settings)){preview->setText("Could not save filename settings. Check the settings location and try again.");return;}
+        filenamePolicy=candidate;dialog.accept();
+    });
+    connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
+    refresh();dialog.exec();
+}
 void Window::chooseExport() {
     const auto selected = table->selectionModel()->selectedRows();
     if (busy || session.isEmpty() || selected.size() != 1) return;
-    const int row = selected.first().row();
-    const auto name = table->item(row, 0)->data(Qt::UserRole).toString();
     QString directory = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
     if (!QDir(directory).exists()) directory = QDir::homePath();
-    // CP/M '/' is part of the image name; never suggest a host subdirectory.
-    QString hostName = name.mid(2); hostName.replace('/', '_');
-    const QString suggested = QDir(directory).filePath(QString("user%1-%2").arg(name.left(2), hostName));
+    QString problem;
+    const QString hostName = selectedExportName(&problem);
+    if (!problem.isEmpty()) { status->setText(problem); return; }
+    const QString suggested = QDir(directory).filePath(hostName);
     const auto destination = QFileDialog::getSaveFileName(this, "Export file", suggested,
         "All files (*)", nullptr, QFileDialog::DontConfirmOverwrite);
     if (!destination.isEmpty()) exportFile(destination);
@@ -331,6 +414,8 @@ void Window::exportFile(const QString &destination) {
     const auto selected = table->selectionModel()->selectedRows();
     if (busy || session.isEmpty() || selected.size() != 1) return;
     const int row = selected.first().row();
+    const auto problem = FilenamePolicy::validateHostName(QFileInfo(destination).fileName());
+    if (!problem.isEmpty()) { status->setText(problem); return; }
     begin({{"op", "export"}, {"session", session},
            {"name", table->item(row, 0)->data(Qt::UserRole).toString()},
            {"destination", QFileInfo(destination).absoluteFilePath()}});
@@ -405,7 +490,7 @@ void Window::readReply() {
         if (rows.size() > 4096 || result["session"].toString().size() > 128 ||
             !hash.match(result["source_sha256"].toString()).hasMatch()) { invalid(); return; }
         QSet<QString> names;
-        const QRegularExpression filename("^(0[0-9]|1[0-5])[a-z0-9!#$%&'()@^_`{}~+/-]{1,8}(\\.[a-z0-9!#$%&'()@^_`{}~+/-]{1,3})?$");
+        const QRegularExpression filename(QString::fromLatin1(R"CPM(^(0[0-9]|1[0-5])[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,8}(\.[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,3})?$)CPM"));
         for (const auto &row : rows) {
             const auto e = row.toObject(); const auto n = e["name"].toString();
             const double size = e["size"].toDouble(-1), attr = e["attr"].toDouble(-1);

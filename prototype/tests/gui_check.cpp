@@ -18,6 +18,9 @@
 #include <QLabel>
 #include <QComboBox>
 #include <QtTest>
+#include <QSettings>
+#include <QAction>
+#include <QDialogButtonBox>
 
 static QFileDialog *fileDialog() {
     for (auto *w : QApplication::topLevelWidgets())
@@ -28,6 +31,57 @@ static QFileDialog *fileDialog() {
 class GuiCheck : public QObject {
     Q_OBJECT
 private slots:
+    void filenameTranslationPolicy() {
+        FilenamePolicy policy;
+        QCOMPARE(policy.translate("SIG/M.LIB"),QString("SIG_M.LIB"));
+        QCOMPARE(policy.translate("A:B\\C.TXT"),QString("A~B^C.TXT"));
+        QCOMPARE(policy.translate("-CATALOG.310"),QString("-CATALOG.310"));
+        QCOMPARE(policy.translate("A$+`.TXT"),QString("A$+`.TXT"));
+        QVERIFY(!policy.problem("A/B.TXT",{"A/B.TXT","A_B.TXT"}).isEmpty());
+        QVERIFY(!policy.problem("A|B.TXT",{}).isEmpty());
+        QVERIFY(!FilenamePolicy::validateHostName("CON.TXT").isEmpty());
+        QVERIFY(!FilenamePolicy::validateHostName("a.").isEmpty());
+        QVERIFY(!FilenamePolicy::validateMappings({{"/","_"},{"/","~"}}).isEmpty());
+        QVERIFY(!FilenamePolicy::validateMappings({{"/",":"}}).isEmpty());
+        policy.mappings={{"/","_"},{"_","~"}};
+        QCOMPARE(policy.translate("A/B_C.TXT"),QString("A_B~C.TXT")); // one pass
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        QSettings settings(dir.filePath("names.ini"),QSettings::IniFormat);
+        QVERIFY(policy.save(settings));
+        QSettings reloaded(dir.filePath("names.ini"),QSettings::IniFormat);
+        FilenamePolicy restored; QVERIFY(restored.load(reloaded));
+        QCOMPARE(restored.translate("A/B_C.TXT"),QString("A_B~C.TXT"));
+        settings.setValue("filenames/mappings",42);
+        FilenamePolicy fallback; QVERIFY(!fallback.load(settings));
+        QCOMPARE(fallback.translate("SIG/M.LIB"),QString("SIG_M.LIB"));
+    }
+    void filenameSettingsDialog() {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const auto config=dir.filePath("settings.ini");
+        Window window(qEnvironmentVariable("CPMIMAGE_ROOT"),qEnvironmentVariable("CPMIMAGE_PYTHON","python3"),qEnvironmentVariable("CPMIMAGE_HELPER"),30000,2000,{},config);
+        auto *action=window.findChild<QAction *>("filenameSettingsAction"); QVERIFY(action);
+        bool visited=false;
+        QTimer::singleShot(100,&window,[&] {
+            auto *dialog=qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            if (!dialog) return;
+            auto *table=dialog->findChild<QTableWidget *>("filenameMappings");
+            auto *preview=dialog->findChild<QLabel *>("filenamePreview");
+            visited=table && table->rowCount()==3 && preview && preview->text().contains("SIG_M.LIB");
+            if(table) table->item(0,1)->setText("~");
+            dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Save)->click();
+        });
+        action->trigger(); QVERIFY(visited);
+        QSettings saved(config,QSettings::IniFormat); FilenamePolicy policy;
+        QVERIFY(policy.load(saved)); QCOMPARE(policy.translate("SIG/M.LIB"),QString("SIG~M.LIB"));
+        QTimer::singleShot(100,&window,[&] {
+            auto *dialog=qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            if (!dialog) return;
+            dialog->findChild<QTableWidget *>("filenameMappings")->item(0,1)->setText("_");
+            dialog->reject();
+        });
+        action->trigger(); saved.sync(); QVERIFY(policy.load(saved));
+        QCOMPARE(policy.translate("SIG/M.LIB"),QString("SIG~M.LIB"));
+    }
     void listingAndExport() {
         const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
         QVERIFY(!root.isEmpty());
@@ -38,6 +92,10 @@ private slots:
         window.openImage(root + "/fixtures/ibm3740-independent.raw", "ibm-3740", "raw");
         QVERIFY(done.wait(15000)); QVERIFY(done.takeFirst()[0].toBool());
         QCOMPARE(window.entryCount(), 1);
+        auto *names = window.findChild<QTableWidget *>("fileList");
+        QVERIFY(names);
+        QCOMPARE(names->item(0,0)->text(), QString("BINARY.BIN"));
+        QCOMPARE(names->item(0,0)->data(Qt::UserRole).toString(), QString("00BINARY.BIN"));
         QTemporaryDir directory; QVERIFY(directory.isValid());
         const auto destination = directory.filePath("user 7 export.bin");
         window.findChild<QListWidget *>("userAreas")->setCurrentItem(window.findChild<QListWidget *>("userAreas")->item(7));
@@ -61,6 +119,23 @@ private slots:
         window.openImage(root + "/fixtures/ampro200-independent.dsk", "bettercpm-ampro-little-board", "dsk");
         QVERIFY(done.wait(15000)); QVERIFY(done.takeFirst()[0].toBool());
         QCOMPARE(window.entryCount(), 1);
+    }
+    void replaceSelectedImage() {
+        const auto root=qEnvironmentVariable("CPMIMAGE_ROOT");
+        Window window(root,qEnvironmentVariable("CPMIMAGE_PYTHON","python3"),qEnvironmentVariable("CPMIMAGE_HELPER"));
+        window.show(); QSignalSpy done(&window,&Window::completed);
+        auto *table=window.findChild<QTableWidget *>("fileList"); QVERIFY(table);
+        for(int iteration=0;iteration<6;++iteration) {
+            window.openImage(root+"/fixtures/ibm3740-independent.raw","ibm-3740","raw");
+            QVERIFY(done.wait(15000)); QVERIFY(done.takeFirst()[0].toBool());
+            table->sortItems(iteration%3,Qt::DescendingOrder);
+            table->selectAll();
+            QSignalSpy selection(table,&QTableWidget::itemSelectionChanged);
+            window.openImage(root+"/fixtures/ibm3740-empty.raw","ibm-3740","raw");
+            QCOMPARE(selection.count(),0); // No callbacks during row deletion.
+            QVERIFY(done.wait(15000)); QVERIFY(done.takeFirst()[0].toBool());
+            QCOMPARE(table->rowCount(),0);
+        }
     }
     void userAreaNavigation() {
         const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
@@ -120,7 +195,7 @@ private slots:
         QCOMPARE(files->rowCount(),3);
         files->sortItems(1,Qt::AscendingOrder);
         QCOMPARE(files->item(2,1)->data(Qt::DisplayRole).toLongLong(),1024);
-        QCOMPARE(files->item(2,0)->data(Qt::UserRole).toString(),QString("00binary.bin"));
+        QCOMPARE(files->item(2,0)->data(Qt::UserRole).toString(),QString("00BINARY.BIN"));
         files->sortItems(0,Qt::AscendingOrder);
         auto point=[&](int row) { return files->visualItemRect(files->item(row,0)).center(); };
         QTest::mouseClick(files->viewport(),Qt::LeftButton,Qt::NoModifier,point(0));
@@ -184,7 +259,7 @@ private slots:
         QTimer::singleShot(100, &window, [&] {
             auto *dialog = fileDialog();
             if (!dialog) return;
-            visited = QDir(dialog->directory()).exists(); dialog->setDirectory(destination.path());
+            visited = QDir(dialog->directory()).exists() && !dialog->selectedFiles().isEmpty() && QFileInfo(dialog->selectedFiles().first()).fileName()=="BINARY.BIN"; dialog->setDirectory(destination.path());
             QTimer::singleShot(300, dialog, [dialog, &output] { if (auto *edit = dialog->findChild<QLineEdit *>("fileNameEdit")) { edit->setText(output); QTest::keyClick(edit, Qt::Key_Return); } });
         });
         QVERIFY(button("Export")); button("Export")->click(); QVERIFY(visited);
@@ -207,7 +282,7 @@ private slots:
         QTest::newRow("overflow") << QByteArray("import sys; sys.stdin.readline(); print('x'*270000,flush=True); sys.stdin.read()\n");
         const QByteArray prefix = "import sys,json,time\nr=json.loads(sys.stdin.readline())\n";
         QTest::newRow("bad-schema") << prefix + "print(json.dumps(dict(v=1,id=r['id'],ok=True,result=dict(session='x',source_sha256='a'*64,entries=[dict(name='../../x',size=1,attr=0)]))),flush=True)\ntime.sleep(60)\n";
-        QTest::newRow("wrong-size-type") << prefix + "print(json.dumps(dict(v=1,id=r['id'],ok=True,result=dict(session='x',source_sha256='a'*64,entries=[dict(name='00x.bin',size='1',attr=0)]))),flush=True)\ntime.sleep(60)\n";
+        QTest::newRow("wrong-size-type") << prefix + "print(json.dumps(dict(v=1,id=r['id'],ok=True,result=dict(session='x',source_sha256='a'*64,entries=[dict(name='00X.BIN',size='1',attr=0)]))),flush=True)\ntime.sleep(60)\n";
         QTest::newRow("unresponsive") << QByteArray("import sys,time,signal\nif hasattr(signal,'SIGTERM'): signal.signal(signal.SIGTERM,signal.SIG_IGN)\nsys.stdin.readline()\ntime.sleep(60)\n");
     }
     void readerFailures() {

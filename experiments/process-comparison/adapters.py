@@ -16,13 +16,14 @@ FORMATS={'ibm-3740':(128,77,26,1024,64,2,[0,6,12,18,24,4,10,16,22,2,8,14,20,1,7,
  'bettercpm-ampro-little-board':(512,40,10,2048,64,2,list(range(10)))}
 NAME=re.compile(r'^(0[0-9]|1[0-5])[a-z0-9!#$%&\x27()@^_`{}~-]{1,8}(?:\.[a-z0-9!#$%&\x27()@^_`{}~-]{1,3})?$')
 # CP/M '/' is an opaque image filename character, never a host path.
-READ_ONLY_NAME=re.compile(r"^(0[0-9]|1[0-5])[a-z0-9!#$%&\x27()@^_`{}~+/-]{1,8}(?:\.[a-z0-9!#$%&\x27()@^_`{}~+/-]{1,3})?$")
+READ_ONLY_NAME=re.compile('^(0[0-9]|1[0-5])[a-z0-9!#$%&\'()@^_`{}~+/:\\\\|"-]{1,8}(?:\\.[a-z0-9!#$%&\'()@^_`{}~+/:\\\\|"-]{1,3})?$',re.IGNORECASE)
 class Failure(Exception):
  def __init__(self,code,message=''):self.code=code;self.message=message;super().__init__(code+': '+message)
 def digest(b):return hashlib.sha256(b).hexdigest()
 def filename(n,read_only=False):
  if not isinstance(n,str):raise Failure('invalid_name')
- n=n.lower()
+ if not n.isascii():raise Failure('invalid_name')
+ n=n.upper() if read_only else n.lower()
  if not (READ_ONLY_NAME if read_only else NAME).fullmatch(n):raise Failure('invalid_name','supported scope: user 0-15 and strict CP/M 8.3')
  return n
 def validate(data,fmt,container,read_only=False):

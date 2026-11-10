@@ -17,7 +17,7 @@ def create(destination,platform):
  copy(ROOT/'prototype/licenses/libdsk-Library-GPL-2.0.txt',destination/'libdsk-Library-GPL-2.0.txt')
  with tarfile.open(ROOT/'vendor/cpmtools-2.23.tar.gz') as cpm:
   (destination/'cpmtools-README.txt').write_bytes(cpm.extractfile('cpmtools-2.23/README').read())
- (destination/'cpmtools-local-modifications.txt').write_text('CPMImage local modification,2026-11-10: cpmtools2.23 device_libdsk.c geometry fallback preserves odd logical track counts as single-sided rather than dropping the last track. Explicit geometry and successful probes retain priority. See corresponding-source packaging/source/cpmtools-2.23-odd-tracks-libdsk.patch and build recipes. libdsk1.4.2 itself is unchanged.\n')
+ (destination/'cpmtools-local-modifications.txt').write_text('CPMImage local modification,2026-11-10: cpmtools2.23 device_libdsk.c geometry fallback preserves odd logical track counts as single-sided rather than dropping the last track. Explicit geometry and successful probes retain priority. See corresponding-source packaging/source/cpmtools-2.23-odd-tracks-libdsk.patch and build recipes. libdsk1.4.2 itself is unchanged.\nCPMImage read-only-name modification, 2026-11-10: a dedicated cpmfs-readonly.o accepts colon as opaque directory-name data under CPMIMAGE_READ_ONLY_NAMES. Ordinary CLI objects retain their original validation. See packaging/source/cpmtools-2.23-readonly-names.patch.\n')
  if platform == 'macos':
   (destination/'Qt-local-modifications.txt').write_text('CPMImage macOS Qt modification, 2026-11-10: backport upstream commit b74d6cb3c5e8418602494ae549b60839d88ef858 (QTBUG-149612) to Qt 6.12.0. Native accessibility element teardown no longer deletes interfaces owned by the item view/accessibility cache. Upstream author and review metadata are retained in corresponding-source packaging/source/qtbase-6.12.0-cocoa-accessibility.patch. Windows/Linux builds do not apply this Cocoa-only patch.\n')
  copy(PYTHON/'LICENSE',destination/'CPython-LICENSE.txt')
@@ -76,7 +76,10 @@ You may copy, modify and redistribute it under that license. There is no warrant
 The GPL does not replace the licenses of the separate third-party components below.
 
 cpmtools 2.23 — GPL-3.0-or-later. Copyright Michael Haardt and contributors.
-The helper links cpmtools internal filesystem/device code. See GPL-3.0.txt,
+The helper links cpmtools internal filesystem/device code.
+Local read-only-name modification (2026-11-10): the dedicated helper accepts
+colon as an opaque directory-name character; CLI tools retain their original
+validation. See packaging/source/cpmtools-2.23-readonly-names.patch. See GPL-3.0.txt,
 cpmtools-README.txt, and the complete source/build material beside this package.
 
 libdsk 1.4.2 — GNU Library GPL v2-or-later in most files; GPL v2-or-later and

@@ -1,6 +1,6 @@
 # Filename translation policy notes
 
-This is design/backlog material. The owner requested preserving the validated prototype in this commit. No configurable mapping or import policy is implemented here.
+The local v0.2 review implements uppercase filename identities, faithful single-file export suggestions, and configurable export character mappings. Import reversal remains future work.
 
 ## Agreed configurable defaults
 
@@ -12,15 +12,15 @@ The owner approved these three export mappings:
 | `:` | `~` |
 | `\` | `^` |
 
-Provide a configuration setting where users can add, edit or remove character translations. Use the same configured mapping on every host OS, including when preparing names for DOS interchange. Keep the original CP/M filename separate from the exported filename. These are recorded requirements; the validated prototype is unchanged in this commit.
+Provide a configuration setting where users can add, edit or remove character translations. Use the same configured mapping on every host OS, including when preparing names for DOS interchange. Keep the original CP/M filename separate from the exported filename. The local review implements these settings with a live example and saved preferences.
 
 Leave translations for pipe, double quote and plus unresolved. Leave dollar signs and literal backticks unchanged by default. Earlier proposals for those characters are not adopted. All three agreed substitutes are absent from the audited SIG/M catalogue filenames, which reduces ambiguity for this corpus but does not guarantee reversibility for other collections.
 
 No one-character substitution is collision-free: `SIG/M.LIB` and `SIG_M.LIB` can map to the same name. Exports must detect/refuse collisions. Reverse translation on import must be explicit, not applied blindly; guaranteed restoration requires original-name metadata or a documented escaping scheme. The current single-file workflow refuses an existing destination; it does not yet implement that future reversible scheme.
 
-## Owner-defined source-character requirements
+## Source-character handling
 
-Plan host export handling for `/ : \ | "`, plus `+` for the DOS8.3 profile. Colon was discussed as a character in a source CP/M directory entry, not as a proposed replacement character. Directory entries can contain bytes that ordinary command parsers or cpmtools reject. Supporting those archive names requires retaining the original identity and validating backend access, not relabeling the input as invalid merely because a command parser reserves it. Current cpmtools rejects embedded colon; the prototype's narrower subset also excludes backslash/pipe/quote. These remain future compatibility cases.
+Plan host export handling for `/ : \ | "`, plus `+` for the DOS8.3 profile. Colon was discussed as a character in a source CP/M directory entry, not as a proposed replacement character. Directory entries can contain bytes that ordinary command parsers or cpmtools reject. Supporting those archive names requires retaining the original identity and validating backend access, not relabeling the input as invalid merely because a command parser reserves it. The local review uses a dedicated read-only cpmtools object that accepts colon; colon, backslash, pipe and quote listing/export have been checked against independent file bytes. The CLI tools retain their original validation.
 
 DOS is an export naming/interchange profile, not an additional GUI platform.
 

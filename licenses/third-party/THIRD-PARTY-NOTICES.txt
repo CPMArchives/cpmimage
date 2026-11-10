@@ -5,7 +5,10 @@ You may copy, modify and redistribute it under that license. There is no warrant
 The GPL does not replace the licenses of the separate third-party components below.
 
 cpmtools 2.23 — GPL-3.0-or-later. Copyright Michael Haardt and contributors.
-The helper links cpmtools internal filesystem/device code. See GPL-3.0.txt,
+The helper links cpmtools internal filesystem/device code.
+Local read-only-name modification (2026-11-10): the dedicated helper accepts
+colon as an opaque directory-name character; CLI tools retain their original
+validation. See packaging/source/cpmtools-2.23-readonly-names.patch. See GPL-3.0.txt,
 cpmtools-README.txt, and the complete source/build material beside this package.
 
 libdsk 1.4.2 — GNU Library GPL v2-or-later in most files; GPL v2-or-later and
