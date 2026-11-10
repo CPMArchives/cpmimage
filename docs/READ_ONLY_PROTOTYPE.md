@@ -1,6 +1,6 @@
 # Read-only prototype
 
-The merged v0.1 prototype is the baseline. This local v0.2 review adds user-area navigation and multiple selection; other owner feedback remains backlog work. See [the review and validation scope](V0_2_NAVIGATION_REVIEW.md).
+The merged v0.1 prototype is the baseline. v0.2 adds user-area navigation, multiple selection and configurable filename translations. The local batch-export review adds selected-file batches and whole-user-area export; see [the review and validation scope](V0_2_BATCH_EXPORT_REVIEW.md).
 
 ## Runtime boundary
 
@@ -31,8 +31,16 @@ Short IBM3740 raw images are accepted only when sector-aligned and every directo
 
 This does not add general geometry detection or settle a long-term public backend API.
 
-## Current UI limitations
+## Browsing and export
 
-The v0.2 navigation work supports one image, a resizable left pane containing all user areas 0–15, and a sortable Name/Bytes/Attributes table filtered to the selected area. Populated areas have a centered plus on their folder icon. Multiple selection and selection count/byte totals are supported. Export remains limited to exactly one selected file until the separate batch-export step. The suggested export filename currently uses an internal lowercase name prefixed with its user area; `/` is replaced with `_`. The table displays uppercase names. Filename defaults/settings, batch and whole-area export, tabs, and future import/creation/drag-and-drop workflows remain backlog items.
+The v0.2 UI supports one image, a resizable left pane containing all user areas 0–15, and a sortable Name/Bytes/Attributes table filtered to the selected area. Populated areas have a centered plus on their folder icon. Selection count/byte totals are visible. Changing layout clears the session, listing, selection and populated markers.
 
-The image layout selector clears the current listing, selection and populated-area markers and stops the current reader when changed. Some unusual CP/M names remain outside the prototype's allowed naming subset. Dollar signs, plus signs and opaque CP/M slashes are supported by the read-only name validator. No reversible import mapping is implemented.
+CP/M names remain uppercase. Single-file export suggests the displayed filename without a user-area prefix. Configurable translations default to `/ → _`, `: → ~` and `\ → ^` on every host OS. Source names are displayed unchanged; translation applies only to export suggestions. No reverse import mapping is implemented. See [filename policy](FILENAME_POLICY_NOTES.md).
+
+For multiple selected files, **Export selected…** asks for a destination folder once and exports directly into it. **Export user area…** exports every file in the current area, regardless of selection, into a decimal-numbered child folder such as `7/`. Explicit empty-area export creates its empty numbered folder. Both actions are available from File, the labeled buttons and the corresponding file/folder context menus.
+
+Preflight checks all planned translated names before creating files or a numbered folder. Unsafe names and case-insensitive translation collisions are refused. Existing destinations offer **Skip existing**, **Choose another destination** or **Cancel**. Existing numbered folders can be reused; a numbered destination that is a file or symbolic link is refused. A destination created after preflight is still never overwritten by the broker. The last accepted destination is remembered.
+
+Files export sequentially with progress and Cancel. Completed exports are retained on cancellation. Interrupted extraction stays in private staging and is cleaned up through the existing adapter. A failure stops the batch and marks remaining entries not attempted; a later export can skip completed destinations. **Export report…** gives counts and a per-file exported/skipped/failed/cancelled/not-attempted result. Reports are retained in memory for the current application run.
+
+Tabs, automatic format detection, arbitrary diskdefs, image mutation, and future import/creation/drag-and-drop workflows remain outside this implementation. Full binary-package requalification and native Windows/Linux desktop checks for this slice remain outstanding.
