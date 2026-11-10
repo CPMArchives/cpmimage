@@ -14,6 +14,7 @@ class QTableWidget;
 class QListWidget;
 class QSettings;
 class QProgressBar;
+class QAction;
 
 class Window : public QMainWindow {
     Q_OBJECT
@@ -56,6 +57,7 @@ private:
     void nextBatchFile();
     void finishBatch();
     void showExportReport();
+    void showImageInformation();
     QString selectedExportName(QString *problem) const;
     QString root, python, helper, image, format, container, session, requestId, operation, error;
     QByteArray output;
@@ -66,7 +68,7 @@ private:
     void *readerJob = nullptr;
     bool busy = false, closing = false;
     QComboBox *formats;
-    QLabel *source, *notice, *status;
+    QLabel *source, *status;
     QPushButton *openButton, *exportButton, *cancelButton;
     QTableWidget *table;
     QListWidget *userAreas;
@@ -74,7 +76,9 @@ private:
     QString imageNote;
     FilenamePolicy filenamePolicy;
     QSettings *settings;
-    QPushButton *areaExportButton, *reportButton;
+    QPushButton *areaExportButton, *reportButton, *imageInfoButton;
+    QAction *imageInfoAction;
+    QString snapshotHash, exportDiagnostics;
     QProgressBar *progress;
     ExportPlan batch;
     int batchIndex = 0;
