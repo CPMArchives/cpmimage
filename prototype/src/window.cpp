@@ -13,6 +13,10 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QTableWidget>
+#include <QListWidget>
+#include <QSplitter>
+#include <QPainter>
+#include <QStyle>
 #include <QUuid>
 #include <QSignalBlocker>
 #include <QVBoxLayout>
@@ -97,19 +101,49 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     source->setWordWrap(true);
     source->setTextInteractionFlags(Qt::TextSelectableByMouse);
     layout->addWidget(source);
-    table = new QTableWidget(0, 4);
-    table->setHorizontalHeaderLabels({"User", "File", "Bytes", "Attributes"});
+    auto *splitter = new QSplitter;
+    splitter->setObjectName("browserSplitter");
+    userAreas = new QListWidget;
+    userAreas->setObjectName("userAreas");
+    userAreas->setSelectionMode(QAbstractItemView::SingleSelection);
+    userAreas->setIconSize(QSize(24, 24));
+    userAreas->setAccessibleName("CP/M user areas");
+    for (int area = 0; area < 16; ++area) {
+        auto *item = new QListWidgetItem(QString::number(area), userAreas);
+        item->setData(Qt::UserRole, area);
+    }
+    auto *areaPane = new QWidget;
+    auto *areaLayout = new QVBoxLayout(areaPane);
+    areaLayout->setContentsMargins(0,0,0,0);
+    areaLayout->addWidget(new QLabel("User areas"));
+    areaLayout->addWidget(userAreas);
+    splitter->addWidget(areaPane);
+    table = new QTableWidget(0, 3);
+    table->setObjectName("fileList");
+    table->setAccessibleName("Files in selected user area");
+    table->setHorizontalHeaderLabels({"Name", "Bytes", "Attributes"});
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
-    table->setSelectionMode(QAbstractItemView::SingleSelection);
+    table->setSelectionMode(QAbstractItemView::ExtendedSelection);
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
     table->verticalHeader()->hide();
     table->setAlternatingRowColors(true);
-    layout->addWidget(table, 1);
+    table->setSortingEnabled(true);
+    table->sortItems(0, Qt::AscendingOrder);
+    splitter->addWidget(table);
+    splitter->setStretchFactor(1, 1);
+    splitter->setSizes({160, 720});
+    layout->addWidget(splitter, 1);
+    auto *selectAll = new QAction("Select all", table);
+    selectAll->setShortcut(QKeySequence::SelectAll);
+    selectAll->setShortcutContext(Qt::WidgetShortcut);
+    table->addAction(selectAll);
+    connect(selectAll, &QAction::triggered, table, &QTableWidget::selectAll);
     auto *scope = new QLabel("Supported layouts only; no automatic format detection. Export keeps CP/M record padding.");
     scope->setWordWrap(true);
     layout->addWidget(scope);
     status = new QLabel("Choose the image layout, then open an image.");
+    status->setObjectName("selectionStatus");
     status->setTextFormat(Qt::PlainText);
     status->setWordWrap(true);
     status->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -118,8 +152,14 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     connect(openButton, &QPushButton::clicked, this, &Window::chooseImage);
     connect(exportButton, &QPushButton::clicked, this, &Window::chooseExport);
     connect(cancelButton, &QPushButton::clicked, this, &Window::cancel);
-    connect(table, &QTableWidget::itemSelectionChanged, this, [this] { setBusy(busy); });
+    connect(table, &QTableWidget::itemSelectionChanged, this, [this] {
+        setBusy(busy); updateSelectionStatus();
+    });
+    connect(userAreas, &QListWidget::currentItemChanged, this, [this] { showUserArea(); });
     connect(formats, &QComboBox::currentIndexChanged, this, [this] {
+        if (process.state() != QProcess::NotRunning) {
+            stopReader(); process.waitForFinished(2000);
+        }
         resetImage(); status->setText("Layout changed. Open the image again.");
     });
     connect(&process, &QProcess::readyReadStandardOutput, this, &Window::readReply);
@@ -143,7 +183,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         cancel();
         status->setText("Taking too long. Cancelling the operation…");
     });
-    setBusy(false);
+    resetImage();
 }
 
 Window::~Window() {
@@ -181,14 +221,21 @@ void Window::sendPending() {
     if (!pending.isEmpty()) { process.write(pending); pending.clear(); }
 }
 void Window::resetImage() {
-    session.clear(); image.clear(); table->setRowCount(0);
+    session.clear(); image.clear(); directoryEntries = {}; imageNote.clear();
+    { QSignalBlocker block(userAreas); userAreas->setCurrentItem(nullptr); userAreas->clearSelection(); }
+    table->setRowCount(0); updateUserAreas();
     source->setText("No image open"); setBusy(busy);
 }
 void Window::setBusy(bool value) {
     busy = value;
     openButton->setEnabled(!busy);
     formats->setEnabled(!busy);
-    exportButton->setEnabled(!busy && !session.isEmpty() && table->currentRow() >= 0);
+    table->setEnabled(!busy && !session.isEmpty());
+    userAreas->setEnabled(!busy && !session.isEmpty());
+    const int selected = table->selectionModel()->selectedRows().size();
+    exportButton->setEnabled(!busy && !session.isEmpty() && selected == 1);
+    exportButton->setToolTip(selected > 1 ? "Batch export will be added in the next implementation step." :
+        "Export selected (Ctrl+E / Command+E)");
     cancelButton->setEnabled(busy);
 }
 void Window::chooseImage() {
@@ -211,10 +258,66 @@ void Window::openImage(const QString &path, const QString &fmt, const QString &t
 }
 int Window::entryCount() const { return table->rowCount(); }
 void Window::selectEntry(int row) { table->selectRow(row); }
+void Window::updateUserAreas() {
+    for (int area = 0; area < 16; ++area) {
+        int count = 0;
+        for (const auto &value : directoryEntries)
+            if (value.toObject()["name"].toString().left(2).toInt() == area) ++count;
+        auto *item = userAreas->item(area);
+        item->setData(Qt::UserRole + 1, count);
+        item->setToolTip(QString("User area %1 · %2 files").arg(area).arg(count));
+        auto folder = style()->standardIcon(QStyle::SP_DirIcon).pixmap(24, 24);
+        if (count) {
+            QPainter painter(&folder);
+            painter.setRenderHint(QPainter::Antialiasing);
+            painter.setPen(QPen(palette().color(QPalette::Text), 2));
+            painter.drawLine(8, 14, 16, 14);
+            painter.drawLine(12, 10, 12, 18);
+        }
+        item->setIcon(QIcon(folder));
+        item->setData(Qt::AccessibleTextRole,
+            QString("User area %1, %2 files").arg(area).arg(count));
+    }
+}
+void Window::showUserArea() {
+    const QSignalBlocker block(table);
+    const auto *area = userAreas->currentItem();
+    const int currentArea = area ? area->data(Qt::UserRole).toInt() : -1;
+    table->setSortingEnabled(false);
+    table->clearSelection(); table->setCurrentItem(nullptr); table->setRowCount(0);
+    for (const auto &value : directoryEntries) {
+        const auto entry = value.toObject();
+        const auto name = entry["name"].toString();
+        if (name.left(2).toInt() != currentArea) continue;
+        const int row = table->rowCount(); table->insertRow(row);
+        auto *file = new QTableWidgetItem(name.mid(2).toUpper());
+        file->setData(Qt::UserRole, name); table->setItem(row, 0, file);
+        auto *size = new QTableWidgetItem;
+        size->setData(Qt::DisplayRole, entry["size"].toInteger());
+        table->setItem(row, 1, size);
+        const int bits = entry["attr"].toInt(); QStringList flags;
+        for (const auto &flag : QList<QPair<int,QString>>{{1,"F1"},{2,"F2"},{4,"F3"},{8,"F4"},{256,"Read-only"},{512,"System"},{1024,"Archive"}})
+            if (bits & flag.first) flags << flag.second;
+        table->setItem(row, 2, new QTableWidgetItem(flags.isEmpty() ? "—" : flags.join(", ")));
+    }
+    table->setSortingEnabled(true);
+    if (table->rowCount()) table->selectRow(0);
+    setBusy(busy); updateSelectionStatus();
+}
+void Window::updateSelectionStatus() {
+    if (busy || session.isEmpty() || !userAreas->currentItem()) return;
+    const auto rows = table->selectionModel()->selectedRows();
+    qint64 bytes = 0;
+    for (const auto &row : rows) bytes += table->item(row.row(), 1)->data(Qt::DisplayRole).toLongLong();
+    status->setText(QString("User area %1 · %2 of %3 files selected · %4 bytes%5")
+        .arg(userAreas->currentItem()->data(Qt::UserRole).toInt())
+        .arg(rows.size()).arg(table->rowCount()).arg(bytes).arg(imageNote));
+}
 void Window::chooseExport() {
-    const int row = table->currentRow();
-    if (row < 0) return;
-    const auto name = table->item(row, 1)->data(Qt::UserRole).toString();
+    const auto selected = table->selectionModel()->selectedRows();
+    if (busy || session.isEmpty() || selected.size() != 1) return;
+    const int row = selected.first().row();
+    const auto name = table->item(row, 0)->data(Qt::UserRole).toString();
     QString directory = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
     if (!QDir(directory).exists()) directory = QDir::homePath();
     // CP/M '/' is part of the image name; never suggest a host subdirectory.
@@ -225,10 +328,11 @@ void Window::chooseExport() {
     if (!destination.isEmpty()) exportFile(destination);
 }
 void Window::exportFile(const QString &destination) {
-    const int row = table->currentRow();
-    if (busy || session.isEmpty() || row < 0) return;
+    const auto selected = table->selectionModel()->selectedRows();
+    if (busy || session.isEmpty() || selected.size() != 1) return;
+    const int row = selected.first().row();
     begin({{"op", "export"}, {"session", session},
-           {"name", table->item(row, 1)->data(Qt::UserRole).toString()},
+           {"name", table->item(row, 0)->data(Qt::UserRole).toString()},
            {"destination", QFileInfo(destination).absoluteFilePath()}});
 }
 void Window::begin(QJsonObject request) {
@@ -313,26 +417,14 @@ void Window::readReply() {
             names.insert(n);
         }
         session = result["session"].toString();
-        const auto entries = result["entries"].toArray();
-        for (const auto &value : entries) {
-            const auto entry = value.toObject();
-            const auto name = entry["name"].toString();
-            const int row = table->rowCount(); table->insertRow(row);
-            table->setItem(row, 0, new QTableWidgetItem(QString::number(name.left(2).toInt())));
-            auto *file = new QTableWidgetItem(name.mid(2).toUpper()); file->setData(Qt::UserRole, name);
-            table->setItem(row, 1, file);
-            table->setItem(row, 2, new QTableWidgetItem(QString::number(entry["size"].toInteger())));
-            const int bits = entry["attr"].toInt(); QStringList flags;
-            for (const auto &flag : QList<QPair<int,QString>>{{1,"F1"},{2,"F2"},{4,"F3"},{8,"F4"},{256,"Read-only"},{512,"System"},{1024,"Archive"}})
-                if (bits & flag.first) flags << flag.second;
-            table->setItem(row, 3, new QTableWidgetItem(flags.isEmpty() ? "—" : flags.join(", ")));
-        }
-        source->setText(image + "\nSnapshot SHA-256: " + result["source_sha256"].toString());
+        directoryEntries = rows;
         const auto tail = result["unused_tail_filled"];
         if (!tail.isUndefined() && !tail.isBool()) { invalid(); return; }
-        status->setText(QString("%1 files. Select a row to export.").arg(entries.size()) +
-            (tail.toBool() ? " Unused image tail filled in the temporary copy; original unchanged." : ""));
-        if (!entries.isEmpty()) table->selectRow(0);
+        imageNote = tail.toBool() ? " · Unused tail filled in temporary copy; original unchanged." : "";
+        source->setText(image + "\nSnapshot SHA-256: " + result["source_sha256"].toString());
+        updateUserAreas();
+        { QSignalBlocker block(userAreas); userAreas->setCurrentItem(userAreas->item(0)); }
+        showUserArea();
     } else {
         const double size = result["size"].toDouble(-1);
         if (size < 0 || size > 16777216 || std::floor(size) != size ||
@@ -340,7 +432,9 @@ void Window::readReply() {
         status->setText(QString("Exported %1 bytes. SHA-256: %2")
             .arg(result["size"].toInteger()).arg(result["sha256"].toString()));
     }
-    deadline.stop(); cancellationDeadline.stop(); setBusy(false); emit completed(true);
+    deadline.stop(); cancellationDeadline.stop(); setBusy(false);
+    if (operation == "open") updateSelectionStatus();
+    emit completed(true);
     if (closing) close();
 }
 void Window::closeEvent(QCloseEvent *event) {

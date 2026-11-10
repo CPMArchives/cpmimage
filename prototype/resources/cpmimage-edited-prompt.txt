@@ -1,0 +1,4 @@
+Built-in image editing tool; 2026-11-10.
+Input: cpmimage.png (CPMArchives GitHub profile icon).
+
+Edit the supplied CP/M icon. Change ONLY the lower word "inside" to "image" (i-m-a-g-e). Retain the same appearance: exact blue color, solid black background, thick imperfect circular ring with the same opening at top right, unchanged upper "cp/m" lettering, same square composition and margins. Render "image" using the original lower word’s distinctive bold hand-drawn condensed lowercase lettering, upward diagonal baseline, weight, and perspective. Fit it into the same lower region of the ring. No other words, new symbols, shadows, gradients, or redesign. This is a faithful text replacement, not a new logo concept.

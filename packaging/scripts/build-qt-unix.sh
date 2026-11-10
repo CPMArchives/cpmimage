@@ -10,6 +10,11 @@ ROOT=$(CDPATH= cd -- "$BASE/.." && pwd)
 SRC="$BASE/qt-source/qtbase-everywhere-src-6.12.0"
 mkdir -p "$BASE/qt-source"
 if [ ! -f "$SRC/CMakeLists.txt" ]; then tar xf "$ROOT/vendor/qtbase-everywhere-src-6.12.0.tar.xz" -C "$BASE/qt-source"; fi
+# Qt's upstream fix keeps native accessibility queries from deleting table interfaces.
+# Apply only on macOS; the exact pinned 6.12.0 source contains this removed method.
+if [ "$PLATFORM" = macos ] && grep -q 'removeElementsFromCache' "$SRC/src/plugins/platforms/cocoa/qcocoaaccessibilityelement.mm"; then
+  patch -d "$SRC" -p1 --forward --batch < "$BASE/source/qtbase-6.12.0-cocoa-accessibility.patch"
+fi
 cmake -S "$SRC" -B "$BASE/qt-$PLATFORM/build" \
  $CPMIMAGE_QT_DESKTOP_FLAGS -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$BASE/qt-$PLATFORM/install" \
  -DQT_BUILD_EXAMPLES=OFF -DQT_BUILD_TESTS=OFF \

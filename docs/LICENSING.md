@@ -13,7 +13,7 @@ New cpmimage application, helper integration, broker, tests and packaging code i
 | LLVM-MinGW/MinGW/libffi | Windows C helper/runtime inputs | Original notices retained; no LLVM C++ runtime DLL is required by the helper |
 | Microsoft CRT | release ARM64 VC143 runtime | Unmodified distributable runtime; retains Microsoft licensing |
 
-The cpmtools/libdsk bridge patch has a dated modification notice and is included in `packaging/source`. libdsk itself is unchanged. The process boundary does not remove copyleft obligations from the linked GPL helper.
+The cpmtools/libdsk bridge patch has a dated modification notice and is included in `packaging/source`. libdsk itself is unchanged. The v0.2 macOS build recipe additionally backports upstream Qt commit `b74d6cb3c5e8418602494ae549b60839d88ef858` for QTBUG-149612; its original author/review metadata and regression test are retained in `packaging/source/qtbase-6.12.0-cocoa-accessibility.patch`, and generated macOS notices identify this modification. The process boundary does not remove copyleft obligations from the linked GPL helper.
 
 `licenses/third-party` preserves the assembled upstream texts, copyright notices, Qt attribution records, cpmtools local-change notice, CPython notices, MinGW notices, and Microsoft terms. This is deliberately a conservative superset of upstream attributions. `packaging/scripts/notices.py` regenerates product notices from the exact pinned source trees. Platform binaries, toolchains and downloaded dependency archives are not committed.
 

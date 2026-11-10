@@ -2,6 +2,7 @@
 #include "window.h"
 #include "runtime_paths.h"
 #include <QApplication>
+#include <QIcon>
 #include <QCommandLineParser>
 #include <QDir>
 #include <QFileInfo>
@@ -12,6 +13,7 @@
 
 int main(int argc, char **argv) {
     QApplication app(argc, argv);
+    QApplication::setWindowIcon(QIcon(":/icons/cpmimage.png"));
     QApplication::setApplicationName("cpmimage Review");
     QCommandLineParser parser;
     parser.setApplicationDescription("Read-only CP/M image listing and export — local review prototype");

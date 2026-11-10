@@ -1,0 +1,34 @@
+-- Could NOT find WrapVulkanHeaders (missing: Vulkan_INCLUDE_DIR)
+-- Configuring done (0.1s)
+-- Generating done (0.4s)
+-- Build files have been written to: <msvc-kit>/app-build-v02
+[  0%] Built target cpmimage-review_autogen_timestamp_deps
+[  7%] Automatic MOC for target cpmimage-review
+[  7%] Built target cpmimage-review_autogen
+[ 15%] Automatic RCC for resources/icons.qrc
+[ 23%] Building CXX object CMakeFiles/cpmimage-review.dir/cpmimage-review_autogen/mocs_compilation.cpp.obj
+mocs_compilation.cpp
+[ 30%] Building CXX object CMakeFiles/cpmimage-review.dir/src/main.cpp.obj
+main.cpp
+[ 38%] Building CXX object CMakeFiles/cpmimage-review.dir/src/window.cpp.obj
+window.cpp
+[ 46%] Building RC object CMakeFiles/cpmimage-review.dir/resources/cpmimage.rc.res
+Microsoft (R) Windows (R) Resource Compiler Version 10.0.10011.16384
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+[ 46%] Automatic RCC for resources/icons.qrc
+[ 53%] Building CXX object CMakeFiles/cpmimage-review.dir/cpmimage-review_autogen/3YJK5W5UP7/qrc_icons.cpp.obj
+qrc_icons.cpp
+[ 61%] Linking CXX executable cpmimage-review.exe
+[ 61%] Built target cpmimage-review
+[ 61%] Built target gui-check_autogen_timestamp_deps
+[ 69%] Automatic MOC for target gui-check
+[ 69%] Built target gui-check_autogen
+[ 76%] Building CXX object CMakeFiles/gui-check.dir/gui-check_autogen/mocs_compilation.cpp.obj
+mocs_compilation.cpp
+[ 84%] Building CXX object CMakeFiles/gui-check.dir/tests/gui_check.cpp.obj
+gui_check.cpp
+[ 92%] Building CXX object CMakeFiles/gui-check.dir/src/window.cpp.obj
+window.cpp
+[100%] Linking CXX executable gui-check.exe
+[100%] Built target gui-check

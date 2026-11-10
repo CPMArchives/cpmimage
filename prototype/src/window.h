@@ -2,12 +2,14 @@
 #pragma once
 #include <QMainWindow>
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QProcess>
 #include <QTimer>
 class QComboBox;
 class QLabel;
 class QPushButton;
 class QTableWidget;
+class QListWidget;
 
 class Window : public QMainWindow {
     Q_OBJECT
@@ -34,6 +36,9 @@ private:
     void stopReader();
     bool containReader();
     void sendPending();
+    void showUserArea();
+    void updateSelectionStatus();
+    void updateUserAreas();
     void chooseImage();
     void chooseExport();
     QString root, python, helper, image, format, container, session, requestId, operation, error;
@@ -48,4 +53,7 @@ private:
     QLabel *source, *notice, *status;
     QPushButton *openButton, *exportButton, *cancelButton;
     QTableWidget *table;
+    QListWidget *userAreas;
+    QJsonArray directoryEntries;
+    QString imageNote;
 };
