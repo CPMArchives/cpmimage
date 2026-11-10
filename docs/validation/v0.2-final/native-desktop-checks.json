@@ -13,8 +13,8 @@
         "sha256": "110009dcee21620b166f3abfecb5eff7a873be729d1c2d53822e7acc5f34eb9b"
       }
     },
-    "post_export_accessibility": "CUA timed out, including after reconnect/reset; final rendered report not observed",
-    "process_sample": "Main thread idle in Cocoa event loop; not evidence of crash or completed responsiveness check"
+    "post_export_accessibility": "Follow-up 2026-11-11: reconnected successfully; observed 2-export report with exact source/destination names, closed it, opened Image Information showing export hash, then closed it. Continued responsiveness verified.",
+    "process_sample": "Historical diagnostic from initial automation timeout; follow-up interaction resolved the responsiveness gap."
   },
   "linux": {
     "desktop": "Debian 13 KDE X11",
@@ -22,19 +22,20 @@
     "qt_fallback_open_and_folder_dialogs": true,
     "uppercase_and_slash_listing": true,
     "batch_export_report": "2 exported, 0 skipped, 0 failed, 0 cancelled, 0 not attempted",
-    "hash_evidence": "linux-native-export-hashes.json"
+    "hash_evidence": "linux-native-export-hashes.json",
+    "whole_user_area": "User manually confirmed whole-area and empty-area exports; files verified in 0, empty folder 1 exists; source unchanged.",
+    "conflict_and_settings_dialogs": "User manually confirmed repeated whole-area export conflict choices and defaults /\u2192_, :\u2192~, backslash\u2192^."
   },
   "windows": {
     "native_package_launch": true,
     "native_windows_open_dialog": true,
     "uppercase_and_slash_listing": true,
-    "manual_batch_export": "not completed; VM keyboard focus and coordinate automation unreliable",
-    "launch_context": "Run dialog displayed administrative privileges; standard-user launch not separately qualified"
+    "manual_batch_export": "Follow-up: two selected files exported through native folder chooser; visible 2-export report. Repeated export detected 2 conflicts, Skip existing produced 0 exported / 2 skipped. Disk hashes match both oracles; source unchanged.",
+    "launch_context": "Medium-integrity test process PID 2356; Administrators SID attributes 16 (deny-only), integrity RID 8192. Open/list and 512-byte export passed. TokenElevation remains 1, so this is reduced-admin-token validation, not a separate standard-user-account login.",
+    "whole_user_area": "User manually confirmed populated area 0 and an empty area export successfully; post-check filesystem evidence verifies 0 and 1 folders and both area-0 file hashes.",
+    "permissions_test": "windows-restricted-launch.json and windows-native-followup.json; no system security settings changed."
   },
-  "manual_remaining": [
-    "Windows batch/whole-area/conflict dialogs",
-    "Linux whole-area/conflict/settings dialogs",
-    "macOS post-export responsiveness/report check"
-  ],
-  "qualification": "Automated regression and relocation pass; final native desktop sign-off remains open"
+  "manual_remaining": [],
+  "qualification": "Remaining native checks completed; mixed agent-observed and user-confirmed checks explicitly attributed. Ready for review/sign-off within the documented ARM64 scope.",
+  "vm_cleanup": "Temporary UTM F10 and Tab shortcuts removed; original Ctrl+Alt+Delete shortcut retained."
 }
