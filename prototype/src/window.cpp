@@ -30,6 +30,8 @@
 #include <QAction>
 #include <QSettings>
 #include <QLineEdit>
+#include <QProgressBar>
+#include <QMessageBox>
 #include <QTextEdit>
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -98,13 +100,17 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     toolbar->addWidget(formats, 1);
     openButton = new QPushButton("Open image…");
     exportButton = new QPushButton("Export selected…");
+    areaExportButton = new QPushButton("Export user area…");
+    areaExportButton->setObjectName("exportUserArea");
     cancelButton = new QPushButton("Cancel");
+    cancelButton->setObjectName("cancelOperation");
     openButton->setShortcut(QKeySequence::Open);
     exportButton->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
     openButton->setToolTip("Open image (Ctrl+O / Command+O)");
     exportButton->setToolTip("Export selected (Ctrl+E / Command+E)");
     toolbar->addWidget(openButton);
     toolbar->addWidget(exportButton);
+    toolbar->addWidget(areaExportButton);
     toolbar->addWidget(cancelButton);
     layout->addLayout(toolbar);
     source = new QLabel("No image open");
@@ -159,6 +165,36 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     status->setWordWrap(true);
     status->setTextInteractionFlags(Qt::TextSelectableByMouse);
     layout->addWidget(status);
+    progress=new QProgressBar; progress->setObjectName("exportProgress"); progress->hide();
+    layout->addWidget(progress);
+    reportButton=new QPushButton("Export report…"); reportButton->setObjectName("exportReport"); reportButton->setEnabled(false);
+    layout->addWidget(reportButton);
+    connect(reportButton,&QPushButton::clicked,this,&Window::showExportReport);
+    connect(areaExportButton,&QPushButton::clicked,this,[this]{chooseBatch(true);});
+    table->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(table,&QTableWidget::customContextMenuRequested,this,[this](const QPoint &point){
+        if(busy || session.isEmpty()) return;
+        const auto *item=table->itemAt(point);
+        if(item && !item->isSelected()) table->selectRow(item->row());
+        QMenu menu; auto *action=menu.addAction("Export selected…");
+        action->setEnabled(!table->selectionModel()->selectedRows().isEmpty());
+        if(menu.exec(table->viewport()->mapToGlobal(point))==action) chooseExport();
+    });
+    userAreas->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(userAreas,&QListWidget::customContextMenuRequested,this,[this](const QPoint &point){
+        if(busy || session.isEmpty()) return;
+        auto *item=userAreas->itemAt(point); if(!item) return;
+        userAreas->setCurrentItem(item);
+        QMenu menu; auto *action=menu.addAction("Export user area…");
+        if(menu.exec(userAreas->viewport()->mapToGlobal(point))==action) chooseBatch(true);
+    });
+    auto *fileMenu=new QMenu("File",this);
+    menuBar()->insertMenu(preferences->menuAction(),fileMenu);
+    auto *exportAction=fileMenu->addAction("Export selected…");
+    connect(exportAction,&QAction::triggered,exportButton,&QPushButton::click);
+    auto *areaAction=fileMenu->addAction("Export user area…");
+    connect(areaAction,&QAction::triggered,areaExportButton,&QPushButton::click);
+    connect(fileMenu,&QMenu::aboutToShow,this,[=]{exportAction->setEnabled(exportButton->isEnabled());areaAction->setEnabled(areaExportButton->isEnabled());});
     setCentralWidget(central);
     connect(openButton, &QPushButton::clicked, this, &Window::chooseImage);
     connect(exportButton, &QPushButton::clicked, this, &Window::chooseExport);
@@ -255,9 +291,9 @@ void Window::setBusy(bool value) {
     table->setEnabled(!busy && !session.isEmpty());
     userAreas->setEnabled(!busy && !session.isEmpty());
     const int selected = table->selectionModel()->selectedRows().size();
-    exportButton->setEnabled(!busy && !session.isEmpty() && selected == 1);
-    exportButton->setToolTip(selected > 1 ? "Batch export will be added in the next implementation step." :
-        "Export selected (Ctrl+E / Command+E)");
+    exportButton->setEnabled(!busy && !session.isEmpty() && selected > 0);
+    exportButton->setToolTip("Export selected (Ctrl+E / Command+E)");
+    areaExportButton->setEnabled(!busy && !session.isEmpty() && userAreas->currentItem());
     cancelButton->setEnabled(busy);
 }
 void Window::chooseImage() {
@@ -345,6 +381,7 @@ QString Window::selectedExportName(QString *problem) const {
     return filenamePolicy.translate(name);
 }
 void Window::editFilenameSettings() {
+    if(busy) return;
     QDialog dialog(this); dialog.setWindowTitle("Filename translations"); dialog.resize(610,440);
     auto *layout=new QVBoxLayout(&dialog);
     auto *description=new QLabel("Translate characters when exporting. The same mappings apply on every OS. Original CP/M names stay uppercase. Import reversal is not enabled.");
@@ -399,8 +436,9 @@ void Window::editFilenameSettings() {
 }
 void Window::chooseExport() {
     const auto selected = table->selectionModel()->selectedRows();
-    if (busy || session.isEmpty() || selected.size() != 1) return;
-    QString directory = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+    if (busy || session.isEmpty() || selected.isEmpty()) return;
+    if(selected.size()>1) { chooseBatch(false); return; }
+    QString directory = settings->value("exports/directory",QStandardPaths::writableLocation(QStandardPaths::DownloadLocation)).toString();
     if (!QDir(directory).exists()) directory = QDir::homePath();
     QString problem;
     const QString hostName = selectedExportName(&problem);
@@ -408,7 +446,10 @@ void Window::chooseExport() {
     const QString suggested = QDir(directory).filePath(hostName);
     const auto destination = QFileDialog::getSaveFileName(this, "Export file", suggested,
         "All files (*)", nullptr, QFileDialog::DontConfirmOverwrite);
-    if (!destination.isEmpty()) exportFile(destination);
+    if (!destination.isEmpty()) {
+        settings->setValue("exports/directory",QFileInfo(destination).absolutePath());
+        exportFile(destination);
+    }
 }
 void Window::exportFile(const QString &destination) {
     const auto selected = table->selectionModel()->selectedRows();
@@ -420,6 +461,123 @@ void Window::exportFile(const QString &destination) {
            {"name", table->item(row, 0)->data(Qt::UserRole).toString()},
            {"destination", QFileInfo(destination).absoluteFilePath()}});
 }
+QJsonArray Window::exportEntries(bool wholeArea) const {
+    QJsonArray entries;
+    if(wholeArea) {
+        if(!userAreas->currentItem()) return entries;
+        const int area=userAreas->currentItem()->data(Qt::UserRole).toInt();
+        for(const auto &value:directoryEntries)
+            if(value.toObject()["name"].toString().left(2).toInt()==area) entries.append(value);
+    } else {
+        for(const auto &row:table->selectionModel()->selectedRows()) {
+            const auto name=table->item(row.row(),0)->data(Qt::UserRole).toString();
+            for(const auto &value:directoryEntries)
+                if(value.toObject()["name"].toString()==name) { entries.append(value); break; }
+        }
+    }
+    return entries;
+}
+void Window::chooseBatch(bool wholeArea) {
+    if(busy || session.isEmpty() || !userAreas->currentItem()) return;
+    const auto entries=exportEntries(wholeArea);
+    if(!wholeArea && entries.isEmpty()) return;
+    QString previous=settings->value("exports/directory",QStandardPaths::writableLocation(QStandardPaths::DownloadLocation)).toString();
+    if(!QDir(previous).exists()) previous=QDir::homePath();
+    while(true) {
+        const auto directory=QFileDialog::getExistingDirectory(this,wholeArea ? "Export user area" : "Export selected files",previous);
+        if(directory.isEmpty()) return;
+        previous=directory;
+        const int area=wholeArea?userAreas->currentItem()->data(Qt::UserRole).toInt():-1;
+        auto plan=planExport(entries,directory,area,filenamePolicy);
+        if(!plan.error.isEmpty()) { QMessageBox::warning(this,"Cannot export",plan.error);return; }
+        bool skip=false;
+        if(!plan.conflicts.isEmpty()) {
+            QMessageBox dialog(QMessageBox::Warning,"Existing destinations",
+                QString("%1 destination name(s) already exist. Nothing will be overwritten.").arg(plan.conflicts.size()),QMessageBox::NoButton,this);
+            auto *skipButton=dialog.addButton("Skip existing",QMessageBox::AcceptRole);
+            auto *another=dialog.addButton("Choose another destination",QMessageBox::ActionRole);
+            dialog.addButton(QMessageBox::Cancel); dialog.exec();
+            if(dialog.clickedButton()==another) continue;
+            if(dialog.clickedButton()!=skipButton) return;
+            skip=true;
+        }
+        settings->setValue("exports/directory",directory);
+        startBatch(plan,skip); return;
+    }
+}
+void Window::exportSelection(const QString &directory,bool skipExisting) {
+    if(busy || session.isEmpty()) return;
+    const auto entries=exportEntries(false);
+    if(entries.isEmpty()) return;
+    startBatch(planExport(entries,directory,-1,filenamePolicy),skipExisting);
+}
+void Window::exportUserArea(const QString &directory,bool skipExisting) {
+    if(busy || session.isEmpty() || !userAreas->currentItem()) return;
+    startBatch(planExport(exportEntries(true),directory,userAreas->currentItem()->data(Qt::UserRole).toInt(),filenamePolicy),skipExisting);
+}
+void Window::startBatch(ExportPlan plan,bool skipExisting) {
+    if(!plan.error.isEmpty() || (!skipExisting && !plan.conflicts.isEmpty())) {
+        error=plan.error.isEmpty()?"Existing destinations found. Choose Skip existing or another destination; nothing was exported.":plan.error;
+        status->setText(error); emit completed(false); return;
+    }
+    if(!QDir(plan.directory).exists() && !QDir().mkdir(plan.directory)) {
+        error="Cannot create the numbered user-area folder."; status->setText(error);emit completed(false);return;
+    }
+    error.clear();
+    batch=plan; batchIndex=0; batchActive=true; batchInFlight=false; batchCancelRequested=false;
+    batchReport.clear(); reportButton->setEnabled(false);
+    for(auto &item:batch.items) if(item.exists) item.outcome="Skipped: destination exists";
+    progress->setRange(0,batch.items.size()); progress->setValue(0); progress->show();
+    setBusy(true); emit exportProgress(0,batch.items.size());
+    QTimer::singleShot(0,this,&Window::nextBatchFile);
+}
+void Window::nextBatchFile() {
+    if(!batchActive || batchInFlight) return;
+    if(batchCancelRequested) { finishBatch();return; }
+    while(batchIndex<batch.items.size() && batch.items[batchIndex].outcome.startsWith("Skipped")) ++batchIndex;
+    progress->setValue(batchIndex);
+    if(batchIndex==batch.items.size()) { finishBatch();return; }
+    if(session.isEmpty() || process.state()!=QProcess::Running) {
+        error="The image session ended; open the image again."; finishBatch();return;
+    }
+    batchInFlight=true;
+    const auto &item=batch.items[batchIndex];
+    begin({{"op","export"},{"session",session},{"name",item.name},{"destination",item.destination}});
+}
+void Window::finishBatch() {
+    if(!batchActive) return;
+    int exported=0,skipped=0,failed=0,cancelled=0,remaining=0;
+    QStringList lines;
+    for(auto &item:batch.items) {
+        if(item.outcome=="Exported") ++exported;
+        else if(item.outcome.startsWith("Skipped")) ++skipped;
+        else if(item.outcome.startsWith("Failed")) ++failed;
+        else if(item.outcome.startsWith("Cancelled")) ++cancelled;
+        else { item.outcome="Not attempted"; ++remaining; }
+        lines<<item.name.mid(2)+" → "+item.destination+" — "+item.outcome;
+    }
+    const bool success=!batchCancelRequested && error.isEmpty() && failed==0 && remaining==0;
+    const auto summary=QString("%1 exported · %2 skipped · %3 failed · %4 cancelled · %5 not attempted")
+        .arg(exported).arg(skipped).arg(failed).arg(cancelled).arg(remaining);
+    batchReport=summary+"\nDestination: "+batch.directory+"\n"+
+        (batchCancelRequested?"Cancelled. Completed exports were retained.\n":QString())+
+        (error.isEmpty()?QString():error+"\n")+lines.join('\n');
+    batchActive=false; batchInFlight=false;
+    deadline.stop(); cancellationDeadline.stop();setBusy(false);
+    progress->setRange(0,qMax(1,int(batch.items.size())));
+    progress->setValue(exported+skipped+failed+cancelled);
+    reportButton->setEnabled(true); status->setText(summary);
+    emit completed(success);
+    if(closing) close();
+}
+void Window::showExportReport() {
+    QDialog dialog(this);dialog.setWindowTitle("Export report");dialog.resize(750,450);
+    auto *layout=new QVBoxLayout(&dialog);
+    auto *text=new QTextEdit; text->setReadOnly(true);text->setPlainText(batchReport);layout->addWidget(text);
+    auto *buttons=new QDialogButtonBox(QDialogButtonBox::Close);layout->addWidget(buttons);
+    connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);dialog.exec();
+}
+
 void Window::begin(QJsonObject request) {
     error.clear(); output.clear();
     operation = request["op"].toString();
@@ -429,7 +587,8 @@ void Window::begin(QJsonObject request) {
         fail("The image reader is restarting. Open the image again."); return;
     }
     setBusy(true);
-    status->setText(operation == "open" ? "Reading image…" : "Exporting selected file…");
+    status->setText(operation == "open" ? "Reading image…" : batchActive ?
+        QString("Exporting %1 of %2: %3").arg(batchIndex+1).arg(batch.items.size()).arg(batch.items[batchIndex].name.mid(2)) : "Exporting selected file…");
     deadline.start(deadlineMs);
     pending = QJsonDocument(request).toJson(QJsonDocument::Compact) + '\n';
     if (process.state() == QProcess::NotRunning) {
@@ -441,6 +600,10 @@ void Window::begin(QJsonObject request) {
 }
 void Window::cancel() {
     if (!busy) return;
+    if(batchActive) {
+        batchCancelRequested=true;
+        if(!batchInFlight) { finishBatch(); return; }
+    }
     if (!cancellationDeadline.isActive()) cancellationDeadline.start(graceMs);
     const QJsonObject request{{"v",1}, {"id","cancel"}, {"op","cancel"}, {"target",requestId}};
     process.write(QJsonDocument(request).toJson(QJsonDocument::Compact) + '\n');
@@ -448,7 +611,13 @@ void Window::cancel() {
     status->setText("Cancelling…");
 }
 void Window::fail(const QString &message) {
-    deadline.stop(); cancellationDeadline.stop(); error = message; setBusy(false);
+    deadline.stop(); cancellationDeadline.stop(); error = message;
+    if(batchActive) {
+        if(batchInFlight && batchIndex<batch.items.size()) batch.items[batchIndex].outcome=
+            batchCancelRequested ? "Cancelled: "+message : "Failed: "+message;
+        batchInFlight=false; finishBatch(); return;
+    }
+    setBusy(false);
     if (operation == "open") resetImage();
     status->setText(message); emit completed(false);
     if (closing) close();
@@ -512,12 +681,20 @@ void Window::readReply() {
         showUserArea();
     } else {
         const double size = result["size"].toDouble(-1);
+        if(batchActive && size!=batch.items[batchIndex].size) { invalid();return; }
         if (size < 0 || size > 16777216 || std::floor(size) != size ||
             !hash.match(result["sha256"].toString()).hasMatch()) { invalid(); return; }
         status->setText(QString("Exported %1 bytes. SHA-256: %2")
             .arg(result["size"].toInteger()).arg(result["sha256"].toString()));
     }
-    deadline.stop(); cancellationDeadline.stop(); setBusy(false);
+    deadline.stop(); cancellationDeadline.stop();
+    if(batchActive && operation=="export") {
+        batch.items[batchIndex].outcome="Exported";
+        batchInFlight=false; ++batchIndex;
+        progress->setValue(batchIndex); emit exportProgress(batchIndex,batch.items.size());
+        QTimer::singleShot(0,this,&Window::nextBatchFile); return;
+    }
+    setBusy(false);
     if (operation == "open") updateSelectionStatus();
     emit completed(true);
     if (closing) close();
