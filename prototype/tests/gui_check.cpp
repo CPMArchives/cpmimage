@@ -22,6 +22,7 @@
 #include <QAction>
 #include <QDialogButtonBox>
 #include <QMessageBox>
+#include <QTextEdit>
 
 static QFileDialog *fileDialog() {
     for (auto *w : QApplication::topLevelWidgets())
@@ -32,6 +33,59 @@ static QFileDialog *fileDialog() {
 class GuiCheck : public QObject {
     Q_OBJECT
 private slots:
+    void compactToolbarAndImageInformation() {
+        const auto root=qEnvironmentVariable("CPMIMAGE_ROOT");
+        Window window(root,qEnvironmentVariable("CPMIMAGE_PYTHON","python3"),qEnvironmentVariable("CPMIMAGE_HELPER"));
+        window.show();window.resize(920,580);
+        auto *information=window.findChild<QPushButton *>("imageInformation");
+        auto *action=window.findChild<QAction *>("imageInformationAction");
+        auto *name=window.findChild<QLabel *>("imageName");
+        auto *cancel=window.findChild<QPushButton *>("cancelOperation");
+        QVERIFY(information);QVERIFY(action);QVERIFY(name);QVERIFY(cancel);
+        QVERIFY(!information->isEnabled());QVERIFY(!action->isEnabled());QVERIFY(cancel->isHidden());
+        QVERIFY2(window.minimumSizeHint().width()<=920,qPrintable(QString::number(window.minimumSizeHint().width())));
+        QSignalSpy done(&window,&Window::completed);
+        const auto source=root+"/fixtures/ibm3740-independent.raw";
+        window.openImage(source,"ibm-3740","raw");
+        QVERIFY(!information->isEnabled());QVERIFY(!cancel->isHidden());
+        QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        QVERIFY(information->isEnabled());QVERIFY(action->isEnabled());QVERIFY(cancel->isHidden());
+        QCOMPARE(name->text(),QString("ibm3740-independent.raw"));QVERIFY(window.windowTitle().contains(name->text()));
+        for(auto *label:window.findChildren<QLabel *>()) QVERIFY(!label->text().contains("SHA-256"));
+        auto dialogText=[&](bool menu) {
+            QString text;
+            QTimer::singleShot(100,&window,[&]{
+                if(auto *dialog=qobject_cast<QDialog *>(QApplication::activeModalWidget())) {
+                    if(auto *field=dialog->findChild<QTextEdit *>("imageInformationText")) text=field->toPlainText();
+                    dialog->reject();
+                }
+            });
+            if(menu) action->trigger();else information->click();
+            return text;
+        };
+        auto details=dialogText(false);
+        QVERIFY(details.contains(QFileInfo(source).absoluteFilePath()));QVERIFY(details.contains("IBM 3740"));
+        QVERIFY(details.contains("Container: raw"));QVERIFY(details.contains("Files: 3"));
+        QVERIFY(details.contains("Populated user areas: 3 of 16"));
+        QFile original(source);QVERIFY(original.open(QIODevice::ReadOnly));const auto bytes=original.readAll();
+        QVERIFY(details.contains(QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex())));
+        QVERIFY(details.contains("Read-only normalization: None."));
+        QTemporaryDir temp;window.selectEntry(0);window.exportFile(temp.filePath("export.bin"));
+        QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        QVERIFY(!window.findChild<QLabel *>("selectionStatus")->text().contains("SHA-256"));
+        details=dialogText(true);QVERIFY(details.contains("Last completed export"));
+        QVERIFY(details.contains("110009dcee21620b166f3abfecb5eff7a873be729d1c2d53822e7acc5f34eb9b"));
+        QFile trimmed(temp.filePath("trimmed.raw"));QVERIFY(trimmed.open(QIODevice::WriteOnly));trimmed.write(bytes.left(bytes.size()-128));trimmed.close();
+        window.openImage(trimmed.fileName(),"ibm-3740","raw");QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        details=dialogText(false);QVERIFY(details.contains("tail filled with E5"));QVERIFY(!details.contains("Last completed export"));
+        QVERIFY(!window.findChild<QLabel *>("selectionStatus")->text().contains("tail"));
+        window.findChild<QComboBox *>()->setCurrentIndex(1);
+        QVERIFY(!information->isEnabled());QVERIFY(!action->isEnabled());QCOMPARE(name->text(),QString("No image open"));
+        window.openImage(root+"/fixtures/ibm3740-truncated.raw","ibm-3740","raw");
+        QVERIFY(done.wait(15000));QVERIFY(!done.takeFirst()[0].toBool());
+        QVERIFY(!information->isEnabled());QVERIFY(name->toolTip().isEmpty());
+    }
+
     void exportPlanning() {
         QTemporaryDir dir; QVERIFY(dir.isValid());
         FilenamePolicy policy;

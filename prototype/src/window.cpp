@@ -82,10 +82,6 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     resize(920, 580);
     auto *central = new QWidget(this);
     auto *layout = new QVBoxLayout(central);
-    auto *title = new QLabel("<h2>CP/M disk images</h2>");
-    layout->addWidget(title);
-    notice = new QLabel("Browse and export files. The source image is never edited.");
-    layout->addWidget(notice);
     auto *toolbar = new QHBoxLayout;
     formats = new QComboBox;
     const QList<QStringList> choices = {
@@ -96,8 +92,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         {"Ampro Little Board · raw", "bettercpm-ampro-little-board", "raw"},
         {"Ampro Little Board · standard DSK", "bettercpm-ampro-little-board", "dsk"}};
     for (const auto &choice : choices) formats->addItem(choice[0], choice.mid(1));
-    toolbar->addWidget(new QLabel("Image layout:"));
-    toolbar->addWidget(formats, 1);
+
     openButton = new QPushButton("Open image…");
     exportButton = new QPushButton("Export selected…");
     areaExportButton = new QPushButton("Export user area…");
@@ -111,11 +106,25 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     toolbar->addWidget(openButton);
     toolbar->addWidget(exportButton);
     toolbar->addWidget(areaExportButton);
-    toolbar->addWidget(cancelButton);
+    toolbar->addStretch();
+    auto *readOnly = new QLabel("Read-only");
+    readOnly->setToolTip("Browse and export. The source image is never edited.");
+    toolbar->addWidget(readOnly);
     layout->addLayout(toolbar);
+    auto *imageRow=new QHBoxLayout;
+    imageRow->addWidget(new QLabel("Image layout:"));
+    formats->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    formats->setMinimumContentsLength(18);
+    imageRow->addWidget(formats,1);
+    imageInfoButton=new QPushButton("Image information…");
+    imageInfoButton->setObjectName("imageInformation");
+    imageRow->addWidget(imageInfoButton);
+    layout->addLayout(imageRow);
     source = new QLabel("No image open");
     source->setTextFormat(Qt::PlainText);
-    source->setWordWrap(true);
+    source->setObjectName("imageName");
+    source->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);
+    source->setMinimumWidth(0);
     source->setTextInteractionFlags(Qt::TextSelectableByMouse);
     layout->addWidget(source);
     auto *splitter = new QSplitter;
@@ -156,19 +165,21 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     selectAll->setShortcutContext(Qt::WidgetShortcut);
     table->addAction(selectAll);
     connect(selectAll, &QAction::triggered, table, &QTableWidget::selectAll);
-    auto *scope = new QLabel("Supported layouts only; no automatic format detection. Export keeps CP/M record padding.");
-    scope->setWordWrap(true);
-    layout->addWidget(scope);
+
     status = new QLabel("Choose the image layout, then open an image.");
     status->setObjectName("selectionStatus");
     status->setTextFormat(Qt::PlainText);
     status->setWordWrap(true);
     status->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    layout->addWidget(status);
+    auto *statusRow=new QHBoxLayout;
+    statusRow->addWidget(status,1);
+    statusRow->addWidget(cancelButton);
     progress=new QProgressBar; progress->setObjectName("exportProgress"); progress->hide();
     layout->addWidget(progress);
     reportButton=new QPushButton("Export report…"); reportButton->setObjectName("exportReport"); reportButton->setEnabled(false);
-    layout->addWidget(reportButton);
+    reportButton->hide();
+    statusRow->addWidget(reportButton);
+    layout->addLayout(statusRow);
     connect(reportButton,&QPushButton::clicked,this,&Window::showExportReport);
     connect(areaExportButton,&QPushButton::clicked,this,[this]{chooseBatch(true);});
     table->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -190,11 +201,18 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     });
     auto *fileMenu=new QMenu("File",this);
     menuBar()->insertMenu(preferences->menuAction(),fileMenu);
+    auto *openAction=fileMenu->addAction("Open image…");
+    connect(openAction,&QAction::triggered,openButton,&QPushButton::click);
     auto *exportAction=fileMenu->addAction("Export selected…");
     connect(exportAction,&QAction::triggered,exportButton,&QPushButton::click);
     auto *areaAction=fileMenu->addAction("Export user area…");
     connect(areaAction,&QAction::triggered,areaExportButton,&QPushButton::click);
-    connect(fileMenu,&QMenu::aboutToShow,this,[=]{exportAction->setEnabled(exportButton->isEnabled());areaAction->setEnabled(areaExportButton->isEnabled());});
+    fileMenu->addSeparator();
+    imageInfoAction=fileMenu->addAction("Image information…");
+    imageInfoAction->setObjectName("imageInformationAction");
+    connect(imageInfoAction,&QAction::triggered,this,&Window::showImageInformation);
+    connect(imageInfoButton,&QPushButton::clicked,this,&Window::showImageInformation);
+    connect(fileMenu,&QMenu::aboutToShow,this,[=]{openAction->setEnabled(openButton->isEnabled());exportAction->setEnabled(exportButton->isEnabled());areaAction->setEnabled(areaExportButton->isEnabled());});
     setCentralWidget(central);
     connect(openButton, &QPushButton::clicked, this, &Window::chooseImage);
     connect(exportButton, &QPushButton::clicked, this, &Window::chooseExport);
@@ -270,6 +288,7 @@ void Window::sendPending() {
 }
 void Window::resetImage() {
     session.clear(); image.clear(); directoryEntries = {}; imageNote.clear();
+    snapshotHash.clear(); exportDiagnostics.clear();
     { QSignalBlocker block(userAreas); userAreas->setCurrentItem(nullptr); userAreas->clearSelection(); }
     // Selection callbacks can enter widget/accessibility code while rows are being
     // removed. Clear selection before deleting items and notify only after reset.
@@ -282,7 +301,8 @@ void Window::resetImage() {
         table->setSortingEnabled(true);
     }
     updateUserAreas();
-    source->setText("No image open"); setBusy(busy);
+    source->setText("No image open"); source->setToolTip({});
+    setWindowTitle("cpmimage — Review prototype"); setBusy(busy);
 }
 void Window::setBusy(bool value) {
     busy = value;
@@ -295,6 +315,10 @@ void Window::setBusy(bool value) {
     exportButton->setToolTip("Export selected (Ctrl+E / Command+E)");
     areaExportButton->setEnabled(!busy && !session.isEmpty() && userAreas->currentItem());
     cancelButton->setEnabled(busy);
+    cancelButton->setVisible(busy);
+    imageInfoButton->setEnabled(!busy && !session.isEmpty());
+    imageInfoAction->setEnabled(!busy && !session.isEmpty());
+    progress->setVisible(busy && batchActive);
 }
 void Window::chooseImage() {
     const QString path = QFileDialog::getOpenFileName(this, "Open CP/M image", image.isEmpty() ? QDir::homePath() : image,
@@ -311,7 +335,7 @@ void Window::openImage(const QString &path, const QString &fmt, const QString &t
         }
     }
     resetImage(); image = QFileInfo(path).absoluteFilePath(); format = fmt; container = type;
-    source->setText(image);
+    source->setText(QFileInfo(image).fileName()); source->setToolTip(image);
     begin({{"op", "open"}, {"image", image}, {"format", fmt}, {"container", type}});
 }
 int Window::entryCount() const { return table->rowCount(); }
@@ -367,9 +391,9 @@ void Window::updateSelectionStatus() {
     const auto rows = table->selectionModel()->selectedRows();
     qint64 bytes = 0;
     for (const auto &row : rows) bytes += table->item(row.row(), 1)->data(Qt::DisplayRole).toLongLong();
-    status->setText(QString("User area %1 · %2 of %3 files selected · %4 bytes%5")
+    status->setText(QString("User area %1 · %2 of %3 files selected · %4 bytes")
         .arg(userAreas->currentItem()->data(Qt::UserRole).toInt())
-        .arg(rows.size()).arg(table->rowCount()).arg(bytes).arg(imageNote));
+        .arg(rows.size()).arg(table->rowCount()).arg(bytes));
 }
 QString Window::selectedExportName(QString *problem) const {
     const auto selected = table->selectionModel()->selectedRows();
@@ -525,7 +549,7 @@ void Window::startBatch(ExportPlan plan,bool skipExisting) {
     }
     error.clear();
     batch=plan; batchIndex=0; batchActive=true; batchInFlight=false; batchCancelRequested=false;
-    batchReport.clear(); reportButton->setEnabled(false);
+    batchReport.clear(); reportButton->setEnabled(false); reportButton->hide();
     for(auto &item:batch.items) if(item.exists) item.outcome="Skipped: destination exists";
     progress->setRange(0,batch.items.size()); progress->setValue(0); progress->show();
     setBusy(true); emit exportProgress(0,batch.items.size());
@@ -566,10 +590,25 @@ void Window::finishBatch() {
     deadline.stop(); cancellationDeadline.stop();setBusy(false);
     progress->setRange(0,qMax(1,int(batch.items.size())));
     progress->setValue(exported+skipped+failed+cancelled);
-    reportButton->setEnabled(true); status->setText(summary);
+    reportButton->setEnabled(true); reportButton->show(); status->setText(summary);
     emit completed(success);
     if(closing) close();
 }
+void Window::showImageInformation() {
+    if(busy || session.isEmpty()) return;
+    int populated=0;
+    for(int area=0;area<16;++area)
+        if(userAreas->item(area)->data(Qt::UserRole+1).toInt()>0) ++populated;
+    const auto details=QString("Source image: %1\nImage layout: %2\nFormat identifier: %3\nContainer: %4\nFiles: %5\nPopulated user areas: %6 of 16\n\nSnapshot SHA-256: %7\nRead-only normalization: %8\n\nRead-only: the source image is never edited.\nLayout selection is manual; no automatic format detection.\nExport retains CP/M record padding.")
+        .arg(image,formats->currentText(),format,container).arg(directoryEntries.size()).arg(populated).arg(snapshotHash,imageNote);
+    QDialog dialog(this);dialog.setWindowTitle("Image information");dialog.resize(700,420);
+    auto *layout=new QVBoxLayout(&dialog);
+    auto *text=new QTextEdit;text->setObjectName("imageInformationText");text->setReadOnly(true);
+    text->setPlainText(details+(exportDiagnostics.isEmpty()?QString():"\n\n"+exportDiagnostics));layout->addWidget(text);
+    auto *buttons=new QDialogButtonBox(QDialogButtonBox::Close);layout->addWidget(buttons);
+    connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);dialog.exec();
+}
+
 void Window::showExportReport() {
     QDialog dialog(this);dialog.setWindowTitle("Export report");dialog.resize(750,450);
     auto *layout=new QVBoxLayout(&dialog);
@@ -674,8 +713,10 @@ void Window::readReply() {
         directoryEntries = rows;
         const auto tail = result["unused_tail_filled"];
         if (!tail.isUndefined() && !tail.isBool()) { invalid(); return; }
-        imageNote = tail.toBool() ? " · Unused tail filled in temporary copy; original unchanged." : "";
-        source->setText(image + "\nSnapshot SHA-256: " + result["source_sha256"].toString());
+        imageNote = tail.toBool() ? "Unused image tail filled with E5 in the temporary snapshot; original unchanged." : "None.";
+        snapshotHash=result["source_sha256"].toString();
+        source->setText(QFileInfo(image).fileName()); source->setToolTip(image);
+        setWindowTitle("cpmimage — "+QFileInfo(image).fileName());
         updateUserAreas();
         { QSignalBlocker block(userAreas); userAreas->setCurrentItem(userAreas->item(0)); }
         showUserArea();
@@ -684,8 +725,9 @@ void Window::readReply() {
         if(batchActive && size!=batch.items[batchIndex].size) { invalid();return; }
         if (size < 0 || size > 16777216 || std::floor(size) != size ||
             !hash.match(result["sha256"].toString()).hasMatch()) { invalid(); return; }
-        status->setText(QString("Exported %1 bytes. SHA-256: %2")
-            .arg(result["size"].toInteger()).arg(result["sha256"].toString()));
+        exportDiagnostics=QString("Last completed export\nBytes: %1\nSHA-256: %2")
+            .arg(result["size"].toInteger()).arg(result["sha256"].toString());
+        status->setText(QString("Exported %1 bytes.").arg(result["size"].toInteger()));
     }
     deadline.stop(); cancellationDeadline.stop();
     if(batchActive && operation=="export") {
