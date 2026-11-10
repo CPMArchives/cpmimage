@@ -1,0 +1,64 @@
+-- The CXX compiler identification is GNU 14.2.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Performing Test HAVE_STDATOMIC
+-- Performing Test HAVE_STDATOMIC - Success
+-- Found WrapAtomic: TRUE
+-- Found OpenGL: /usr/lib/aarch64-linux-gnu/libOpenGL.so
+-- Found WrapOpenGL: TRUE
+-- Found WrapVulkanHeaders: /usr/include
+-- Configuring done (0.3s)
+-- Generating done (0.0s)
+-- Build files have been written to: /tmp/cpmimage-v02/build
+[  0%] Built target gui-check_autogen_timestamp_deps
+[  0%] Built target cpmimage-review_autogen_timestamp_deps
+[  8%] Automatic MOC for target gui-check
+[ 16%] Automatic MOC for target cpmimage-review
+[ 16%] Built target cpmimage-review_autogen
+[ 25%] Automatic RCC for resources/icons.qrc
+[ 33%] Building CXX object CMakeFiles/cpmimage-review.dir/cpmimage-review_autogen/mocs_compilation.cpp.o
+[ 33%] Built target gui-check_autogen
+[ 41%] Building CXX object CMakeFiles/cpmimage-review.dir/src/main.cpp.o
+[ 50%] Building CXX object CMakeFiles/cpmimage-review.dir/src/window.cpp.o
+[ 58%] Building CXX object CMakeFiles/gui-check.dir/gui-check_autogen/mocs_compilation.cpp.o
+[ 66%] Building CXX object CMakeFiles/gui-check.dir/tests/gui_check.cpp.o
+[ 75%] Building CXX object CMakeFiles/cpmimage-review.dir/cpmimage-review_autogen/3YJK5W5UP7/qrc_icons.cpp.o
+[ 83%] Linking CXX executable cpmimage-review
+[ 83%] Built target cpmimage-review
+[ 91%] Building CXX object CMakeFiles/gui-check.dir/src/window.cpp.o
+[100%] Linking CXX executable gui-check
+[100%] Built target gui-check
+Internal ctest changing into directory: /tmp/cpmimage-v02/build
+Test project /tmp/cpmimage-v02/build
+    Start 1: gui-check
+1/1 Test #1: gui-check ........................   Passed    9.69 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =   9.70 sec
+test_broker_death_reaps_orphan_helper (__main__.BrokerCheck.test_broker_death_reaps_orphan_helper) ... ok
+test_cancel_reaps_helper_and_recovers (__main__.BrokerCheck.test_cancel_reaps_helper_and_recovers) ... ok
+test_export_padding_and_no_clobber (__main__.BrokerCheck.test_export_padding_and_no_clobber) ... ok
+test_failed_open_invalidates_listing (__main__.BrokerCheck.test_failed_open_invalidates_listing) ... ok
+test_missing_allocated_sector_rejected (__main__.BrokerCheck.test_missing_allocated_sector_rejected) ... ok
+test_mutations_rejected (__main__.BrokerCheck.test_mutations_rejected) ... ok
+test_partial_sector_and_oversize_rejected (__main__.BrokerCheck.test_partial_sector_and_oversize_rejected) ... ok
+test_read_only_cpm_slash_and_plus_names (__main__.BrokerCheck.test_read_only_cpm_slash_and_plus_names) ... ok
+test_sequential_requests_never_report_busy (__main__.BrokerCheck.test_sequential_requests_never_report_busy) ... ok
+test_source_change_and_stale_session (__main__.BrokerCheck.test_source_change_and_stale_session) ... ok
+test_trimmed_unused_tail_export_and_source_fingerprint (__main__.BrokerCheck.test_trimmed_unused_tail_export_and_source_fingerprint) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 4.312s
+
+OK
+/tmp/cpmimage-v02-final-track.json
+Linux debian 6.12.116+deb13-arm64 #1 SMP Debian 6.12.116-1 (2026-11-07) aarch64 GNU/Linux
+c++ (Debian 14.2.0-19) 14.2.0
+Python 3.13.5

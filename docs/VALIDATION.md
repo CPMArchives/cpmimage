@@ -43,3 +43,7 @@ The runtime source identity check is recorded alongside the fresh replay. Depend
 ## Limits
 
 ARM64 only. No x64/x86 or older-macOS execution qualification. The14.4 Mac target is not a tested minimum. Linux distribution portability and D-Bus accessibility need further work. The old even-track fallback heuristic remains; there is no general detector. GUI tests run offscreen; the owner separately confirmed the native Mac application opens/lists real images after the fix. No new write workflow, import mapping, multi-selection or tabbed architecture is claimed.
+
+## v0.2 navigation and selection
+
+The subsequent v0.2 slice is documented in [V0_2_NAVIGATION_REVIEW.md](V0_2_NAVIGATION_REVIEW.md), with current logs under `docs/validation/v0.2-navigation`. Native ARM64 macOS, Windows/MSVC and Debian builds pass the GUI suite. Windows and Debian broker/final-track regressions also pass (two expected POSIX-only broker skips on Windows). This is application/build validation, not a repeat of the complete v0.1 relocatable-package qualification. Native macOS accessibility inspection required the recorded upstream Qt Cocoa backport.

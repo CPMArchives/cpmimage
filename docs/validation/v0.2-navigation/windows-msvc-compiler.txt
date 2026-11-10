@@ -1,0 +1,14 @@
+Microsoft (R) C/C++ Optimizing Compiler Version 19.44.35229 for ARM64
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+Compiler Passes:
+ <msvc-kit>\MSVC\VC\Tools\MSVC\14.44.35207\bin\Hostarm64\arm64\cl.exe:        Version 19.44.35229.0
+ <msvc-kit>\MSVC\VC\Tools\MSVC\14.44.35207\bin\Hostarm64\arm64\c1.dll:        Version 19.44.35229.0
+ <msvc-kit>\MSVC\VC\Tools\MSVC\14.44.35207\bin\Hostarm64\arm64\c1xx.dll:      Version 19.44.35229.0
+ <msvc-kit>\MSVC\VC\Tools\MSVC\14.44.35207\bin\Hostarm64\arm64\c2.dll:        Version 19.44.35229.0
+ <msvc-kit>\MSVC\VC\Tools\MSVC\14.44.35207\bin\Hostarm64\arm64\c1xx.dll:      Version 19.44.35229.0
+ <msvc-kit>\MSVC\VC\Tools\MSVC\14.44.35207\bin\Hostarm64\arm64\link.exe:      Version 14.44.35229.0
+ <msvc-kit>\MSVC\VC\Tools\MSVC\14.44.35207\bin\Hostarm64\arm64\mspdb140.dll:  Version 14.44.35229.0
+ <msvc-kit>\MSVC\VC\Tools\MSVC\14.44.35207\bin\Hostarm64\arm64\1033\clui.dll: Version 19.44.35229.0
+
+cl : Command line error D8003 : missing source filename

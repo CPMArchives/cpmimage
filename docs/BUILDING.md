@@ -1,6 +1,10 @@
 # Build and package the read-only prototype
 
-Run commands from the repository root. Python 3.9+, CMake 3.21+, a C++17 compiler and Qt 6.7+ Widgets/Test are development prerequisites. Qualification used Qt 6.12.0. The runtime GUI/broker/helper sources are preserved from the validated milestone. Downloaded sources, build products, native toolchains and VM state are ignored by Git.
+Run commands from the repository root. Python 3.9+, CMake 3.21+, a C++17 compiler and Qt 6.7+ Widgets/Test are development prerequisites. Qualification used Qt 6.12.0. The v0.1 runtime is the baseline; the v0.2 navigation review changes the GUI while retaining the read-only broker/helper. See `V0_2_NAVIGATION_REVIEW.md` for the current validation scope. Downloaded sources, build products, native toolchains and VM state are ignored by Git.
+
+## macOS accessibility requirement
+
+Qt 6.12.0 has a native Cocoa accessibility crash when selected table cells are queried (QTBUG-149612). Offscreen test success does not establish native safety. For the v0.2 native UI, use the private source build below: `build-qt-unix.sh macos` applies the recorded upstream fix. Keep the application and platform plugin on the same Qt build; do not mix Homebrew and private runtimes. Homebrew Qt itself is not patched by these scripts. See [the local review findings](V0_2_NAVIGATION_REVIEW.md).
 
 ## macOS developer build
 
@@ -74,7 +78,7 @@ The GUI uses official Qt6.12 MSVC2022 ARM64 and native MSVC19.44/SDK10.0.26100. 
 5. Run `build-msvc.cmd` in Windows. `CPMIMAGE_ROOT`, `CPMIMAGE_HELPER` and `CPMIMAGE_PYTHON` can override the default source/helper/interpreter paths. The kit paths, release CRT import libraries, native ARM64 resource tools and Release/MD probe configuration are intentionally pinned.
 6. Pull the resulting `cpmimage-review.exe` back to the packaging host and run `package-windows.py /path/to/cpmimage-review.exe`, then `audit-windows.py` (requires the pinned LLVM readobj tool).
 
-The complete Windows kit acquisition/extraction sequence was not rerun during preparation of this source commit. The preserved runtime code and prior native Windows validation are documented separately from the new staging/manifest cleanup. The committed Microsoft payload plans replace reliance on a mutable live catalog. No SDK/compiler/IDE binaries enter the product or source companion.
+The complete Windows kit acquisition/extraction sequence was not rerun. The v0.2 navigation/icon source was rebuilt and tested natively using the existing offline ARM64 kit; see `V0_2_NAVIGATION_REVIEW.md`. Prior v0.1 packaging qualification is recorded separately from the v0.2 GUI changes. The committed Microsoft payload plans replace reliance on a mutable live catalog. No SDK/compiler/IDE binaries enter the product or source companion.
 
 ## Package verification and corresponding source
 

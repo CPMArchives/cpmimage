@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/icons">
+    <file>cpmimage.png</file>
+  </qresource>
+</RCC>

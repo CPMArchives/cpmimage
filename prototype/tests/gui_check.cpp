@@ -12,6 +12,11 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QPushButton>
+#include <QListWidget>
+#include <QTableWidget>
+#include <QSplitter>
+#include <QLabel>
+#include <QComboBox>
 #include <QtTest>
 
 static QFileDialog *fileDialog() {
@@ -32,10 +37,11 @@ private slots:
         QSignalSpy done(&window, &Window::completed);
         window.openImage(root + "/fixtures/ibm3740-independent.raw", "ibm-3740", "raw");
         QVERIFY(done.wait(15000)); QVERIFY(done.takeFirst()[0].toBool());
-        QCOMPARE(window.entryCount(), 3);
+        QCOMPARE(window.entryCount(), 1);
         QTemporaryDir directory; QVERIFY(directory.isValid());
         const auto destination = directory.filePath("user 7 export.bin");
-        window.selectEntry(1); window.exportFile(destination);
+        window.findChild<QListWidget *>("userAreas")->setCurrentItem(window.findChild<QListWidget *>("userAreas")->item(7));
+        window.selectEntry(0); window.exportFile(destination);
         QVERIFY(done.wait(15000)); QVERIFY(done.takeFirst()[0].toBool());
         QFile file(destination); QVERIFY(file.open(QIODevice::ReadOnly));
         const auto bytes = file.readAll(); QCOMPARE(bytes.size(), 256);
@@ -54,7 +60,96 @@ private slots:
         QCOMPARE(window.entryCount(), 0);
         window.openImage(root + "/fixtures/ampro200-independent.dsk", "bettercpm-ampro-little-board", "dsk");
         QVERIFY(done.wait(15000)); QVERIFY(done.takeFirst()[0].toBool());
-        QCOMPARE(window.entryCount(), 3);
+        QCOMPARE(window.entryCount(), 1);
+    }
+    void userAreaNavigation() {
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"), qEnvironmentVariable("CPMIMAGE_HELPER"));
+        window.show();
+        auto *areas = window.findChild<QListWidget *>("userAreas");
+        auto *files = window.findChild<QTableWidget *>("fileList");
+        auto *status = window.findChild<QLabel *>("selectionStatus");
+        QVERIFY(areas); QVERIFY(files); QVERIFY(status);
+        QCOMPARE(areas->count(), 16); QVERIFY(!areas->isEnabled());
+        QSignalSpy done(&window, &Window::completed);
+        window.openImage(root + "/fixtures/ibm3740-independent.raw", "ibm-3740", "raw");
+        QVERIFY(done.wait(15000)); QVERIFY(done.takeFirst()[0].toBool());
+        for (int area = 0; area < 16; ++area) {
+            auto *item = areas->item(area);
+            QCOMPARE(item->text(), QString::number(area)); QVERIFY(!item->icon().isNull());
+            const bool populated = area == 0 || area == 7 || area == 15;
+            QCOMPARE(item->data(Qt::UserRole + 1).toInt(), populated ? 1 : 0);
+            areas->setCurrentItem(item);
+            QCOMPARE(files->rowCount(), populated ? 1 : 0);
+            QCOMPARE(files->selectionModel()->selectedRows().size(), populated ? 1 : 0);
+            QVERIFY(status->text().startsWith(QString("User area %1 ·").arg(area)));
+            if (populated) QCOMPARE(files->item(0,0)->data(Qt::UserRole).toString().left(2).toInt(), area);
+        }
+        QVERIFY(areas->item(0)->icon().pixmap(24,24).toImage() !=
+                areas->item(1)->icon().pixmap(24,24).toImage());
+        areas->setCurrentItem(areas->item(7));
+        QVERIFY(status->text().contains("1 of 1 files selected · 256 bytes"));
+        // A format transition invalidates every old row, selection and populated marker.
+        window.findChild<QComboBox *>()->setCurrentIndex(1);
+        QCOMPARE(files->rowCount(), 0); QVERIFY(!areas->currentItem());
+        QVERIFY(!areas->isEnabled()); QVERIFY(!window.readerRunning());
+        for (int area=0; area<16; ++area) QCOMPARE(areas->item(area)->data(Qt::UserRole+1).toInt(),0);
+        window.openImage(root + "/fixtures/ibm3740-empty.raw", "ibm-3740", "raw");
+        QVERIFY(done.wait(15000)); QVERIFY(done.takeFirst()[0].toBool());
+        QVERIFY(areas->isEnabled()); QCOMPARE(files->rowCount(),0);
+        QVERIFY(status->text().contains("0 of 0 files selected · 0 bytes"));
+    }
+    void multipleSelectionAndSorting() {
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        // Derive a disposable, valid three-file user-0 image from the independent fixture.
+        QFile original(root + "/fixtures/ibm3740-independent.raw"); QVERIFY(original.open(QIODevice::ReadOnly));
+        auto bytes = original.readAll();
+        bytes[6656+15] = 8; // 1024 bytes within the existing allocated block.
+        bytes[6656+32] = 0; bytes.replace(6656+33,8,"SMALL   ");
+        bytes[6656+64] = 0;
+        QTemporaryDir temp; QVERIFY(temp.isValid());
+        QFile fixture(temp.filePath("selection.raw")); QVERIFY(fixture.open(QIODevice::WriteOnly));
+        QCOMPARE(fixture.write(bytes),qint64(bytes.size())); fixture.close();
+        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"), qEnvironmentVariable("CPMIMAGE_HELPER"));
+        window.show(); QSignalSpy done(&window,&Window::completed);
+        window.openImage(fixture.fileName(),"ibm-3740","raw");
+        QVERIFY(done.wait(15000)); QVERIFY2(done.takeFirst()[0].toBool(),qPrintable(window.lastError()));
+        auto *files=window.findChild<QTableWidget *>("fileList");
+        auto *areas=window.findChild<QListWidget *>("userAreas");
+        auto *status=window.findChild<QLabel *>("selectionStatus");
+        QCOMPARE(files->rowCount(),3);
+        files->sortItems(1,Qt::AscendingOrder);
+        QCOMPARE(files->item(2,1)->data(Qt::DisplayRole).toLongLong(),1024);
+        QCOMPARE(files->item(2,0)->data(Qt::UserRole).toString(),QString("00binary.bin"));
+        files->sortItems(0,Qt::AscendingOrder);
+        auto point=[&](int row) { return files->visualItemRect(files->item(row,0)).center(); };
+        QTest::mouseClick(files->viewport(),Qt::LeftButton,Qt::NoModifier,point(0));
+        QTest::mouseClick(files->viewport(),Qt::LeftButton,Qt::ShiftModifier,point(2));
+        QCOMPARE(files->selectionModel()->selectedRows().size(),3);
+        QVERIFY(status->text().contains("3 of 3 files selected · 1536 bytes"));
+        QPushButton *exportButton=nullptr;
+        for(auto *button:window.findChildren<QPushButton *>()) if(button->text().startsWith("Export")) exportButton=button;
+        QVERIFY(exportButton); QVERIFY(!exportButton->isEnabled());
+        window.exportFile(temp.filePath("must-not-export.bin"));
+        QVERIFY(done.isEmpty()); QVERIFY(!QFile::exists(temp.filePath("must-not-export.bin")));
+        // Qt maps ControlModifier to the Command key on macOS.
+        const auto individual=Qt::ControlModifier;
+        QTest::mouseClick(files->viewport(),Qt::LeftButton,individual,point(1));
+        QCOMPARE(files->selectionModel()->selectedRows().size(),2);
+        files->setFocus(); QTest::keySequence(files,QKeySequence::SelectAll);
+        QCOMPARE(files->selectionModel()->selectedRows().size(),3);
+        files->clearSelection(); QVERIFY(!exportButton->isEnabled());
+        QVERIFY(status->text().contains("0 of 3 files selected · 0 bytes"));
+        window.selectEntry(0); QVERIFY(exportButton->isEnabled());
+        files->sortItems(1,Qt::DescendingOrder);
+        const auto output=temp.filePath("sorted.bin"); window.exportFile(output);
+        QVERIFY(done.wait(15000)); QVERIFY(done.takeFirst()[0].toBool());
+        QFile exported(output); QCOMPARE(exported.size(),qint64(1024));
+        areas->setCurrentItem(areas->item(1));
+        QCOMPARE(files->rowCount(),0); QVERIFY(!exportButton->isEnabled());
+        areas->setCurrentItem(areas->item(0));
+        QCOMPARE(files->selectionModel()->selectedRows().size(),1);
+        QVERIFY(fixture.open(QIODevice::ReadOnly)); QCOMPARE(fixture.readAll(),bytes);
     }
     void qtDialogFlow() {
         // Exercise real button wiring and QFileDialog acceptance/cancellation.
@@ -82,7 +177,7 @@ private slots:
         });
         QVERIFY(button("Open")); button("Open")->click(); QVERIFY(visited);
         if (done.isEmpty()) QVERIFY(done.wait(5000));
-        QVERIFY(done.takeFirst()[0].toBool()); QCOMPARE(window.entryCount(),3);
+        QVERIFY(done.takeFirst()[0].toBool()); QCOMPARE(window.entryCount(),1);
         QTemporaryDir destination; QVERIFY(destination.isValid());
         const auto output = destination.filePath("dialog export.bin");
         visited = false;
@@ -101,7 +196,7 @@ private slots:
         QTimer::singleShot(100, &window, [&] {
             if (auto *dialog = fileDialog()) dialog->reject();
         });
-        button("Open")->click(); QCOMPARE(window.entryCount(),3); QVERIFY(done.isEmpty());
+        button("Open")->click(); QCOMPARE(window.entryCount(),1); QVERIFY(done.isEmpty());
         QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, false);
     }
     void readerFailures_data() {
@@ -138,7 +233,7 @@ private slots:
         code.replace("    args = parser.parse_args()", "    args = parser.parse_args()\n    args.root = Path(" + encoded.mid(1,encoded.size()-2) + ")");
         QVERIFY(broker.open(QIODevice::WriteOnly | QIODevice::Truncate)); broker.write(code); broker.close();
         window.openImage(realRoot + "/fixtures/ibm3740-independent.raw", "ibm-3740", "raw");
-        QVERIFY(done.wait(6000)); QVERIFY2(done.takeFirst()[0].toBool(), qPrintable(window.lastError())); QCOMPARE(window.entryCount(), 3);
+        QVERIFY(done.wait(6000)); QVERIFY2(done.takeFirst()[0].toBool(), qPrintable(window.lastError())); QCOMPARE(window.entryCount(), 1);
     }
     void processTreeTermination_data() {
         QTest::addColumn<bool>("closeBusy");

@@ -18,6 +18,8 @@ def create(destination,platform):
  with tarfile.open(ROOT/'vendor/cpmtools-2.23.tar.gz') as cpm:
   (destination/'cpmtools-README.txt').write_bytes(cpm.extractfile('cpmtools-2.23/README').read())
  (destination/'cpmtools-local-modifications.txt').write_text('CPMImage local modification,2026-11-10: cpmtools2.23 device_libdsk.c geometry fallback preserves odd logical track counts as single-sided rather than dropping the last track. Explicit geometry and successful probes retain priority. See corresponding-source packaging/source/cpmtools-2.23-odd-tracks-libdsk.patch and build recipes. libdsk1.4.2 itself is unchanged.\n')
+ if platform == 'macos':
+  (destination/'Qt-local-modifications.txt').write_text('CPMImage macOS Qt modification, 2026-11-10: backport upstream commit b74d6cb3c5e8418602494ae549b60839d88ef858 (QTBUG-149612) to Qt 6.12.0. Native accessibility element teardown no longer deletes interfaces owned by the item view/accessibility cache. Upstream author and review metadata are retained in corresponding-source packaging/source/qtbase-6.12.0-cocoa-accessibility.patch. Windows/Linux builds do not apply this Cocoa-only patch.\n')
  copy(PYTHON/'LICENSE',destination/'CPython-LICENSE.txt')
  copy(PYTHON/'Doc/license.rst',destination/'CPython-full-third-party-notices.txt')
  # Full LGPL/GPL exceptions and all upstream Qt attribution records retained.

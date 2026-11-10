@@ -1,6 +1,6 @@
 # Read-only prototype
 
-The validated behavior is preserved in this proposed source commit. Owner feedback is recorded separately; it has not been silently implemented as new behavior.
+The merged v0.1 prototype is the baseline. This local v0.2 review adds user-area navigation and multiple selection; other owner feedback remains backlog work. See [the review and validation scope](V0_2_NAVIGATION_REVIEW.md).
 
 ## Runtime boundary
 
@@ -33,6 +33,6 @@ This does not add general geometry detection or settle a long-term public backen
 
 ## Current UI limitations
 
-One image and one selected file at a time. User areas appear as a table column. The suggested export filename currently uses an internal lowercase name prefixed with its user area; `/` is replaced with `_`. The table displays uppercase names. Filename defaults, multi-selection, user-area folders, tabs, and future import/creation/drag-and-drop workflows remain backlog items.
+The v0.2 navigation work supports one image, a resizable left pane containing all user areas 0–15, and a sortable Name/Bytes/Attributes table filtered to the selected area. Populated areas have a centered plus on their folder icon. Multiple selection and selection count/byte totals are supported. Export remains limited to exactly one selected file until the separate batch-export step. The suggested export filename currently uses an internal lowercase name prefixed with its user area; `/` is replaced with `_`. The table displays uppercase names. Filename defaults/settings, batch and whole-area export, tabs, and future import/creation/drag-and-drop workflows remain backlog items.
 
-The image layout selector clears the current listing when changed. Some unusual CP/M names remain outside the prototype's allowed naming subset. Dollar signs, plus signs and opaque CP/M slashes are supported by the read-only name validator. No reversible import mapping is implemented.
+The image layout selector clears the current listing, selection and populated-area markers and stops the current reader when changed. Some unusual CP/M names remain outside the prototype's allowed naming subset. Dollar signs, plus signs and opaque CP/M slashes are supported by the read-only name validator. No reversible import mapping is implemented.

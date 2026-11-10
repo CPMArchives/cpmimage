@@ -1,0 +1,53 @@
+Start testing: Nov 10 04:09 Pacific Standard Time
+----------------------------------------------------------
+1/1 Testing: gui-check
+1/1 Test: gui-check
+Command: "<msvc-kit>/app-build-v02/gui-check.exe"
+Directory: <msvc-kit>/app-build-v02
+"gui-check" start time: Nov 10 04:09 Pacific Standard Time
+Output:
+----------------------------------------------------------
+********* Start testing of GuiCheck *********
+Config: Using QtTest library 6.12.0, Qt 6.12.0 (arm64-little_endian-llp64 shared (dynamic) release build; by MSVC 2022), windows 11
+PASS   : GuiCheck::initTestCase()
+QWARN  : GuiCheck::listingAndExport() QFontDatabase: Cannot find font directory <msvc-kit>/Qt/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QWARN  : GuiCheck::listingAndExport() This plugin does not support propagateSizeHints()
+QWARN  : GuiCheck::listingAndExport() This plugin does not support propagateSizeHints()
+QWARN  : GuiCheck::listingAndExport() This plugin does not support propagateSizeHints()
+PASS   : GuiCheck::listingAndExport()
+QWARN  : GuiCheck::userAreaNavigation() This plugin does not support propagateSizeHints()
+PASS   : GuiCheck::userAreaNavigation()
+QWARN  : GuiCheck::multipleSelectionAndSorting() This plugin does not support propagateSizeHints()
+QWARN  : GuiCheck::multipleSelectionAndSorting() This plugin does not support propagateSizeHints()
+PASS   : GuiCheck::multipleSelectionAndSorting()
+QWARN  : GuiCheck::qtDialogFlow() This plugin does not support propagateSizeHints()
+QWARN  : GuiCheck::qtDialogFlow() This plugin does not support propagateSizeHints()
+QWARN  : GuiCheck::qtDialogFlow() This plugin does not support propagateSizeHints()
+QWARN  : GuiCheck::qtDialogFlow() This plugin does not support propagateSizeHints()
+QWARN  : GuiCheck::qtDialogFlow() This plugin does not support propagateSizeHints()
+PASS   : GuiCheck::qtDialogFlow()
+PASS   : GuiCheck::readerFailures(crash)
+PASS   : GuiCheck::readerFailures(truncated)
+PASS   : GuiCheck::readerFailures(bad-json)
+PASS   : GuiCheck::readerFailures(overflow)
+PASS   : GuiCheck::readerFailures(bad-schema)
+PASS   : GuiCheck::readerFailures(wrong-size-type)
+PASS   : GuiCheck::readerFailures(unresponsive)
+QWARN  : GuiCheck::processTreeTermination(deadline) This plugin does not support propagateSizeHints()
+PASS   : GuiCheck::processTreeTermination(deadline)
+QWARN  : GuiCheck::processTreeTermination(close-busy) This plugin does not support propagateSizeHints()
+PASS   : GuiCheck::processTreeTermination(close-busy)
+PASS   : GuiCheck::missingReader()
+PASS   : GuiCheck::cleanupTestCase()
+Totals: 16 passed, 0 failed, 0 skipped, 0 blacklisted, 11461ms
+********* Finished testing of GuiCheck *********
+<end of output>
+Test time =  11.55 sec
+----------------------------------------------------------
+Test Passed.
+"gui-check" end time: Nov 10 04:09 Pacific Standard Time
+"gui-check" time elapsed: 00:00:11
+----------------------------------------------------------
+
+End testing: Nov 10 04:09 Pacific Standard Time
