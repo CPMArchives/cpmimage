@@ -16,4 +16,5 @@ cd "$BUILD/cpmtools/cpmtools-2.23"
 ./configure --build=aarch64-apple-darwin --host=aarch64-pc-mingw32 --with-libdsk="$PREFIX" --with-diskdefs=diskdefs
 python3 "$BASE/scripts/apply-cpmtools-patches.py" "$BUILD/cpmtools/cpmtools-2.23"
 make cpmfs.o device_libdsk.o -j2
-"$CC" -DCPMIMAGE_READ_ONLY -DNOTWINDLL -I . -I "$PREFIX/include" "$ROOT/experiments/process-comparison/helper.c" cpmfs.o device_libdsk.o -L "$PREFIX/lib" -ldsk -o "$ROOT/prototype/build-windows/helper-readonly.exe"
+"$CC" -DNOTWINDLL -DCPMIMAGE_READ_ONLY_NAMES '-DDISKDEFS="diskdefs"' -I . -I "$PREFIX/include" -c cpmfs.c -o cpmfs-readonly.o
+"$CC" -DCPMIMAGE_READ_ONLY -DNOTWINDLL -I . -I "$PREFIX/include" "$ROOT/experiments/process-comparison/helper.c" cpmfs-readonly.o device_libdsk.o -L "$PREFIX/lib" -ldsk -o "$ROOT/prototype/build-windows/helper-readonly.exe"

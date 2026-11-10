@@ -11,3 +11,7 @@ else:
  target=source/'device_libdsk.c';text=target.read_text()
  text=text.replace('/* Preserve every logical track when probing cannot identify the layout.', '/* CPMImage local modification, 2026-11-10: preserve every logical track.')
  if text!=target.read_text():target.write_text(text)
+
+# Only dedicated read-only cpmfs objects define this opt-in name policy.
+if 'CPMIMAGE_READ_ONLY_NAMES' not in (source/'cpmdir.h').read_text():
+ subprocess.run(['patch','-p1','-i',str(patch.parent/'cpmtools-2.23-readonly-names.patch')],cwd=source,check=True)

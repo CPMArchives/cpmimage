@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include <QMainWindow>
+#include "filename_policy.h"
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QProcess>
@@ -10,11 +11,12 @@ class QLabel;
 class QPushButton;
 class QTableWidget;
 class QListWidget;
+class QSettings;
 
 class Window : public QMainWindow {
     Q_OBJECT
 public:
-    Window(QString root, QString python, QString helper, int deadlineMs = 30000, int graceMs = 2000, QString noticesPath = {});
+    Window(QString root, QString python, QString helper, int deadlineMs = 30000, int graceMs = 2000, QString noticesPath = {}, QString settingsFile = {});
     ~Window() override;
     void openImage(const QString &path, const QString &format, const QString &container);
     void exportFile(const QString &destination);
@@ -41,6 +43,8 @@ private:
     void updateUserAreas();
     void chooseImage();
     void chooseExport();
+    void editFilenameSettings();
+    QString selectedExportName(QString *problem) const;
     QString root, python, helper, image, format, container, session, requestId, operation, error;
     QByteArray output;
     QProcess process;
@@ -56,4 +60,6 @@ private:
     QListWidget *userAreas;
     QJsonArray directoryEntries;
     QString imageNote;
+    FilenamePolicy filenamePolicy;
+    QSettings *settings;
 };

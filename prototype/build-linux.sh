@@ -28,8 +28,9 @@ if [ ! -f cpmtools-2.23/cpmfs.o ]; then
 fi
 python3 "$ROOT/packaging/scripts/apply-cpmtools-patches.py" "$BUILD/cpmtools-2.23"
 make -C "$BUILD/cpmtools-2.23" cpmfs.o device_libdsk.o -j2
+cc -DCPMIMAGE_READ_ONLY_NAMES '-DDISKDEFS="diskdefs"' -I cpmtools-2.23 -I "$PREFIX/include" -c cpmtools-2.23/cpmfs.c -o cpmtools-2.23/cpmfs-readonly.o
 cc -DCPMIMAGE_READ_ONLY -I cpmtools-2.23 -I "$PREFIX/include" \
-  "$ROOT/experiments/process-comparison/helper.c" cpmtools-2.23/cpmfs.o \
+  "$ROOT/experiments/process-comparison/helper.c" cpmtools-2.23/cpmfs-readonly.o \
   cpmtools-2.23/device_libdsk.o -L "$PREFIX/lib" -Wl,-rpath,"$PREFIX/lib" \
   -ldsk -o helper-readonly
 cmake -S "$ROOT/prototype" -B "$BUILD/qt" -DCMAKE_BUILD_TYPE=Debug

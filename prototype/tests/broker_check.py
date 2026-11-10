@@ -37,6 +37,8 @@ class BrokerCheck(unittest.TestCase):
         reply = self.request('open',image=str(self.image),format='ibm-3740',container='raw')
         self.assertTrue(reply['ok'],reply)
         self.assertEqual(len(reply['result']['entries']),3)
+        self.assertEqual({e['name'] for e in reply['result']['entries']},
+                         {'00BINARY.BIN','07BINARY.BIN','15TAIL.BIN'})
         return reply['result']['session']
     def test_export_padding_and_no_clobber(self):
         token = self.opened(); destination = self.directory/'export ü.bin'
@@ -72,8 +74,14 @@ class BrokerCheck(unittest.TestCase):
         self.assertEqual(self.request('export',session=token,name='00binary.bin',
                                      destination=str(self.directory/'changed'))['error'],'source_changed')
 
-    def test_read_only_cpm_slash_and_plus_names(self):
-        for spelling, name in [(b'SIG/M   LIB', '00sig/m.lib'), (b'CP-M+   LBR', '00cp-m+.lbr')]:
+    def test_read_only_cpm_names_uppercase_and_export(self):
+        for spelling, name in [(b'SIG/M   LIB', '00SIG/M.LIB'), (b'CP-M+   LBR', '00CP-M+.LBR'),
+                               (b'-CATALOG310', '00-CATALOG.310'),
+                               (b'COL:ON  TXT', '00COL:ON.TXT'),
+                               (b'BACK\\SL TXT', '00BACK\\SL.TXT'),
+                               (b'PIPE|   TXT', '00PIPE|.TXT'),
+                               (b'QUOTE"  TXT', '00QUOTE".TXT'),
+                               (b'DOLLAR$ TXT', '00DOLLAR$.TXT')]:
             data = bytearray(self.before)
             found = False
             for offset in range(6656,9984,32):
