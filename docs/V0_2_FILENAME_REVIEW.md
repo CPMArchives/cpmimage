@@ -32,8 +32,30 @@ macOS ARM64, Qt 6.12.0 with the previously documented Cocoa accessibility patch:
 - Native macOS settings dialog and image replacement were checked separately from offscreen automated tests. Owner tested uppercase retention and confirmed the current preview works.
 - Build recipe shell syntax and diff whitespace checks passed. Notice generator syntax checked.
 
-Evidence: `docs/validation/v0.2-filenames/`. Windows/Linux build recipes are updated, but this slice has not been rebuilt or run there. Earlier navigation validation does not qualify these new changes. Full relocatable package validation and x64 validation are also outstanding.
+Evidence: `docs/validation/v0.2-filenames/`. Windows ARM64 and Linux ARM64 validation is now complete as recorded below. Native Windows/Linux desktop interaction, full relocatable package validation and x64 validation remain outstanding.
 
 ## Review preview
 
 `/private/tmp/CPMImage Filename Review.app` is the current developer preview. It uses the existing private Qt runtime with the Cocoa patch and the rebuilt helper, and links to this checkout. It is not a distributable release. No push is authorized by this preparation step.
+
+## Windows and Debian validation follow-up
+
+Both existing offline UTM VMs tested source commit `8dba5db` in new isolated directories. SHA-256 verification checked all 329 source files with no mismatches on either VM. The original source trees and older qualified helpers were preserved.
+
+| Check | Windows 11 ARM64 | Debian 13 ARM64 |
+|---|---|---|
+| Native Qt application build | MSVC 19.44.35229 / Qt 6.12.0 | GCC 14.2.0 / Qt 6.12.0 |
+| Qt UI suite | 19 passed, zero failures/skips | 19 passed, zero failures/skips |
+| Broker integration | 9 passed, 2 expected POSIX-only skips | 11 passed |
+| Final-track regression | 6/6 helper and broker cases passed | 6/6 helper and broker cases passed |
+| Source unchanged checks | Passed | Passed |
+
+The UI tests run offscreen and cover saved translations, cancellation, name collisions, uppercase model/display/export suggestions and repeated selected/sorted image replacement. They do not replace native desktop visual checks. Offscreen plugin/font/collation warnings were nonfatal and are retained in the logs.
+
+The helper was rebuilt for each platform: GCC with the existing libdsk installation on Debian, LLVM-MinGW ARM64 cross-compilation on macOS for Windows, then execution inside Windows. The Windows Qt application and tests were built natively with MSVC, including its icon resource. Expanded filename integration exercises colon, slash, backslash, pipe, quote, dollar, plus and catalogue names, with independent expected export hashes. All six geometry/final-track cases also pass and retain source bytes.
+
+The Windows helper build recipe needed one local fix: libdsk's old `config.guess`/`config.sub` rejected ARM64. The recipe now copies the newer scripts from the pinned cpmtools archive before configuring libdsk, matching the existing Linux approach. The helper then rebuilt and passed the Windows suite. This build-script correction is in addition to the tested application source commit; the host helper build log records the actual compilation.
+
+The first Windows invocation failed in the guest command wrapper before configuration. A direct Python subprocess runner with the same installed toolchain completed validation. Its initial compiler check needed the existing recipe's `CMAKE_TRY_COMPILE_CONFIGURATION=Release`; with that setting the native build succeeded. No account, network access, download or new license acceptance was needed.
+
+Evidence is retained in `docs/validation/v0.2-filenames/`, including configure/build output, complete test logs, source integrity manifests, helper hashes and final-track export checksums. Local path prefixes and trailing whitespace were normalized. No GitHub changes or push were made.

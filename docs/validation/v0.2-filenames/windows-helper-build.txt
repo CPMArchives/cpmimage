@@ -1,0 +1,556 @@
+checking build system type... aarch64-apple-darwin
+checking host system type... aarch64-w64-mingw32
+checking target system type... aarch64-w64-mingw32
+checking how to print strings... printf
+checking for aarch64-w64-mingw32-gcc... <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.exe
+checking for suffix of executables... .exe
+checking whether we are cross compiling... yes
+checking for suffix of object files... o
+checking whether we are using the GNU C compiler... yes
+checking whether <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang accepts -g... yes
+checking for <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang option to accept ISO C89... none needed
+checking whether <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang understands -c and -o together... yes
+checking for a sed that does not truncate output... /usr/bin/sed
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for fgrep... /usr/bin/grep -F
+checking for ld used by <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang... /Users/nathanael/.codex/.chatgpt-projects/g-p-6a682f002be881918281554d644daf48/cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-ld
+checking if the linker (/Users/nathanael/.codex/.chatgpt-projects/g-p-6a682f002be881918281554d644daf48/cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-ld) is GNU ld... yes
+checking for BSD- or MS-compatible name lister (nm)... no
+checking for aarch64-w64-mingw32-dumpbin... no
+checking for aarch64-w64-mingw32-link... no
+checking for dumpbin... no
+checking for link... link -dump
+configure: WARNING: using cross tools not prefixed with host triplet
+checking the name lister (nm) interface... BSD nm
+checking whether ln -s works... yes
+checking the maximum length of command line arguments... sysctl: sysctl fmt -1 1024 1: Operation not permitted
+expr: syntax error
+expr: syntax error
+none
+checking how to convert aarch64-apple-darwin file names to aarch64-w64-mingw32 format... func_convert_file_nix_to_w32
+checking how to convert aarch64-apple-darwin file names to toolchain format... func_convert_file_noop
+checking for /Users/nathanael/.codex/.chatgpt-projects/g-p-6a682f002be881918281554d644daf48/cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-ld option to reload object files... -r
+checking for aarch64-w64-mingw32-objdump... no
+checking for objdump... objdump
+checking how to recognize dependent libraries... file_magic ^x86 archive import|^x86 DLL
+checking for aarch64-w64-mingw32-dlltool... no
+checking for dlltool... no
+checking how to associate runtime and link libraries... func_cygming_dll_for_implib_fallback
+checking for aarch64-w64-mingw32-ar... <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-ar
+checking for archiver @FILE support... @
+checking for aarch64-w64-mingw32-strip... no
+checking for strip... strip
+checking for aarch64-w64-mingw32-ranlib... <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-ranlib
+checking for gawk... no
+checking for mawk... no
+checking for nawk... no
+checking for awk... awk
+checking command to parse nm output from <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang object... ok
+checking for sysroot... no
+checking for a working dd... /bin/dd
+checking how to truncate binary pipes... /bin/dd bs=4096 count=1
+checking for aarch64-w64-mingw32-mt... no
+checking for mt... no
+checking if : is a manifest tool... no
+checking how to run the C preprocessor... <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -E
+checking for ANSI C header files... yes
+checking for sys/types.h... yes
+checking for sys/stat.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for memory.h... yes
+checking for strings.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for unistd.h... yes
+checking for dlfcn.h... no
+checking for objdir... .libs
+checking if <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang supports -fno-rtti -fno-exceptions... yes
+checking for <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang option to produce PIC... -DDLL_EXPORT -DPIC
+checking if <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang PIC flag -DDLL_EXPORT -DPIC works... yes
+checking if <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang static flag -static works... yes
+checking if <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang supports -c -o file.o... yes
+checking if <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang supports -c -o file.o... (cached) yes
+checking whether the <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang linker (/Users/nathanael/.codex/.chatgpt-projects/g-p-6a682f002be881918281554d644daf48/cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-ld) supports shared libraries... yes
+checking dynamic linker characteristics... Win32 ld.exe
+checking how to hardcode library paths into programs... immediate
+checking whether stripping libraries is possible... no
+checking if libtool supports shared libraries... yes
+checking whether to build shared libraries... no
+checking whether to build static libraries... yes
+checking for a BSD-compatible install... /usr/bin/install -c
+checking whether build environment is sane... yes
+<checkout>/windows-runtime/cross-build/libdsk-1.4.2/config/missing: Unknown `--is-lightweight' option
+Try `<checkout>/windows-runtime/cross-build/libdsk-1.4.2/config/missing --help' for more information
+configure: WARNING: 'missing' script is too old or missing
+checking for aarch64-w64-mingw32-strip... strip
+checking for a thread-safe mkdir -p... config/install-sh -c -d
+checking whether make sets $(MAKE)... yes
+checking for style of include used by make... GNU
+checking whether make supports nested variables... yes
+checking dependency style of <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang... gcc3
+checking for aarch64-w64-mingw32-gcc... (cached) <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang
+checking whether we are using the GNU C compiler... (cached) yes
+checking whether <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang accepts -g... (cached) yes
+checking for <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang option to accept ISO C89... (cached) none needed
+checking whether <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang understands -c and -o together... (cached) yes
+checking whether make sets $(MAKE)... (cached) yes
+checking for ANSI C header files... (cached) yes
+checking errno.h usability... yes
+checking errno.h presence... yes
+checking for errno.h... yes
+checking limits.h usability... yes
+checking limits.h presence... yes
+checking for limits.h... yes
+checking sys/ioctl.h usability... no
+checking sys/ioctl.h presence... no
+checking for sys/ioctl.h... no
+checking stat.h usability... no
+checking stat.h presence... no
+checking for stat.h... no
+checking for sys/stat.h... (cached) yes
+checking for sys/types.h... (cached) yes
+checking for unistd.h... (cached) yes
+checking termios.h usability... no
+checking termios.h presence... no
+checking for termios.h... no
+checking libgen.h usability... yes
+checking libgen.h presence... yes
+checking for libgen.h... yes
+checking assert.h usability... yes
+checking assert.h presence... yes
+checking for assert.h... yes
+checking dirent.h usability... yes
+checking dirent.h presence... yes
+checking for dirent.h... yes
+checking fcntl.h usability... yes
+checking fcntl.h presence... yes
+checking for fcntl.h... yes
+checking utime.h usability... yes
+checking utime.h presence... yes
+checking for utime.h... yes
+checking pwd.h usability... no
+checking pwd.h presence... no
+checking for pwd.h... no
+checking time.h usability... yes
+checking time.h presence... yes
+checking for time.h... yes
+checking dir.h usability... yes
+checking dir.h presence... yes
+checking for dir.h... yes
+checking direct.h usability... yes
+checking direct.h presence... yes
+checking for direct.h... yes
+checking linux/fd.h usability... no
+checking linux/fd.h presence... no
+checking for linux/fd.h... no
+checking linux/fdreg.h usability... no
+checking linux/fdreg.h presence... no
+checking for linux/fdreg.h... no
+checking shlobj.h usability... yes
+checking shlobj.h presence... yes
+checking for shlobj.h... yes
+checking for windows.h... yes
+checking for winioctl.h... yes
+checking for strcmpi... yes
+checking for mkstemp... yes
+checking for basename... yes
+checking for fork... no
+checking for GetTempFileName... no
+checking for sleep... yes
+checking zlib.h usability... no
+checking zlib.h presence... no
+checking for zlib.h... no
+checking for zlibVersion in -lz... no
+checking bzlib.h usability... no
+checking bzlib.h presence... no
+checking for bzlib.h... no
+checking for BZ2_bzlibVersion in -lbz2... no
+checking for an ANSI C-conforming const... yes
+checking for size_t... yes
+checking whether <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang needs -traditional... no
+checking whether sys/types.h defines makedev... no
+checking sys/mkdev.h usability... no
+checking sys/mkdev.h presence... no
+checking for sys/mkdev.h... no
+checking sys/sysmacros.h usability... no
+checking sys/sysmacros.h presence... no
+checking for sys/sysmacros.h... no
+checking for working memcmp... no
+checking for strerror... yes
+checking that generated files are newer than configure... done
+configure: creating ./config.status
+config.status: creating Makefile
+config.status: creating doc/Makefile
+config.status: creating include/Makefile
+config.status: creating lib/Makefile
+config.status: creating tools/Makefile
+config.status: creating man/Makefile
+config.status: creating config.h
+config.status: executing libtool commands
+config.status: executing depfiles commands
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskread.lo -MD -MP -MF .deps/dskread.Tpo -c -o dskread.lo dskread.c
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskwrite.lo -MD -MP -MF .deps/dskwrite.Tpo -c -o dskwrite.lo dskwrite.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskread.lo -MD -MP -MF .deps/dskread.Tpo -c dskread.c -o dskread.o
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskwrite.lo -MD -MP -MF .deps/dskwrite.Tpo -c dskwrite.c -o dskwrite.o
+mv -f .deps/dskwrite.Tpo .deps/dskwrite.Plo
+mv -f .deps/dskread.Tpo .deps/dskread.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskcheck.lo -MD -MP -MF .deps/dskcheck.Tpo -c -o dskcheck.lo dskcheck.c
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskstat.lo -MD -MP -MF .deps/dskstat.Tpo -c -o dskstat.lo dskstat.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskstat.lo -MD -MP -MF .deps/dskstat.Tpo -c dskstat.c -o dskstat.o
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskcheck.lo -MD -MP -MF .deps/dskcheck.Tpo -c dskcheck.c -o dskcheck.o
+mv -f .deps/dskstat.Tpo .deps/dskstat.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dsklphys.lo -MD -MP -MF .deps/dsklphys.Tpo -c -o dsklphys.lo dsklphys.c
+mv -f .deps/dskcheck.Tpo .deps/dskcheck.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskfmt.lo -MD -MP -MF .deps/dskfmt.Tpo -c -o dskfmt.lo dskfmt.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dsklphys.lo -MD -MP -MF .deps/dsklphys.Tpo -c dsklphys.c -o dsklphys.o
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskfmt.lo -MD -MP -MF .deps/dskfmt.Tpo -c dskfmt.c -o dskfmt.o
+mv -f .deps/dsklphys.Tpo .deps/dsklphys.Plo
+mv -f .deps/dskfmt.Tpo .deps/dskfmt.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskopen.lo -MD -MP -MF .deps/dskopen.Tpo -c -o dskopen.lo dskopen.c
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskpars.lo -MD -MP -MF .deps/dskpars.Tpo -c -o dskpars.lo dskpars.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskopen.lo -MD -MP -MF .deps/dskopen.Tpo -c dskopen.c -o dskopen.o
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskpars.lo -MD -MP -MF .deps/dskpars.Tpo -c dskpars.c -o dskpars.o
+mv -f .deps/dskpars.Tpo .deps/dskpars.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskerror.lo -MD -MP -MF .deps/dskerror.Tpo -c -o dskerror.lo dskerror.c
+mv -f .deps/dskopen.Tpo .deps/dskopen.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskseek.lo -MD -MP -MF .deps/dskseek.Tpo -c -o dskseek.lo dskseek.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskerror.lo -MD -MP -MF .deps/dskerror.Tpo -c dskerror.c -o dskerror.o
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskseek.lo -MD -MP -MF .deps/dskseek.Tpo -c dskseek.c -o dskseek.o
+mv -f .deps/dskseek.Tpo .deps/dskseek.Plo
+mv -f .deps/dskerror.Tpo .deps/dskerror.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dsksecid.lo -MD -MP -MF .deps/dsksecid.Tpo -c -o dsksecid.lo dsksecid.c
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskgeom.lo -MD -MP -MF .deps/dskgeom.Tpo -c -o dskgeom.lo dskgeom.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dsksecid.lo -MD -MP -MF .deps/dsksecid.Tpo -c dsksecid.c -o dsksecid.o
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskgeom.lo -MD -MP -MF .deps/dskgeom.Tpo -c dskgeom.c -o dskgeom.o
+mv -f .deps/dsksecid.Tpo .deps/dsksecid.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dsktread.lo -MD -MP -MF .deps/dsktread.Tpo -c -o dsktread.lo dsktread.c
+mv -f .deps/dskgeom.Tpo .deps/dskgeom.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dsksgeom.lo -MD -MP -MF .deps/dsksgeom.Tpo -c -o dsksgeom.lo dsksgeom.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dsktread.lo -MD -MP -MF .deps/dsktread.Tpo -c dsktread.c -o dsktread.o
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dsksgeom.lo -MD -MP -MF .deps/dsksgeom.Tpo -c dsksgeom.c -o dsksgeom.o
+mv -f .deps/dsktread.Tpo .deps/dsktread.Plo
+here=`pwd` && cd . && true  -d $here uk/co/demon/seasip/libdsk/Drive.java
+here=`pwd` && cd . && true  -d $here uk/co/demon/seasip/libdsk/Geometry.java
+here=`pwd` && cd . && true  -d $here uk/co/demon/seasip/libdsk/FormatType.java
+here=`pwd` && cd . && true  -d $here uk/co/demon/seasip/libdsk/LibDsk.java
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskreprt.lo -MD -MP -MF .deps/dskreprt.Tpo -c -o dskreprt.lo dskreprt.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskreprt.lo -MD -MP -MF .deps/dskreprt.Tpo -c dskreprt.c -o dskreprt.o
+mv -f .deps/dsksgeom.Tpo .deps/dsksgeom.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskcmt.lo -MD -MP -MF .deps/dskcmt.Tpo -c -o dskcmt.lo dskcmt.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskcmt.lo -MD -MP -MF .deps/dskcmt.Tpo -c dskcmt.c -o dskcmt.o
+mv -f .deps/dskreprt.Tpo .deps/dskreprt.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskretry.lo -MD -MP -MF .deps/dskretry.Tpo -c -o dskretry.lo dskretry.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskretry.lo -MD -MP -MF .deps/dskretry.Tpo -c dskretry.c -o dskretry.o
+mv -f .deps/dskcmt.Tpo .deps/dskcmt.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskdirty.lo -MD -MP -MF .deps/dskdirty.Tpo -c -o dskdirty.lo dskdirty.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskdirty.lo -MD -MP -MF .deps/dskdirty.Tpo -c dskdirty.c -o dskdirty.o
+mv -f .deps/dskretry.Tpo .deps/dskretry.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dsktrkid.lo -MD -MP -MF .deps/dsktrkid.Tpo -c -o dsktrkid.lo dsktrkid.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dsktrkid.lo -MD -MP -MF .deps/dsktrkid.Tpo -c dsktrkid.c -o dsktrkid.o
+mv -f .deps/dskdirty.Tpo .deps/dskdirty.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskrtrd.lo -MD -MP -MF .deps/dskrtrd.Tpo -c -o dskrtrd.lo dskrtrd.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskrtrd.lo -MD -MP -MF .deps/dskrtrd.Tpo -c dskrtrd.c -o dskrtrd.o
+mv -f .deps/dsktrkid.Tpo .deps/dsktrkid.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT compress.lo -MD -MP -MF .deps/compress.Tpo -c -o compress.lo compress.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT compress.lo -MD -MP -MF .deps/compress.Tpo -c compress.c -o compress.o
+mv -f .deps/dskrtrd.Tpo .deps/dskrtrd.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT compsq.lo -MD -MP -MF .deps/compsq.Tpo -c -o compsq.lo compsq.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT compsq.lo -MD -MP -MF .deps/compsq.Tpo -c compsq.c -o compsq.o
+mv -f .deps/compress.Tpo .deps/compress.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT compgz.lo -MD -MP -MF .deps/compgz.Tpo -c -o compgz.lo compgz.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT compgz.lo -MD -MP -MF .deps/compgz.Tpo -c compgz.c -o compgz.o
+mv -f .deps/compsq.Tpo .deps/compsq.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT comptlzh.lo -MD -MP -MF .deps/comptlzh.Tpo -c -o comptlzh.lo comptlzh.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT comptlzh.lo -MD -MP -MF .deps/comptlzh.Tpo -c comptlzh.c -o comptlzh.o
+mv -f .deps/compgz.Tpo .deps/compgz.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT compbz2.lo -MD -MP -MF .deps/compbz2.Tpo -c -o compbz2.lo compbz2.c
+comptlzh.c:533:7: warning: variable 'off' set but not used [-Wunused-but-set-variable]
+  533 |         long off=0;
+      |              ^
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT compbz2.lo -MD -MP -MF .deps/compbz2.Tpo -c compbz2.c -o compbz2.o
+1 warning generated.
+mv -f .deps/comptlzh.Tpo .deps/comptlzh.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT compdskf.lo -MD -MP -MF .deps/compdskf.Tpo -c -o compdskf.lo compdskf.c
+mv -f .deps/compbz2.Tpo .deps/compbz2.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT crctable.lo -MD -MP -MF .deps/crctable.Tpo -c -o crctable.lo crctable.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT compdskf.lo -MD -MP -MF .deps/compdskf.Tpo -c compdskf.c -o compdskf.o
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT crctable.lo -MD -MP -MF .deps/crctable.Tpo -c crctable.c -o crctable.o
+mv -f .deps/compdskf.Tpo .deps/compdskf.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT crc16.lo -MD -MP -MF .deps/crc16.Tpo -c -o crc16.lo crc16.c
+mv -f .deps/crctable.Tpo .deps/crctable.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT rpccli.lo -MD -MP -MF .deps/rpccli.Tpo -c -o rpccli.lo rpccli.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT crc16.lo -MD -MP -MF .deps/crc16.Tpo -c crc16.c -o crc16.o
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT rpccli.lo -MD -MP -MF .deps/rpccli.Tpo -c rpccli.c -o rpccli.o
+mv -f .deps/crc16.Tpo .deps/crc16.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT rpcmap.lo -MD -MP -MF .deps/rpcmap.Tpo -c -o rpcmap.lo rpcmap.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT rpcmap.lo -MD -MP -MF .deps/rpcmap.Tpo -c rpcmap.c -o rpcmap.o
+mv -f .deps/rpccli.Tpo .deps/rpccli.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT rpcpack.lo -MD -MP -MF .deps/rpcpack.Tpo -c -o rpcpack.lo rpcpack.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT rpcpack.lo -MD -MP -MF .deps/rpcpack.Tpo -c rpcpack.c -o rpcpack.o
+mv -f .deps/rpcmap.Tpo .deps/rpcmap.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT rpcserv.lo -MD -MP -MF .deps/rpcserv.Tpo -c -o rpcserv.lo rpcserv.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT rpcserv.lo -MD -MP -MF .deps/rpcserv.Tpo -c rpcserv.c -o rpcserv.o
+mv -f .deps/rpcpack.Tpo .deps/rpcpack.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT remote.lo -MD -MP -MF .deps/remote.Tpo -c -o remote.lo remote.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT remote.lo -MD -MP -MF .deps/remote.Tpo -c remote.c -o remote.o
+mv -f .deps/rpcserv.Tpo .deps/rpcserv.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT rpctios.lo -MD -MP -MF .deps/rpctios.Tpo -c -o rpctios.lo rpctios.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT rpctios.lo -MD -MP -MF .deps/rpctios.Tpo -c rpctios.c -o rpctios.o
+mv -f .deps/remote.Tpo .deps/remote.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT rpcfork.lo -MD -MP -MF .deps/rpcfork.Tpo -c -o rpcfork.lo rpcfork.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT rpcfork.lo -MD -MP -MF .deps/rpcfork.Tpo -c rpcfork.c -o rpcfork.o
+mv -f .deps/rpctios.Tpo .deps/rpctios.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT rpcfossl.lo -MD -MP -MF .deps/rpcfossl.Tpo -c -o rpcfossl.lo rpcfossl.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT rpcfossl.lo -MD -MP -MF .deps/rpcfossl.Tpo -c rpcfossl.c -o rpcfossl.o
+mv -f .deps/rpcfork.Tpo .deps/rpcfork.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT rpcwin32.lo -MD -MP -MF .deps/rpcwin32.Tpo -c -o rpcwin32.lo rpcwin32.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT rpcwin32.lo -MD -MP -MF .deps/rpcwin32.Tpo -c rpcwin32.c -o rpcwin32.o
+mv -f .deps/rpcfossl.Tpo .deps/rpcfossl.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvjv3.lo -MD -MP -MF .deps/drvjv3.Tpo -c -o drvjv3.lo drvjv3.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvjv3.lo -MD -MP -MF .deps/drvjv3.Tpo -c drvjv3.c -o drvjv3.o
+mv -f .deps/rpcwin32.Tpo .deps/rpcwin32.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvlinux.lo -MD -MP -MF .deps/drvlinux.Tpo -c -o drvlinux.lo drvlinux.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvlinux.lo -MD -MP -MF .deps/drvlinux.Tpo -c drvlinux.c -o drvlinux.o
+mv -f .deps/drvjv3.Tpo .deps/drvjv3.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvntwdm.lo -MD -MP -MF .deps/drvntwdm.Tpo -c -o drvntwdm.lo drvntwdm.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvntwdm.lo -MD -MP -MF .deps/drvntwdm.Tpo -c drvntwdm.c -o drvntwdm.o
+mv -f .deps/drvlinux.Tpo .deps/drvlinux.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvwin32.lo -MD -MP -MF .deps/drvwin32.Tpo -c -o drvwin32.lo drvwin32.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvwin32.lo -MD -MP -MF .deps/drvwin32.Tpo -c drvwin32.c -o drvwin32.o
+mv -f .deps/drvntwdm.Tpo .deps/drvntwdm.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvwin16.lo -MD -MP -MF .deps/drvwin16.Tpo -c -o drvwin16.lo drvwin16.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvwin16.lo -MD -MP -MF .deps/drvwin16.Tpo -c drvwin16.c -o drvwin16.o
+drvwin32.c:70:10: warning: the current #pragma pack alignment value is modified in the included file [-Wpragma-pack]
+   70 | #include "w95defs.h"
+      |          ^
+./w95defs.h:31:9: note: previous '#pragma pack' directive that modifies alignment is here
+   31 | #pragma pack(1)
+      |         ^
+drvwin32.c:213:17: warning: cast to smaller integer type 'DWORD' (aka 'unsigned long') from 'MID *' (aka 'struct MID *') [-Wpointer-to-int-cast]
+  213 |   reg.reg_EDX = (DWORD)pMid;
+      |                 ^~~~~~~~~~~
+drvwin32.c:563:6: warning: variable 'res' set but not used [-Wunused-but-set-variable]
+  563 |         int res;
+      |             ^
+drvwin32.c:811:28: warning: cast to smaller integer type 'DWORD' (aka 'unsigned long') from 'void *' [-Wvoid-pointer-to-int-cast]
+  811 |         reg.reg_EBX      = (DWORD)buf;
+      |                            ^~~~~~~~~~
+drvwin32.c:863:28: warning: cast to smaller integer type 'DWORD' (aka 'unsigned long') from 'const void *' [-Wvoid-pointer-to-int-cast]
+  863 |         reg.reg_EBX      = (DWORD)buf;
+      |                            ^~~~~~~~~~
+drvwin32.c:927:28: warning: cast to smaller integer type 'DWORD' (aka 'unsigned long') from 'unsigned char *' [-Wpointer-to-int-cast]
+  927 |         reg.reg_EBX      = (DWORD)trkbuf;
+      |                            ^~~~~~~~~~~~~
+drvwin32.c:980:14: warning: variable 'bResult' set but not used [-Wunused-but-set-variable]
+  980 |         BOOL bResult;
+      |              ^
+drvwin32.c:1097:42: warning: passing 'int *' to parameter of type 'unsigned int *' converts between pointers to integer types with different sign [-Wpointer-sign]
+ 1097 |         return dsk_r_open(self, win32_mailslot, &w32self->w32_unit, filename, "floppy", NULL);
+      |                                                 ^~~~~~~~~~~~~~~~~~
+./rpcfuncs.h:112:69: note: passing argument to parameter 'nDriver' here
+  112 | dsk_err_t dsk_r_open (DSK_PDRIVER self, RPCFUNC func, unsigned int *nDriver,
+      |                                                                     ^
+8 warnings generated.
+mv -f .deps/drvwin32.Tpo .deps/drvwin32.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvint25.lo -MD -MP -MF .deps/drvint25.Tpo -c -o drvint25.lo drvint25.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvint25.lo -MD -MP -MF .deps/drvint25.Tpo -c drvint25.c -o drvint25.o
+mv -f .deps/drvwin16.Tpo .deps/drvwin16.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvdos16.lo -MD -MP -MF .deps/drvdos16.Tpo -c -o drvdos16.lo drvdos16.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvdos16.lo -MD -MP -MF .deps/drvdos16.Tpo -c drvdos16.c -o drvdos16.o
+mv -f .deps/drvint25.Tpo .deps/drvint25.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvdos32.lo -MD -MP -MF .deps/drvdos32.Tpo -c -o drvdos32.lo drvdos32.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvdos32.lo -MD -MP -MF .deps/drvdos32.Tpo -c drvdos32.c -o drvdos32.o
+mv -f .deps/drvdos16.Tpo .deps/drvdos16.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvcpcem.lo -MD -MP -MF .deps/drvcpcem.Tpo -c -o drvcpcem.lo drvcpcem.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvcpcem.lo -MD -MP -MF .deps/drvcpcem.Tpo -c drvcpcem.c -o drvcpcem.o
+mv -f .deps/drvdos32.Tpo .deps/drvdos32.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvdskf.lo -MD -MP -MF .deps/drvdskf.Tpo -c -o drvdskf.lo drvdskf.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvdskf.lo -MD -MP -MF .deps/drvdskf.Tpo -c drvdskf.c -o drvdskf.o
+mv -f .deps/drvcpcem.Tpo .deps/drvcpcem.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvimd.lo -MD -MP -MF .deps/drvimd.Tpo -c -o drvimd.lo drvimd.c
+drvdskf.c:129:11: warning: variable 'len' set but not used [-Wunused-but-set-variable]
+  129 |                         size_t len;
+      |                                ^
+drvdskf.c:144:19: warning: variable 'dskfself' set but not used [-Wunused-but-set-variable]
+  144 |         DSKF_DSK_DRIVER *dsklibtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvimd.lo -MD -MP -MF .deps/drvimd.Tpo -c drvimd.c -o drvimd.o
+fself;
+      |                          ^
+2 warnings generated.
+mv -f .deps/drvdskf.Tpo .deps/drvdskf.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvlogi.lo -MD -MP -MF .deps/drvlogi.Tpo -c -o drvlogi.lo drvlogi.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvlogi.lo -MD -MP -MF .deps/drvlogi.Tpo -c drvlogi.c -o drvlogi.o
+mv -f .deps/drvlogi.Tpo .deps/drvlogi.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvsimh.lo -MD -MP -MF .deps/drvsimh.Tpo -c -o drvsimh.lo drvsimh.c
+mv -f .deps/drvimd.Tpo .deps/drvimd.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvposix.lo -MD -MP -MF .deps/drvposix.Tpo -c -o drvposix.lo drvposix.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvsimh.lo -MD -MP -MF .deps/drvsimh.Tpo -c drvsimh.c -o drvsimh.o
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvposix.lo -MD -MP -MF .deps/drvposix.Tpo -c drvposix.c -o drvposix.o
+mv -f .deps/drvsimh.Tpo .deps/drvsimh.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvnwasp.lo -MD -MP -MF .deps/drvnwasp.Tpo -c -o drvnwasp.lo drvnwasp.c
+mv -f .deps/drvposix.Tpo .deps/drvposix.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvadisk.lo -MD -MP -MF .deps/drvadisk.Tpo -c -o drvadisk.lo drvadisk.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvnwasp.lo -MD -MP -MF .deps/drvnwasp.Tpo -c drvnwasp.c -o drvnwasp.o
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvadisk.lo -MD -MP -MF .deps/drvadisk.Tpo -c drvadisk.c -o drvadisk.o
+mv -f .deps/drvnwasp.Tpo .deps/drvnwasp.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvrcpm.lo -MD -MP -MF .deps/drvrcpm.Tpo -c -o drvrcpm.lo drvrcpm.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvrcpm.lo -MD -MP -MF .deps/drvrcpm.Tpo -c drvrcpm.c -o drvrcpm.o
+mv -f .deps/drvadisk.Tpo .deps/drvadisk.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvtele.lo -MD -MP -MF .deps/drvtele.Tpo -c -o drvtele.lo drvtele.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvtele.lo -MD -MP -MF .deps/drvtele.Tpo -c drvtele.c -o drvtele.o
+drvrcpm.c:734:11: warning: variable 'dirsecs' set but not used [-Wunused-but-set-variable]
+  734 |         unsigned dirsecs;
+      |                  ^
+drvrcpm.c:792:11: warning: variable 'dirsecs' set but not used [-Wunused-but-set-variable]
+  792 |         unsigned dirsecs;
+      |                  ^
+drvrcpm.c:892:17: warning: variable 'rcb' set but not used [-Wunused-but-set-variable]
+  892 |         RCPMFS_BUFFER *rcb;
+      |                        ^
+drvrcpm.c:894:31: warning: variable 'extsize' set but not used [-Wunused-but-set-variable]
+  894 |         int blocks_per_extent, blkp, extsize;
+      |                                      ^
+drvrcpm.c:2093:21: warning: variable 'rcself' set but not used [-Wunused-but-set-variable]
+ 2093 |         RCPMFS_DSK_DRIVER *rcself;
+      |                            ^
+drvtele.c:330:7: warning: variable 'pos' set but not used [-Wunused-but-set-variable]
+  330 |         long pos;
+      |              ^
+1 warning generated.
+mv -f .deps/drvtele.Tpo .deps/drvtele.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvmyz80.lo -MD -MP -MF .deps/drvmyz80.Tpo -c -o drvmyz80.lo drvmyz80.c
+5 warnings generated.
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvmyz80.lo -MD -MP -MF .deps/drvmyz80.Tpo -c drvmyz80.c -o drvmyz80.o
+mv -f .deps/drvrcpm.Tpo .deps/drvrcpm.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvydsk.lo -MD -MP -MF .deps/drvydsk.Tpo -c -o drvydsk.lo drvydsk.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvydsk.lo -MD -MP -MF .deps/drvydsk.Tpo -c drvydsk.c -o drvydsk.o
+mv -f .deps/drvmyz80.Tpo .deps/drvmyz80.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvcfi.lo -MD -MP -MF .deps/drvcfi.Tpo -c -o drvcfi.lo drvcfi.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvcfi.lo -MD -MP -MF .deps/drvcfi.Tpo -c drvcfi.c -o drvcfi.o
+mv -f .deps/drvydsk.Tpo .deps/drvydsk.Plo
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT drvqm.lo -MD -MP -MF .deps/drvqm.Tpo -c -o drvqm.lo drvqm.c
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT drvqm.lo -MD -MP -MF .deps/drvqm.Tpo -c drvqm.c -o drvqm.o
+mv -f .deps/drvcfi.Tpo .deps/drvcfi.Plo
+true -jni uk.co.demon.seasip.libdsk.`basename uk/co/demon/seasip/libdsk/Drive.class .class`
+drvqm.c:113:16: warning: shifting a negative signed value is undefined [-Wshift-negative-value]
+  113 |         outInt = (-1) << 16;
+      |                  ~~~~ ^
+touch uk_co_demon_seasip_libdsk_Drive.h
+true -jni uk.co.demon.seasip.libdsk.`basename uk/co/demon/seasip/libdsk/Geometry.class .class`
+touch uk_co_demon_seasip_libdsk_Geometry.h
+true -jni uk.co.demon.seasip.libdsk.`basename uk/co/demon/seasip/libdsk/FormatType.class .class`
+touch uk_co_demon_seasip_libdsk_FormatType.h
+true -jni uk.co.demon.seasip.libdsk.`basename uk/co/demon/seasip/libdsk/LibDsk.class .class`
+touch uk_co_demon_seasip_libdsk_LibDsk.h
+/bin/sh ../libtool  --tag=CC   --mode=compile <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I..  -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk  -Wall -DNOTWINDLL -g -O2 -MT dskjni.lo -MD -MP -MF .deps/dskjni.Tpo -c -o dskjni.lo dskjni.c
+1 warning generated.
+mv -f .deps/drvqm.Tpo .deps/drvqm.Plo
+libtool: compile:  <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -DHAVE_CONFIG_H -I. -I.. -I../include -DAUTOSHARE=<checkout>/windows-runtime/cross-prefix/share/LibDsk -Wall -DNOTWINDLL -g -O2 -MT dskjni.lo -MD -MP -MF .deps/dskjni.Tpo -c dskjni.c -o dskjni.o
+mv -f .deps/dskjni.Tpo .deps/dskjni.Plo
+/bin/sh ../libtool  --tag=CC   --mode=link <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang  -Wall -DNOTWINDLL -g -O2 -version-info 6:13:3  -o libdsk.la -rpath <checkout>/windows-runtime/cross-prefix/lib dskread.lo dskwrite.lo dskcheck.lo dskstat.lo dsklphys.lo dskfmt.lo dskopen.lo dskpars.lo dskerror.lo dskseek.lo dsksecid.lo dskgeom.lo dsktread.lo dsksgeom.lo dskjni.lo dskreprt.lo dskcmt.lo dskretry.lo dskdirty.lo dsktrkid.lo dskrtrd.lo compress.lo compsq.lo compgz.lo comptlzh.lo compbz2.lo compdskf.lo crctable.lo crc16.lo rpccli.lo rpcmap.lo rpcpack.lo rpcserv.lo remote.lo rpctios.lo rpcfork.lo rpcfossl.lo rpcwin32.lo drvjv3.lo drvlinux.lo drvntwdm.lo drvwin32.lo drvwin16.lo drvint25.lo drvdos16.lo drvdos32.lo drvcpcem.lo drvdskf.lo drvimd.lo drvlogi.lo drvsimh.lo drvposix.lo drvnwasp.lo drvadisk.lo drvrcpm.lo drvtele.lo drvmyz80.lo drvydsk.lo drvcfi.lo drvqm.lo
+libtool: warning: undefined symbols not allowed in aarch64-w64-mingw32 shared libraries; building static only
+../libtool: line 11191: test: : integer expression expected
+../libtool: line 11191: test: : integer expression expected
+libtool: link: <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-ar cru .libs/libdsk.a @.libs/libdsk.libcmd
+libtool: link: <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-ranlib .libs/libdsk.a
+libtool: link: ( cd ".libs" && rm -f "libdsk.la" && ln -s "../libdsk.la" "libdsk.la" )
+make[1]: Nothing to be done for `install-exec-am'.
+ ../config/install-sh -c -d '<checkout>/windows-runtime/cross-prefix/include'
+ /usr/bin/install -c -m 644 libdsk.h '<checkout>/windows-runtime/cross-prefix/include'
+here=`pwd` && cd . && true  -d $here uk/co/demon/seasip/libdsk/Drive.java
+true -jni uk.co.demon.seasip.libdsk.`basename uk/co/demon/seasip/libdsk/Drive.class .class`
+touch uk_co_demon_seasip_libdsk_Drive.h
+here=`pwd` && cd . && true  -d $here uk/co/demon/seasip/libdsk/Geometry.java
+true -jni uk.co.demon.seasip.libdsk.`basename uk/co/demon/seasip/libdsk/Geometry.class .class`
+touch uk_co_demon_seasip_libdsk_Geometry.h
+here=`pwd` && cd . && true  -d $here uk/co/demon/seasip/libdsk/FormatType.java
+true -jni uk.co.demon.seasip.libdsk.`basename uk/co/demon/seasip/libdsk/FormatType.class .class`
+touch uk_co_demon_seasip_libdsk_FormatType.h
+here=`pwd` && cd . && true  -d $here uk/co/demon/seasip/libdsk/LibDsk.java
+true -jni uk.co.demon.seasip.libdsk.`basename uk/co/demon/seasip/libdsk/LibDsk.class .class`
+touch uk_co_demon_seasip_libdsk_LibDsk.h
+/bin/sh <checkout>/windows-runtime/cross-build/libdsk-1.4.2/config/install-sh -d <checkout>/windows-runtime/cross-prefix/lib
+if test x = x; then true; else /usr/bin/install -c -m 644  /<checkout>/windows-runtime/cross-prefix/lib; fi
+here=`pwd` && cd . && true  -d $here uk/co/demon/seasip/libdsk/Drive.java
+true -jni uk.co.demon.seasip.libdsk.`basename uk/co/demon/seasip/libdsk/Drive.class .class`
+touch uk_co_demon_seasip_libdsk_Drive.h
+here=`pwd` && cd . && true  -d $here uk/co/demon/seasip/libdsk/Geometry.java
+true -jni uk.co.demon.seasip.libdsk.`basename uk/co/demon/seasip/libdsk/Geometry.class .class`
+touch uk_co_demon_seasip_libdsk_Geometry.h
+here=`pwd` && cd . && true  -d $here uk/co/demon/seasip/libdsk/FormatType.java
+true -jni uk.co.demon.seasip.libdsk.`basename uk/co/demon/seasip/libdsk/FormatType.class .class`
+touch uk_co_demon_seasip_libdsk_FormatType.h
+here=`pwd` && cd . && true  -d $here uk/co/demon/seasip/libdsk/LibDsk.java
+true -jni uk.co.demon.seasip.libdsk.`basename uk/co/demon/seasip/libdsk/LibDsk.class .class`
+touch uk_co_demon_seasip_libdsk_LibDsk.h
+ ../config/install-sh -c -d '<checkout>/windows-runtime/cross-prefix/lib'
+ /bin/sh ../libtool   --mode=install /usr/bin/install -c   libdsk.la '<checkout>/windows-runtime/cross-prefix/lib'
+libtool: install: /usr/bin/install -c .libs/libdsk.lai <checkout>/windows-runtime/cross-prefix/lib/libdsk.la
+libtool: install: /usr/bin/install -c .libs/libdsk.a <checkout>/windows-runtime/cross-prefix/lib/libdsk.a
+libtool: install: chmod 644 <checkout>/windows-runtime/cross-prefix/lib/libdsk.a
+libtool: install: <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-ranlib <checkout>/windows-runtime/cross-prefix/lib/libdsk.a
+make[1]: Nothing to be done for `install-data-am'.
+checking build system type... aarch64-apple-darwin
+checking host system type... aarch64-pc-mingw32
+checking for aarch64-pc-mingw32-gcc... <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.exe
+checking for suffix of executables... .exe
+checking whether we are cross compiling... yes
+checking for suffix of object files... o
+checking whether the compiler supports GNU C... yes
+checking whether <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang accepts -g... yes
+checking for <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang option to enable C11 features... none needed
+checking for a BSD-compatible install... /usr/bin/install -c
+checking how to run the C preprocessor... <checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -E
+checking for printw in -lcurses... no
+checking for printw in -lncurses... no
+checking for dsk_open in -ldsk... yes
+checking for libdsk.h... yes
+checking for fcntl.h... yes
+checking for sys/types.h... yes
+checking for sys/stat.h... yes
+checking for limits.h... yes
+checking for unistd.h... yes
+checking for sys/utime.h... yes
+checking for utime.h... yes
+checking for an ANSI C-conforming const... yes
+checking for mode_t... yes
+checking for off_t... yes
+checking for pid_t... yes
+checking for size_t... yes
+checking for ssize_t... yes
+checking whether struct tm is in sys/time.h or time.h... time.h
+checking for special C compiler options needed for large files... no
+checking for _FILE_OFFSET_BITS value needed for large files... 64
+checking for working memcmp... no
+checking for strftime... yes
+checking for mktime... yes
+checking for strerror... yes
+configure: creating ./config.status
+config.status: creating Makefile
+config.status: creating cpm.5
+config.status: creating cpmchattr.1
+config.status: creating cpmchmod.1
+config.status: creating cpmcp.1
+config.status: creating cpmls.1
+config.status: creating cpmrm.1
+config.status: creating fsck.cpm.1
+config.status: creating fsed.cpm.1
+config.status: creating mkfs.cpm.1
+config.status: creating diskdefs.5
+config.status: creating config.h
+patching file device_libdsk.c
+patching file cpmdir.h
+<checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -g -O2 -pipe -Wall -Wextra -Wshadow -Wno-unused-parameter -Wunused -Wbad-function-cast -Wmissing-prototypes -Wstrict-prototypes -Wcast-align -Wcast-qual -Wpointer-arith -Wwrite-strings -Wmissing-declarations -Wnested-externs -Wundef -pedantic -fno-common -I<checkout>/windows-runtime/cross-prefix/include -DNOTWINDLL -I<checkout>/windows-runtime/cross-prefix/include -DDISKDEFS=\"diskdefs\" -DFORMAT=\"ibm-3740\"  -c -o cpmfs.o cpmfs.c
+<checkout>/../cpmimage-feasibility/windows-runtime/llvm-mingw-20261104-ucrt-macos-universal/bin/aarch64-w64-mingw32-clang -g -O2 -pipe -Wall -Wextra -Wshadow -Wno-unused-parameter -Wunused -Wbad-function-cast -Wmissing-prototypes -Wstrict-prototypes -Wcast-align -Wcast-qual -Wpointer-arith -Wwrite-strings -Wmissing-declarations -Wnested-externs -Wundef -pedantic -fno-common -I<checkout>/windows-runtime/cross-prefix/include -DNOTWINDLL -I<checkout>/windows-runtime/cross-prefix/include -DDISKDEFS=\"diskdefs\" -DFORMAT=\"ibm-3740\"  -c -o device_libdsk.o device_libdsk.c
+device_libdsk.c:74:9: warning: unused variable 'boo' [-Wunused-variable]
+   74 |   char *boo;
+      |         ^~~
+device_libdsk.c:91:53: warning: comparison of integers of different signs: 'unsigned int' and 'int' [-Wsign-compare]
+   91 |   if (this->geom.dg_cylinders * this->geom.dg_heads == tracks) return NULL;
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^  ~~~~~~
+2 warnings generated.

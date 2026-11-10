@@ -1,0 +1,8 @@
+{
+  "source_commit": "8dba5db",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "python": "3.13.17 (tags/v3.13.17:64e080d, Oct 21 2026, 14:38:33) [MSC v.1944 64 bit (ARM64)]",
+  "checked_files": 329,
+  "mismatches": [],
+  "helper_sha256": "80d6644d279ca83015f7a32ebb932aa50144a85b9f7eb839762017d898014b54"
+}
