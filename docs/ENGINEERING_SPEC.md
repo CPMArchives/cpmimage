@@ -793,19 +793,19 @@ Technical information shall remain accessible without dominating ordinary file-m
 
 ## 11. Command-Line Interface
 
-### 15.1 Mode precedence
+### 11.1 Mode precedence
 
 CP/M Image has GUI and headless cpmtools operating modes. A recognized cpmtools utility selector anywhere on the command line shall take absolute precedence: **the GUI must not initialize or open**, regardless of any other arguments or their order. The entire argument list shall be scanned before mode selection.
 
 Multiple utility selectors shall cause a command-line error. GUI-only arguments supplied with a utility selector shall cause a command-line error unless specifically supported in headless mode; neither case shall launch the GUI.
 
-### 15.2 GUI invocation
+### 11.2 GUI invocation
 
 The GUI shall support `/img=PATH` and unambiguous positional image paths, `/f=FORMAT` to select a persistent format for subsequent images, and `/diskdefs=PATH` to select a disk-definition catalogue globally for the invocation. Corresponding long options `--image`, `--format`, and `--diskdefs` shall be available for conventional host-shell usage.
 
 A selected `/f` overrides a matching image sidecar; without `/f`, Section 4.9 governs format selection. `/diskdefs` selects the catalogue, not a particular format, and applies to the invocation as a whole. Conflicting repeated catalogue options or an invalid specified catalogue shall cause explicit errors. Host absolute paths beginning with `/` shall not be misinterpreted as options.
 
-### 15.3 Headless cpmtools invocation
+### 11.3 Headless cpmtools invocation
 
 `cpmimage /UTILITY [utility arguments]` shall dispatch to the identically named utility from the pinned bundled cpmtools distribution, including `/cpmcp`, `/cpmls`, `/cpmchattr`, `/fsck.cpm`, and `/fsed.cpm`. The complete bundled suite shall be available. No aliases or renamed cpmtools commands are required.
 
@@ -813,7 +813,7 @@ The dispatcher shall preserve original utility argument semantics, standard inpu
 
 Standalone utilities shall be built from the pinned source and packaged for every supported platform, without requiring a separate cpmtools installation. Windows console behavior shall be tested explicitly; a GUI-subsystem executable shall not be assumed to provide correct console streams or exit codes.
 
-### 15.4 Scope and milestone
+### 11.4 Scope and milestone
 
 Exposing existing `fsck.cpm` and `fsed.cpm` in headless mode does not introduce their GUI equivalents into 1.0. GUI checking, repair, and low-level editing remain post-1.0. GUI catalogue-option handling begins in v0.3; the full dispatcher and packaging integration are targeted for v0.8.
 
@@ -821,19 +821,19 @@ Exposing existing `fsck.cpm` and `fsed.cpm` in headless mode does not introduce 
 
 ## 12. Verification and Qualification
 
-### 15.1 General requirements
+### 12.1 General requirements
 
 Each milestone shall have independently testable acceptance criteria.
 
 Regression testing shall protect previously implemented functionality.
 
-### 15.2 Disk-format compatibility
+### 12.2 Disk-format compatibility
 
 Testing shall establish that valid supported definitions are resolved through the cpmtools-derived interface rather than an application-level whitelist.
 
 Tests shall include differing geometry, allocation parameters, and sector translation.
 
-### 15.3 Independent RAW compatibility
+### 12.3 Independent RAW compatibility
 
 Every supported RAW-generation workflow shall be tested for compatibility with an independent, unmodified cpmtools build.
 
@@ -849,7 +849,7 @@ Tests shall include images where physical sector order, numeric sector-ID order,
 
 For custom definitions, the same definition shall be supplied to the independent cpmtools installation.
 
-### 15.4 Filesystem operations
+### 12.4 Filesystem operations
 
 Write operations shall be verified through save, reopen, and content comparison.
 
@@ -864,7 +864,7 @@ Tests shall include:
 - Interrupted operations.
 - Source-image preservation.
 
-### 15.5 System tracks
+### 12.5 System tracks
 
 Tests shall verify:
 
@@ -878,7 +878,7 @@ Tests shall verify:
 
 Tests shall not attempt to certify the suitability of arbitrary operating-system binaries.
 
-### 15.6 Containers
+### 12.6 Containers
 
 Container adapters shall be tested using appropriate images and, where relevant, target emulators.
 
@@ -894,13 +894,13 @@ Tests shall cover:
 - Save and reopen behavior.
 - Independent cpmtools compatibility of generated RAW images.
 
-### 15.7 Cross-platform qualification
+### 12.7 Cross-platform qualification
 
 The project shall establish an explicit operating-system and architecture matrix before 1.0.
 
 Existing ARM64 validation is the starting baseline.
 
-### 15.8 Packaging
+### 12.8 Packaging
 
 Distributed packages shall include required dependencies and applicable licensing materials.
 
