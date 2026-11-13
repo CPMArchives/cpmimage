@@ -85,6 +85,9 @@ The current five-format restriction is an implementation limitation, **not** a p
 - Support multiple open image sessions with independent formats and unsaved states.
 - Support copying/moving files between images and user areas.
 - Implement drag-and-drop, clipboard transfers, multiple selection, and conflict handling.
+- Preserve the narrow left CP/M user-area sidebar (approximately 90–120 pixels by default, resizable) and wide right file-list pane; do not add a permanent host filesystem browser.
+- Support native host file-manager drag-and-drop: drop images to open, host files onto user areas to import, CP/M files onto host folders to export, and files between open images to transfer. Distinguish opening an image from importing it as data by drop target.
+- Write or update Help topics as features are implemented, using repository Markdown as the common source for offline and online Help.
 - Integrate recent images and pinned image shortcuts.
 
 **Acceptance:** Cross-image transfers preserve contents, handle partial failures safely, and do not lose source data before successful destination writes.
@@ -96,6 +99,9 @@ The current five-format restriction is an implementation limitation, **not** a p
 - A recognized utility selector **anywhere** on the command line always prevents GUI initialization. Multiple selectors or incompatible GUI-only options cause explicit errors, never GUI launch.
 - Build and package the pinned standalone cpmtools executables for each supported host platform. Preserve arguments, stdin/stdout/stderr, and exit codes, with explicit Windows console qualification.
 - Complete preferences, Image Information, relevant format-detection assistance, progress/error presentation, and general workflow integration.
+- Integrate bundled searchable offline Help as the primary Help experience, accessible through the Help menu and F1 where appropriate, with context-sensitive entry points.
+- Provide a Help-menu link to companion online documentation generated from the same repository Markdown source.
+- Review native desktop visual consistency and refine the approved narrow-sidebar/right-file-list layout without redesigning the application.
 
 **Acceptance:** GUI image/format arguments behave predictably; headless commands match the corresponding bundled utilities; the GUI never opens for utility dispatch, regardless of argument order. Providing existing `fsck.cpm` and `fsed.cpm` executables does **not** add GUI checker/repair/editor features.
 
@@ -105,9 +111,11 @@ The current five-format restriction is an implementation limitation, **not** a p
 - Validate source preservation, interruption/recovery, error handling, CLI output/exit behavior, and package relocation.
 - Establish and test the supported OS/CPU release matrix. Existing ARM64 macOS/Windows/Linux evidence is a starting point, not proof of x86-64 compatibility.
 - Produce self-contained packages with required runtime dependencies, cpmtools executables, licensing, and corresponding-source materials.
-- Complete documentation and release-readiness checks.
+- Publish online Help and complete documentation and release-readiness checks.
+- Validate offline Help without network access, search, contextual topics, online/offline content consistency, and Help links.
+- Qualify native UI appearance, sidebar sizing, file-list usability, and bidirectional drag-and-drop with host file managers on the release platforms.
 
-**Acceptance:** Release targets have reproducible builds, qualified installers/packages, and documented evidence of the required workflows.
+**Acceptance:** Release targets have reproducible builds, qualified installers/packages, working bundled offline Help, published online documentation, verified native file-manager transfers, and documented evidence of the required workflows.
 
 ## v1.0 — Release
 
