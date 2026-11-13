@@ -1,6 +1,6 @@
 # CP/M Image — Development Roadmap
 
-**Status:** Approved development sequence, reconciled with Engineering Specification 0.7  
+**Status:** Approved development sequence, reconciled with Engineering Specification 0.8  
 **Project:** CPMArchives/cpmimage  
 **Target release:** 1.0  
 **Date:** November 14, 2026
@@ -105,6 +105,8 @@ The current five-format restriction is an implementation limitation, **not** a p
 - Finalize the narrow-sidebar file list with default Filename, Records, Size (bytes), Attributes columns; optional User and supported timestamps; numeric sorting, column-header Choose Columns, reorder/resize, and persistent layout. Display logical bytes as records × 128, not exact original length.
 - Provide the five-button labeled toolbar (Open, New, Save | Import, Export), visible by default and persistently hideable via View → Toolbar. Keep sorting and other contextual commands off the toolbar.
 - Implement target-specific context menus for files, user areas, empty file-list space, image tabs, and column headers, with selection-sensitive availability and consistent underlying actions. Double-click opens Properties in 1.0; F2 renames; Delete confirms; Properties edits RO/SYS/ARC and shows available metadata.
+- Implement approved function keys: F1 Help, F2 Rename, F4 Properties, F5 Refresh, F6 Move to User; reserve F3 for a future viewer, leave F7–F9/F11–F12 unassigned, and respect native F10 menu behavior.
+- Implement Ctrl/Cmd+O/S/C/X/V/A and Delete with native platform modifier conventions, state-sensitive availability, shared command handlers, and deletion confirmation.
 - Integrate bundled searchable offline Help as the primary Help experience, accessible through the Help menu and F1 where appropriate, with context-sensitive entry points.
 - Provide a Help-menu link to companion online documentation generated from the same repository Markdown source.
 - Review native desktop visual consistency and refine the approved narrow-sidebar/right-file-list layout without redesigning the application.
@@ -119,7 +121,7 @@ The current five-format restriction is an implementation limitation, **not** a p
 - Produce self-contained packages with required runtime dependencies, cpmtools executables, licensing, and corresponding-source materials.
 - Publish online Help and complete documentation and release-readiness checks.
 - Validate offline Help without network access, search, contextual topics, online/offline content consistency, and Help links.
-- Qualify native UI appearance, sidebar sizing, column sorting/persistence, toolbar visibility, context menus, Properties, tab/instance ownership, conflict behavior, safe rename/delete, filename review, and bidirectional drag-and-drop with host file managers on the release platforms.
+- Qualify native UI appearance, sidebar sizing, column sorting/persistence, toolbar visibility, context menus, Properties, function-key and standard shortcuts (including macOS/Windows/Linux differences), tab/instance ownership, conflict behavior, safe rename/delete, filename review, and bidirectional drag-and-drop with host file managers on the release platforms.
 
 **Acceptance:** Release targets have reproducible builds, qualified installers/packages, working bundled offline Help, published online documentation, verified native file-manager transfers, and documented evidence of the required workflows.
 
