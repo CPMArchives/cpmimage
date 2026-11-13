@@ -1,6 +1,6 @@
 # CP/M Image — Engineering Specification
 
-**Version:** 0.7  
+**Version:** 0.8  
 **Status:** Approved engineering baseline  
 **Project:** CPMArchives/cpmimage  
 **Target release:** 1.0  
@@ -820,7 +820,37 @@ Context menus shall be defined by target:
 
 Right-clicking a selected file shall preserve the current multiselection; right-clicking an unselected file shall select it. Commands inappropriate for the current selection/state shall be disabled or omitted (e.g., Rename for multiple files). Menus, shortcuts, and toolbar actions shall invoke the same underlying commands. Native secondary-click, Control-click where appropriate, and keyboard context-menu access shall be supported.
 
-### 10.7 Recent images
+### 10.7 Keyboard shortcuts and function keys
+
+CP/M Image shall provide the following function-key assignments, subject to native host-platform conventions:
+
+| Key | Action |
+|---|---|
+| F1 | Open Help, context-sensitive where available |
+| F2 | Rename the selected file |
+| F3 | Reserved for a future file viewer; no 1.0 action |
+| F4 | Open File Properties |
+| F5 | Refresh the current file listing |
+| F6 | Move the selected file(s) to another user area |
+| F7–F9 | Unassigned |
+| F10 | Native menu activation where supported |
+| F11–F12 | Unassigned |
+
+Standard application shortcuts shall be:
+
+| Shortcut | Action |
+|---|---|
+| Ctrl/Cmd+O | Open disk image |
+| Ctrl/Cmd+S | Save active image |
+| Ctrl/Cmd+C | Copy |
+| Ctrl/Cmd+X | Cut |
+| Ctrl/Cmd+V | Paste |
+| Ctrl/Cmd+A | Select all files in the active list |
+| Delete | Delete selected files, with confirmation |
+
+Use Command on macOS and Control on Windows/Linux as appropriate. Do not override operating-system function-key or hardware-control behavior. Keyboard shortcuts, menus, context menus, and toolbar controls shall invoke the same underlying commands, with availability governed by current selection and image state. F3 is reserved rather than implemented as a viewer in 1.0.
+
+### 10.11 Recent images
 
 The application shall remember recently opened images and their selected formats.
 
