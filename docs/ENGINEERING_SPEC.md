@@ -1,10 +1,10 @@
 # CP/M Image — Engineering Specification
 
-**Version:** 0.6  
+**Version:** 0.7  
 **Status:** Approved engineering baseline  
 **Project:** CPMArchives/cpmimage  
 **Target release:** 1.0  
-**Date:** November 13, 2026
+**Date:** November 14, 2026
 
 ---
 
@@ -247,7 +247,7 @@ When opening an image, CP/M Image shall search beside it for a matching `.FDF` f
 
 A generated sidecar shall contain a complete, standalone cpmtools-compatible disk definition, including its identifier and any inherited parameters needed to interpret the image. It shall be independently usable by unmodified cpmtools without CP/M Image-specific syntax.
 
-Saving an image shall by default create or update its sidecar using the selected disk definition. Users may disable automatic sidecar generation in preferences. An existing sidecar that conflicts with the selected definition shall not be silently overwritten. Saving the image and sidecar shall follow a documented failure-recovery policy that avoids silently leaving inconsistent results.
+An explicit Save or Save As shall by default create or update the image's sidecar using the selected disk definition, even if the image has no content changes. Merely opening, detecting, or selecting a format shall not create a sidecar. The sidecar shall be generated only as part of an explicit image-save workflow. Users may disable automatic sidecar generation in preferences. An existing sidecar that conflicts with the selected definition shall not be silently overwritten. Saving the image and sidecar shall follow a documented failure-recovery policy that avoids silently leaving inconsistent results.
 
 Format-selection precedence is: (1) explicit `/f=FORMAT`, (2) matching `.FDF` sidecar, (3) remembered format, (4) normal selection or detection. Explicitly opening an image with a different format shall not itself rewrite the sidecar. Invalid sidecars shall be reported.
 
@@ -255,11 +255,9 @@ Sidecar discovery and loading belong to v0.3; sidecar generation and updating be
 
 ### 4.10 Automatic format detection
 
-Automatic format detection may assist users but shall not be required for manual format selection.
+Assisted detection shall offer candidate formats based on available container metadata, geometry, and filesystem plausibility, while retaining access to the full catalogue. Geometric compatibility or plausible directory contents alone do not establish a uniquely correct format.
 
-Detection shall not silently override an explicit user selection.
-
-The precise scope of automatic detection remains an implementation decision.
+For unfamiliar images without an explicit `/f`, valid matching `.FDF`, or validated remembered association, users shall confirm the selected format before writable operations. Detection is read-only and shall not silently override a selected format. Candidate-ranking algorithms remain an implementation detail.
 
 ---
 
@@ -481,7 +479,7 @@ Users shall be able to rename and delete files in the working image.
 
 Rename shall preserve file contents and applicable attributes.
 
-Deletion shall not modify the original source until the resulting image is saved.
+Deletion shall not modify the original source until the resulting image is saved. Delete shall always require confirmation, with one prompt for a multiselection. It modifies only the private working image, marks the image dirty, and is committed on Save. Discard restores the entire last-saved state, not merely the most recent deletion. General undo/redo is not required for 1.0.
 
 ### 6.5 Copy and move
 
@@ -492,6 +490,8 @@ The application shall support copying and moving files:
 - Between simultaneously open images.
 
 A move shall not discard source data before the destination operation has succeeded.
+
+Moving between user areas on the same filesystem shall be a metadata-only operation that updates the user byte in every extent of the file, without copying allocation blocks, subject to destination-name collision checks and safe working-image updates. Copying between user areas allocates separate data and directory entries; moving between distinct images copies successfully before removing the source.
 
 Destination conflicts, insufficient space, and incompatible filenames shall be handled predictably.
 
@@ -507,7 +507,7 @@ The application shall support standard attributes, including:
 - System.
 - Archive.
 
-Applicable user-defined attribute bits supported by the filesystem engine shall also be exposed.
+Other supported user-defined attribute bits may be exposed in technical details where reliably supported; the standard Properties editor shall provide RO, SYS, and ARC checkboxes.
 
 Attribute editing shall be available through file properties and appropriate context-menu commands.
 
@@ -541,7 +541,19 @@ Filename collisions shall be detected.
 
 Import shall not assume that reversing a filename substitution necessarily reconstructs the original CP/M filename.
 
-### 6.9 Filesystem statistics
+### 6.9 Import filename review and conflicts
+
+Host filenames already valid under the selected CP/M format shall import automatically, with lowercase converted to uppercase where appropriate. For names requiring shortening or character translation, the application shall propose valid 8.3 names and present one editable review dialog for the batch before import; no silent truncation is permitted. Validate all proposed names and detect both destination and within-batch collisions.
+
+File-transfer conflicts shall offer Replace, Skip, and Cancel, with **Skip preselected**. Apply to All shall be available for batch conflicts. Skip preserves the destination and continues; Cancel stops remaining operations; Replace follows safe-write rules. Report skipped files. Export-name collisions caused by host filename translation follow the same protection policy.
+
+Rename is separate from transfer conflict handling: F2 or the context menu shall edit one filename at a time, validate CP/M naming rules, uppercase applicable input, and reject same-user-area collisions without offering Replace. Renaming shall preserve data blocks, attributes, and supported timestamps, updating all relevant extents in the working image until Save.
+
+### 6.10 File size semantics
+
+The file list shall show **Records** (CP/M 128-byte logical records) and **Size (bytes)** (records × 128), both sortable numerically. Byte counts shall be displayed as full integers with thousands separators and shall not be represented as exact original content lengths where the filesystem does not store that information. Allocated space may be shown in Properties technical details. Supported filesystem-specific exact-length metadata may be used only when genuinely available.
+
+### 6.11 Filesystem statistics
 
 The application shall display ordinary filesystem information, including where available:
 
@@ -553,7 +565,7 @@ The application shall display ordinary filesystem information, including where a
 
 This is informational file-management functionality, not filesystem consistency checking.
 
-### 6.10 CP/M Plus metadata
+### 6.12 CP/M Plus metadata
 
 Where supported by the filesystem engine, CP/M Image shall recognize and display relevant CP/M Plus metadata, including disk labels and timestamps.
 
@@ -772,15 +784,43 @@ CP/M Image shall interoperate with Finder, Windows Explorer, and supported Linux
 
 Drop targets shall distinguish opening an image from importing the same file as ordinary CP/M data. Ambiguous actions shall be resolved explicitly. Existing filename translation, conflict handling, cancellation, and save-safety requirements apply.
 
-### 10.4 Multiple images
+### 10.4 Multiple images and independent instances
 
-The application shall support multiple simultaneously open images.
+Each application window shall provide tabs for multiple images. Users shall also be able to launch multiple independent application processes, each with its own tabbed workspace. Every tab shall retain its selected format, selected user area, working state, and unsaved-change indicator.
 
-Each image shall maintain independent format selection, working state, and unsaved modifications.
+Multiple processes may open the same source read-only, but only one writable session shall own a given source at a time; subsequent sessions shall not silently acquire write access. Source changes shall be revalidated before publication. Closing a modified tab, window, or instance shall offer Save / Discard / Cancel.
 
-The precise combination of separate windows and tabs remains an interface decision.
+Transfers between tabs in one instance may be coordinated internally; cross-instance transfers shall use native operating-system clipboard/drag-and-drop facilities without a dedicated interprocess transfer protocol.
 
-### 10.5 Recent images
+### 10.4.1 Clipboard and transfer semantics
+
+Copy/Paste duplicates files without modifying their sources. Cut/Paste moves files, removing the source only after successful destination writing. Drag-and-drop between user areas or images copies by default; moving requires explicit user action. Clipboard and drag-and-drop shall share the approved conflict policy and safe-write rules.
+
+### 10.5 File-list columns and interaction
+
+The default columns, in order, shall be **Filename**, **Records**, **Size (bytes)**, and **Attributes**. User area and supported timestamp columns are optional; an eventual All User Areas view shall include the User column. Column headers sort ascending/descending, with filename ascending by default and numeric sorting for record and byte counts. Columns shall be resizable, reorderable, and configurable through a column-header Choose Columns context menu. Visibility, order, and widths shall persist.
+
+Single-click selects a file; double-click opens Properties in 1.0. A future viewer may replace double-click behavior, with Properties remaining in the context menu. F2 renames and Delete invokes confirmed deletion. Multiselection shall follow native platform conventions.
+
+Properties shall display filename, user area, logical size, available timestamps, and optional directory extent/allocation details. RO, SYS, and ARC are editable; renaming and moving user areas are separate operations. Unsupported timestamps shall not be fabricated.
+
+### 10.6 Toolbar and context menus
+
+The toolbar shall contain exactly five labeled primary actions in two groups: **Open, New, Save** | **Import, Export**. Delete, sorting, Rename, Properties, Help, and format selection shall not require dedicated toolbar buttons. The toolbar shall be visible by default, hideable via View → Toolbar, with application-wide persistent visibility and full recovery of its screen space. Every toolbar command shall remain accessible from the menus.
+
+Context menus shall be defined by target:
+
+| Target | Commands |
+|---|---|
+| Selected file(s) | Export, Copy, Move to User, Rename, Delete, Properties |
+| User-area folder | Open User Area, Import Files, Paste, Export All, Properties |
+| Empty file-list area | Import Files, Paste, Select All, Refresh |
+| Image tab | Save, Save As, Image Information, Close Image |
+| File-list column header | Choose Columns |
+
+Right-clicking a selected file shall preserve the current multiselection; right-clicking an unselected file shall select it. Commands inappropriate for the current selection/state shall be disabled or omitted (e.g., Rename for multiple files). Menus, shortcuts, and toolbar actions shall invoke the same underlying commands. Native secondary-click, Control-click where appropriate, and keyboard context-menu access shall be supported.
+
+### 10.7 Recent images
 
 The application shall remember recently opened images and their selected formats.
 
@@ -788,11 +828,11 @@ Users shall be able to pin frequently used images.
 
 Stored source information shall be validated when images are reopened.
 
-### 10.6 Preferences
+### 10.8 Preferences
 
 Persistent preferences shall include relevant format-catalogue settings, favorites, filename translations, and application behavior.
 
-### 10.7 Image information
+### 10.9 Image information
 
 The Image Information interface shall present relevant details, including:
 
@@ -953,7 +993,7 @@ Tests shall verify generated `.FDF` files using independent cpmtools, image/side
 
 ### 13.10 Interface and Help qualification
 
-Verify the narrow user-area sidebar, populated/empty indicators, right-pane sorting, and native appearance on each supported platform. Exercise image-opening drops, host-to-image imports, image-to-host exports, and cross-image transfers.
+Verify the narrow user-area sidebar, populated/empty indicators, default and optional columns, numeric sorting, column persistence, hideable five-action toolbar, context-menu selection rules, file Properties, independent instances and writable ownership, and native appearance on each supported platform. Exercise image-opening drops, host-to-image imports, image-to-host exports, and cross-image transfers.
 
 Verify bundled offline Help without network access, search, contextual links, and consistency with the published online documentation.
 
@@ -990,8 +1030,8 @@ The following decisions remain open and shall be resolved during their relevant 
 | System-track short-input padding policy | v0.4 |
 | Container conversion implementation and fidelity limits | v0.5 |
 | Missing-sector substitution and save policy | v0.5 |
-| Multiple-window/tab presentation | Multi-image milestone |
-| Automatic format-detection scope | Before 1.0 feature freeze |
+| Multiple-instance ownership and locking mechanism | v0.4/v0.7 |
+| Assisted format-detection ranking and evidence thresholds | v0.3/v0.8 |
 | Supported operating-system and architecture matrix | Release qualification |
 
 These decisions shall not block unrelated approved work.
