@@ -1,6 +1,6 @@
 # CP/M Image — Engineering Specification
 
-**Version:** 0.4  
+**Version:** 0.5  
 **Status:** Approved engineering baseline  
 **Project:** CPMArchives/cpmimage  
 **Target release:** 1.0  
@@ -45,6 +45,8 @@ Version 1.0 shall provide:
 - Drag-and-drop and clipboard operations.
 - Full `diskdefs` catalogue support and dynamic format selection.
 - Custom disk-format catalogues, favorites, and recent-image history.
+- Portable image-specific `.FDF` disk definitions.
+- Command-line image opening and headless access to the bundled cpmtools suite.
 - RAW, IMD, DMK, and JV3 container interoperability.
 - IMD image-comment viewing and editing.
 - Filesystem capacity and usage information.
@@ -236,7 +238,19 @@ The application shall remember the selected disk format for recently opened imag
 
 Recent-image records shall retain sufficient source identity information to avoid blindly applying stale settings.
 
-### 4.9 Automatic format detection
+### 4.9 Image-specific FDF sidecars
+
+When opening an image, CP/M Image shall search beside it for a matching `.FDF` file using the same filename stem, for example `mmcpm223.dmk` and `mmcpm223.fdf`.
+
+A generated sidecar shall contain a complete, standalone cpmtools-compatible disk definition, including its identifier and any inherited parameters needed to interpret the image. It shall be independently usable by unmodified cpmtools without CP/M Image-specific syntax.
+
+Saving an image shall by default create or update its sidecar using the selected disk definition. Users may disable automatic sidecar generation in preferences. An existing sidecar that conflicts with the selected definition shall not be silently overwritten. Saving the image and sidecar shall follow a documented failure-recovery policy that avoids silently leaving inconsistent results.
+
+Format-selection precedence is: (1) explicit `/f=FORMAT`, (2) matching `.FDF` sidecar, (3) remembered format, (4) normal selection or detection. Explicitly opening an image with a different format shall not itself rewrite the sidecar. Invalid sidecars shall be reported.
+
+Sidecar discovery and loading belong to v0.3; sidecar generation and updating belong to v0.4.
+
+### 4.10 Automatic format detection
 
 Automatic format detection may assist users but shall not be required for manual format selection.
 
@@ -777,21 +791,49 @@ Technical information shall remain accessible without dominating ordinary file-m
 
 ---
 
+## 12. Command-Line Interface
+
+### 15.1 Mode precedence
+
+CP/M Image has GUI and headless cpmtools operating modes. A recognized cpmtools utility selector anywhere on the command line shall take absolute precedence: **the GUI must not initialize or open**, regardless of any other arguments or their order. The entire argument list shall be scanned before mode selection.
+
+Multiple utility selectors shall cause a command-line error. GUI-only arguments supplied with a utility selector shall cause a command-line error unless specifically supported in headless mode; neither case shall launch the GUI.
+
+### 15.2 GUI invocation
+
+The GUI shall support `/img=PATH` and unambiguous positional image paths, `/f=FORMAT` to select a persistent format for subsequent images, and `/diskdefs=PATH` to select a disk-definition catalogue globally for the invocation. Corresponding long options `--image`, `--format`, and `--diskdefs` shall be available for conventional host-shell usage.
+
+A selected `/f` overrides a matching image sidecar; without `/f`, Section 4.9 governs format selection. `/diskdefs` selects the catalogue, not a particular format, and applies to the invocation as a whole. Conflicting repeated catalogue options or an invalid specified catalogue shall cause explicit errors. Host absolute paths beginning with `/` shall not be misinterpreted as options.
+
+### 15.3 Headless cpmtools invocation
+
+`cpmimage /UTILITY [utility arguments]` shall dispatch to the identically named utility from the pinned bundled cpmtools distribution, including `/cpmcp`, `/cpmls`, `/cpmchattr`, `/fsck.cpm`, and `/fsed.cpm`. The complete bundled suite shall be available. No aliases or renamed cpmtools commands are required.
+
+The dispatcher shall preserve original utility argument semantics, standard input, standard output, standard error, and exit status. It shall not reimplement cpmtools command parsers or filesystem operations. The shared `/diskdefs=PATH` option shall configure the utility's catalogue through cpmtools-supported mechanisms without forwarding the CP/M Image-specific option as an invalid utility argument.
+
+Standalone utilities shall be built from the pinned source and packaged for every supported platform, without requiring a separate cpmtools installation. Windows console behavior shall be tested explicitly; a GUI-subsystem executable shall not be assumed to provide correct console streams or exit codes.
+
+### 15.4 Scope and milestone
+
+Exposing existing `fsck.cpm` and `fsed.cpm` in headless mode does not introduce their GUI equivalents into 1.0. GUI checking, repair, and low-level editing remain post-1.0. GUI catalogue-option handling begins in v0.3; the full dispatcher and packaging integration are targeted for v0.8.
+
+---
+
 ## 11. Verification and Qualification
 
-### 11.1 General requirements
+### 15.1 General requirements
 
 Each milestone shall have independently testable acceptance criteria.
 
 Regression testing shall protect previously implemented functionality.
 
-### 11.2 Disk-format compatibility
+### 15.2 Disk-format compatibility
 
 Testing shall establish that valid supported definitions are resolved through the cpmtools-derived interface rather than an application-level whitelist.
 
 Tests shall include differing geometry, allocation parameters, and sector translation.
 
-### 11.3 Independent RAW compatibility
+### 15.3 Independent RAW compatibility
 
 Every supported RAW-generation workflow shall be tested for compatibility with an independent, unmodified cpmtools build.
 
@@ -807,7 +849,7 @@ Tests shall include images where physical sector order, numeric sector-ID order,
 
 For custom definitions, the same definition shall be supplied to the independent cpmtools installation.
 
-### 11.4 Filesystem operations
+### 15.4 Filesystem operations
 
 Write operations shall be verified through save, reopen, and content comparison.
 
@@ -822,7 +864,7 @@ Tests shall include:
 - Interrupted operations.
 - Source-image preservation.
 
-### 11.5 System tracks
+### 15.5 System tracks
 
 Tests shall verify:
 
@@ -836,7 +878,7 @@ Tests shall verify:
 
 Tests shall not attempt to certify the suitability of arbitrary operating-system binaries.
 
-### 11.6 Containers
+### 15.6 Containers
 
 Container adapters shall be tested using appropriate images and, where relevant, target emulators.
 
@@ -852,31 +894,35 @@ Tests shall cover:
 - Save and reopen behavior.
 - Independent cpmtools compatibility of generated RAW images.
 
-### 11.7 Cross-platform qualification
+### 15.7 Cross-platform qualification
 
 The project shall establish an explicit operating-system and architecture matrix before 1.0.
 
 Existing ARM64 validation is the starting baseline.
 
-### 11.8 Packaging
+### 15.8 Packaging
 
 Distributed packages shall include required dependencies and applicable licensing materials.
 
 Package relocation, runtime independence, and installation behavior shall be tested.
 
+### 12.9 Sidecar and command-line qualification
+
+Tests shall verify generated `.FDF` files using independent cpmtools, image/sidecar naming and precedence, conflicting sidecars, and interrupted multi-file saves. Tests shall also verify multi-image GUI invocation, persistent format selection, catalogue override, headless precedence regardless of argument order, conflicting utility selectors, console streams, and exit status on supported platforms.
+
 ---
 
-## 12. Development Priorities
+## 13. Development Priorities
 
 The implementation sequence shall be:
 
 1. General `diskdefs` backend support.
-2. Bundled/custom catalogue integration and dynamic format selection.
-3. Safe filesystem writing and core file operations, including attributes and system-track management.
+2. Bundled/custom catalogue integration, `.FDF` discovery, command-line catalogue selection, and dynamic format selection.
+3. Safe filesystem writing and core file operations, including attributes, system-track management, and `.FDF` sidecar saving.
 4. IMD, DMK, and JV3 container interoperability.
 5. Image creation and formatting.
 6. Multiple-image management and desktop integration.
-7. Usability improvements, compatibility testing, and release qualification.
+7. GUI command-line opening, headless cpmtools dispatch, usability improvements, compatibility testing, and release qualification.
 
 The companion roadmap shall define milestone numbers, dependencies, deliverables, and completion criteria.
 
@@ -884,7 +930,7 @@ Full `diskdefs` support is foundational and shall not be postponed until the app
 
 ---
 
-## 13. Open Engineering Decisions
+## 14. Open Engineering Decisions
 
 The following decisions remain open and shall be resolved during their relevant milestones:
 
@@ -893,6 +939,7 @@ The following decisions remain open and shall be resolved during their relevant 
 | General diskdefs resolution API | v0.3 |
 | Catalogue metadata and classification implementation | v0.3 |
 | Safe save/publication mechanism | v0.4 |
+| Image/sidecar publication and recovery policy | v0.4 |
 | System-track short-input padding policy | v0.4 |
 | Container conversion implementation and fidelity limits | v0.5 |
 | Missing-sector substitution and save policy | v0.5 |
@@ -904,27 +951,27 @@ These decisions shall not block unrelated approved work.
 
 ---
 
-## 14. Project Governance
+## 15. Project Governance
 
-### 14.1 Specification authority
+### 15.1 Specification authority
 
 Once approved, this document shall serve as the authoritative engineering specification for CP/M Image 1.0.
 
 The companion roadmap shall govern milestone sequencing.
 
-### 14.2 Architectural changes
+### 15.2 Architectural changes
 
 Consequential architectural changes shall be reviewed against this specification.
 
 Reviews shall identify compatibility impacts, alternatives, implementation costs, and justification.
 
-### 14.3 Implementation status
+### 15.3 Implementation status
 
 Requirements, implementation status, and qualification evidence shall be tracked separately.
 
 A requirement's inclusion in this specification does not imply it has been implemented.
 
-### 14.4 Relationship to other projects
+### 15.4 Relationship to other projects
 
 CP/M Image shall not depend on completion of the separate universal CP/M disk-format database project.
 
