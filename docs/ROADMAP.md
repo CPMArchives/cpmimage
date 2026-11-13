@@ -1,9 +1,9 @@
 # CP/M Image — Development Roadmap
 
-**Status:** Approved development sequence, reconciled with Engineering Specification 0.5  
+**Status:** Approved development sequence, reconciled with Engineering Specification 0.7  
 **Project:** CPMArchives/cpmimage  
 **Target release:** 1.0  
-**Date:** November 13, 2026
+**Date:** November 14, 2026
 
 This roadmap defines the implementation sequence and acceptance criteria for CP/M Image 1.0. The [Engineering Specification](ENGINEERING_SPEC.md) is authoritative for product behavior, architecture, compatibility, and scope. Milestone assignments do not authorize changes outside their stated scope.
 
@@ -41,7 +41,7 @@ The current five-format restriction is an implementation limitation, **not** a p
 - Provide searchable, alphabetized, manufacturer/model/system-family format selection.
 - Provide persistent favorites and recent-image format choices.
 - Allow format switching without closing the source image.
-- Establish format-selection precedence: explicit `/f`, matching image `.FDF`, remembered format, then ordinary selection/detection.
+- Establish format-selection precedence: explicit `/f`, matching image `.FDF`, remembered format, then assisted detection/selection. Candidate detection shall not infer certainty from geometry or plausible directory contents alone; require user confirmation before writable operations on unfamiliar images.
 - Preserve the Save / Discard / Cancel policy for format changes with unsaved work as writing support becomes available.
 
 **Acceptance:** A user can choose any backend-supported definition, open and reinterpret images without closing them, and use custom/reduced catalogues through the GUI.
@@ -52,9 +52,12 @@ The current five-format restriction is an implementation limitation, **not** a p
 
 - Introduce private mutable working images, dirty-state tracking, Discard, Save, and Save As.
 - Implement safe output publication and appropriate conflict, interruption, and concurrent-change handling.
-- Implement file import/export, rename, delete, supported attribute editing, optional text conversion, timestamp handling where supported, and filename collision safeguards.
+- Implement file import/export, rename, confirmed deferred deletion, supported RO/SYS/ARC Properties editing, optional text conversion, timestamp handling where supported, and filename collision safeguards.
+- Import valid CP/M filenames automatically; review names requiring 8.3 shortening/translation in one editable batch dialog, detecting within-batch and destination collisions. Use Replace/Skip/Cancel with Skip preselected and Apply to All for batch conflicts.
+- Implement single-file F2/context-menu Rename as a metadata-only update across extents; reject rename collisions without Replace. Deletion requires confirmation, changes only the working image, and is reversible through Discard of all unsaved changes (not per-operation Undo).
+- Implement same-filesystem cross-user-area moves by updating user bytes across extents, without copying file data; preserve metadata and enforce destination collision checks.
 - Support independent export, import, and replacement of reserved system-track bytes on existing images. Use the selected disk definition to locate the region, protect filesystem data, validate size, and define short-input padding. The user, not CP/M Image, determines whether supplied system software is bootable or appropriate.
-- Generate or update an image-specific, standalone cpmtools-compatible `.FDF` when saving, by default, with a preference to disable automatic creation.
+- Generate or update an image-specific, standalone cpmtools-compatible `.FDF` on explicit Save or Save As by default, including an otherwise unmodified image; never create it merely on open, detection, or format selection. Provide a preference to disable automatic creation.
 - Detect conflicting existing sidecars and define safe image-plus-sidecar publication/recovery behavior.
 
 **Acceptance:** Edited images reopen correctly; unrelated contents and source images remain protected on failure; system-track bytes round-trip accurately; generated `.FDF` files can be parsed by independent unmodified cpmtools.
@@ -82,9 +85,9 @@ The current five-format restriction is an implementation limitation, **not** a p
 
 ## v0.7 — Multiple images and desktop transfers
 
-- Support multiple open image sessions with independent formats and unsaved states.
+- Support tabbed image sessions within each window and multiple independent application instances, with per-tab format, user area, and unsaved state. Allow shared read-only access but enforce a single writable owner per source, with external-change checks before save.
 - Support copying/moving files between images and user areas.
-- Implement drag-and-drop, clipboard transfers, multiple selection, and conflict handling.
+- Implement drag-and-drop, clipboard transfers, multiple selection, and conflict handling. Copy/Paste duplicates; Cut/Paste moves only after successful destination writing; drag-and-drop copies by default between user areas/images and requires an explicit action to move. Cross-instance transfers use native host clipboard/drag-and-drop without a custom interprocess protocol.
 - Preserve the narrow left CP/M user-area sidebar (approximately 90–120 pixels by default, resizable) and wide right file-list pane; do not add a permanent host filesystem browser.
 - Support native host file-manager drag-and-drop: drop images to open, host files onto user areas to import, CP/M files onto host folders to export, and files between open images to transfer. Distinguish opening an image from importing it as data by drop target.
 - Write or update Help topics as features are implemented, using repository Markdown as the common source for offline and online Help.
@@ -99,6 +102,9 @@ The current five-format restriction is an implementation limitation, **not** a p
 - A recognized utility selector **anywhere** on the command line always prevents GUI initialization. Multiple selectors or incompatible GUI-only options cause explicit errors, never GUI launch.
 - Build and package the pinned standalone cpmtools executables for each supported host platform. Preserve arguments, stdin/stdout/stderr, and exit codes, with explicit Windows console qualification.
 - Complete preferences, Image Information, relevant format-detection assistance, progress/error presentation, and general workflow integration.
+- Finalize the narrow-sidebar file list with default Filename, Records, Size (bytes), Attributes columns; optional User and supported timestamps; numeric sorting, column-header Choose Columns, reorder/resize, and persistent layout. Display logical bytes as records × 128, not exact original length.
+- Provide the five-button labeled toolbar (Open, New, Save | Import, Export), visible by default and persistently hideable via View → Toolbar. Keep sorting and other contextual commands off the toolbar.
+- Implement target-specific context menus for files, user areas, empty file-list space, image tabs, and column headers, with selection-sensitive availability and consistent underlying actions. Double-click opens Properties in 1.0; F2 renames; Delete confirms; Properties edits RO/SYS/ARC and shows available metadata.
 - Integrate bundled searchable offline Help as the primary Help experience, accessible through the Help menu and F1 where appropriate, with context-sensitive entry points.
 - Provide a Help-menu link to companion online documentation generated from the same repository Markdown source.
 - Review native desktop visual consistency and refine the approved narrow-sidebar/right-file-list layout without redesigning the application.
@@ -113,7 +119,7 @@ The current five-format restriction is an implementation limitation, **not** a p
 - Produce self-contained packages with required runtime dependencies, cpmtools executables, licensing, and corresponding-source materials.
 - Publish online Help and complete documentation and release-readiness checks.
 - Validate offline Help without network access, search, contextual topics, online/offline content consistency, and Help links.
-- Qualify native UI appearance, sidebar sizing, file-list usability, and bidirectional drag-and-drop with host file managers on the release platforms.
+- Qualify native UI appearance, sidebar sizing, column sorting/persistence, toolbar visibility, context menus, Properties, tab/instance ownership, conflict behavior, safe rename/delete, filename review, and bidirectional drag-and-drop with host file managers on the release platforms.
 
 **Acceptance:** Release targets have reproducible builds, qualified installers/packages, working bundled offline Help, published online documentation, verified native file-manager transfers, and documented evidence of the required workflows.
 
@@ -141,3 +147,4 @@ The existing cpmtools CLI executables, including `fsck.cpm` and `fsed.cpm`, rema
 - Keep source images safe until explicit publication.
 - Test and review each milestone independently. Do not interpret this roadmap as authorization to implement all milestones in a single Work assignment.
 - Resolve open implementation details in the milestone where they matter, without reopening approved product requirements.
+- Treat the approved 1.0 product/UI design as feature-frozen; optional All User Areas and future file viewer are not release blockers.
