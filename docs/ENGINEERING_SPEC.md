@@ -766,13 +766,13 @@ The sidebar shall show numbered user-area folders (0–15, or 0–31 where suppo
 
 An All User Areas view is optional rather than a 1.0 requirement. Host filesystem browsing shall use native file-open dialogs and the operating system's file manager.
 
-### 10.5 Native file-manager drag-and-drop
+### 10.3 Native file-manager drag-and-drop
 
 CP/M Image shall interoperate with Finder, Windows Explorer, and supported Linux file managers. Dropping an image onto the appropriate application-level target shall open it; dropping host files onto a CP/M user area shall import them; dragging CP/M files to a host file manager shall export them; and dragging between open CP/M images shall transfer files.
 
 Drop targets shall distinguish opening an image from importing the same file as ordinary CP/M data. Ambiguous actions shall be resolved explicitly. Existing filename translation, conflict handling, cancellation, and save-safety requirements apply.
 
-### 10.6 Multiple images
+### 10.4 Multiple images
 
 The application shall support multiple simultaneously open images.
 
@@ -780,7 +780,7 @@ Each image shall maintain independent format selection, working state, and unsav
 
 The precise combination of separate windows and tabs remains an interface decision.
 
-### 10.3 Recent images
+### 10.5 Recent images
 
 The application shall remember recently opened images and their selected formats.
 
@@ -788,7 +788,7 @@ Users shall be able to pin frequently used images.
 
 Stored source information shall be validated when images are reopened.
 
-### 10.4 Preferences
+### 10.6 Preferences
 
 Persistent preferences shall include relevant format-catalogue settings, favorites, filename translations, and application behavior.
 
@@ -808,43 +808,43 @@ Technical information shall remain accessible without dominating ordinary file-m
 
 ---
 
-## 12. Help and Documentation
+## 11. Help and Documentation
 
-### 12.1 Primary offline Help
+### 11.1 Primary offline Help
 
 CP/M Image 1.0 shall include complete, searchable Help bundled with the application, accessible through the Help menu and F1 where appropriate. Essential Help shall work without an internet connection.
 
-### 12.2 Online documentation
+### 11.2 Online documentation
 
 The same documentation shall be published online and accessible through the Help menu in the default browser. The online site is secondary; offline Help is the primary experience.
 
-### 12.3 Single source and context-sensitive topics
+### 11.3 Single source and context-sensitive topics
 
 Help content shall be maintained as Markdown in the project repository and used to generate both offline and online documentation. A lightweight existing viewer/generator is preferred over a bespoke Help engine.
 
 Relevant dialogs and workflows shall link to their topics where practical. Coverage shall include opening images, user areas, file operations, filename translation and CP/M record padding, diskdefs and .FDF sidecars, RAW/IMD/DMK/JV3, system tracks, image creation, save safety, command-line operation, and troubleshooting.
 
-### 12.4 Delivery
+### 11.4 Delivery
 
 Documentation shall be developed alongside features. Offline Help, search, and contextual entry points shall be integrated in v0.8. Online publication and documentation qualification shall be completed in v0.9.
 
 ---
 
-## 11. Command-Line Interface
+## 12. Command-Line Interface
 
-### 11.1 Mode precedence
+### 12.1 Mode precedence
 
 CP/M Image has GUI and headless cpmtools operating modes. A recognized cpmtools utility selector anywhere on the command line shall take absolute precedence: **the GUI must not initialize or open**, regardless of any other arguments or their order. The entire argument list shall be scanned before mode selection.
 
 Multiple utility selectors shall cause a command-line error. GUI-only arguments supplied with a utility selector shall cause a command-line error unless specifically supported in headless mode; neither case shall launch the GUI.
 
-### 11.2 GUI invocation
+### 12.2 GUI invocation
 
 The GUI shall support `/img=PATH` and unambiguous positional image paths, `/f=FORMAT` to select a persistent format for subsequent images, and `/diskdefs=PATH` to select a disk-definition catalogue globally for the invocation. Corresponding long options `--image`, `--format`, and `--diskdefs` shall be available for conventional host-shell usage.
 
 A selected `/f` overrides a matching image sidecar; without `/f`, Section 4.9 governs format selection. `/diskdefs` selects the catalogue, not a particular format, and applies to the invocation as a whole. Conflicting repeated catalogue options or an invalid specified catalogue shall cause explicit errors. Host absolute paths beginning with `/` shall not be misinterpreted as options.
 
-### 11.3 Headless cpmtools invocation
+### 12.3 Headless cpmtools invocation
 
 `cpmimage /UTILITY [utility arguments]` shall dispatch to the identically named utility from the pinned bundled cpmtools distribution, including `/cpmcp`, `/cpmls`, `/cpmchattr`, `/fsck.cpm`, and `/fsed.cpm`. The complete bundled suite shall be available. No aliases or renamed cpmtools commands are required.
 
@@ -852,7 +852,7 @@ The dispatcher shall preserve original utility argument semantics, standard inpu
 
 Standalone utilities shall be built from the pinned source and packaged for every supported platform, without requiring a separate cpmtools installation. Windows console behavior shall be tested explicitly; a GUI-subsystem executable shall not be assumed to provide correct console streams or exit codes.
 
-### 11.4 Scope and milestone
+### 12.4 Scope and milestone
 
 Exposing existing `fsck.cpm` and `fsed.cpm` in headless mode does not introduce their GUI equivalents into 1.0. GUI checking, repair, and low-level editing remain post-1.0. GUI catalogue-option handling begins in v0.3; the full dispatcher and packaging integration are targeted for v0.8.
 
