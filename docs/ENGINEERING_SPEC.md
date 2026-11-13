@@ -791,7 +791,7 @@ Technical information shall remain accessible without dominating ordinary file-m
 
 ---
 
-## 12. Command-Line Interface
+## 11. Command-Line Interface
 
 ### 15.1 Mode precedence
 
@@ -819,7 +819,7 @@ Exposing existing `fsck.cpm` and `fsed.cpm` in headless mode does not introduce 
 
 ---
 
-## 11. Verification and Qualification
+## 12. Verification and Qualification
 
 ### 15.1 General requirements
 
