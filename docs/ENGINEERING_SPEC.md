@@ -72,9 +72,13 @@ The application shall target macOS, Windows, and Linux.
 
 ### 2.2 CPU architectures
 
-The existing prototype has documented ARM64 validation on all three operating systems.
+CP/M Image 1.0 shall provide native x86-64 builds for Windows and Linux, and native ARM64 builds for macOS.
 
-The supported CPU architectures and minimum operating-system versions for 1.0 shall be established through release qualification.
+Additional supported targets shall include macOS x86-64, Linux ARM64, and Windows ARM64, subject to successful build, packaging, and qualification.
+
+The existing ARM64 validation on macOS, Windows, and Linux provides the initial development baseline but does not substitute for validation on the other target architectures.
+
+Minimum operating-system versions shall be established during release qualification.
 
 ### 2.3 Self-contained distribution
 
