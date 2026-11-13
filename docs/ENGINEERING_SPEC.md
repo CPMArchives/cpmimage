@@ -850,7 +850,7 @@ Standard application shortcuts shall be:
 
 Use Command on macOS and Control on Windows/Linux as appropriate. Do not override operating-system function-key or hardware-control behavior. Keyboard shortcuts, menus, context menus, and toolbar controls shall invoke the same underlying commands, with availability governed by current selection and image state. F3 is reserved rather than implemented as a viewer in 1.0.
 
-### 10.11 Recent images
+### 10.8 Recent images
 
 The application shall remember recently opened images and their selected formats.
 
@@ -858,11 +858,11 @@ Users shall be able to pin frequently used images.
 
 Stored source information shall be validated when images are reopened.
 
-### 10.8 Preferences
+### 10.9 Preferences
 
 Persistent preferences shall include relevant format-catalogue settings, favorites, filename translations, and application behavior.
 
-### 10.9 Image information
+### 10.10 Image information
 
 The Image Information interface shall present relevant details, including:
 
