@@ -309,6 +309,61 @@ def main():
                                geometry=geometry, dirty=False, confirmed=False)
                 reply['result'].update(session=token, source_sha256=fingerprint, unused_tail_filled=trimmed,
                                        definition_sha256=catalogue.digest(definition))
+            elif op == 'edit':
+                if not session or request.get('session') != session['token']:
+                    raise backend.Failure('stale_session', 'Open the image again.')
+                if session['original_container'] != 'raw':
+                    raise backend.Failure('unsupported_container', 'File editing currently requires RAW.')
+                if not session['confirmed'] and request.get('confirmed') is not True:
+                    raise backend.Failure('confirmation_required', 'Confirm the selected disk definition for writing.')
+                action = request['action']
+                if action not in ('rename', 'delete', 'attrs', 'import', 'move'):
+                    raise backend.Failure('invalid_edit', 'Unknown editing operation.')
+                name = backend.filename(request['name'], True)
+                argument = '-'
+                if action in ('rename', 'move'):
+                    argument = backend.filename(request['target'], True)
+                    if action == 'move' and name[2:] != argument[2:]:
+                        raise backend.Failure('invalid_edit', 'Moving a file preserves its filename.')
+                    action = 'rename'
+                elif action == 'attrs':
+                    attributes = request['attributes']
+                    if type(attributes) is not int or attributes & ~0x700:
+                        raise backend.Failure('invalid_edit', 'Only RO, SYS and ARC can be edited.')
+                    argument = str(attributes)
+                working = session['image']
+                if not session['owner']:
+                    owner = Ownership(session['source'], Path.home() / '.cpmimage' / 'ownership')
+                    if owner.current != session['identity'] or file_hash(owner.path) != session['sha']:
+                        owner.close()
+                        raise backend.Failure('source_changed', 'The source changed. Open it again.')
+                    session['owner'] = owner
+                with tempfile.TemporaryDirectory(prefix='cpmimage-edit-', dir=working.parent) as temp:
+                    edit_dir = Path(temp)
+                    candidate = edit_dir / 'edited.raw'
+                    shutil.copyfile(working, candidate)
+                    (edit_dir / 'diskdefs').write_text(session['definitions'], encoding='utf-8')
+                    if action == 'import':
+                        data = read_image(Path(request['path']))
+                        staged = edit_dir / 'input.bin'
+                        staged.write_bytes(data)
+                        argument = str(staged)
+                        if request.get('replace') is True:
+                            adapter().native(edit_dir, 'edit_delete', candidate, session['format'], 'raw', name, '-')
+                    adapter().native(edit_dir, 'edit_' + action, candidate, session['format'], 'raw', name, argument)
+                    checked = adapter().request({
+                        'v': 1, 'id': rid, 'op': 'list', 'image': str(candidate),
+                        'format': session['format'], 'container': 'raw'}, defs_override=session['definitions'])
+                    if not checked['ok']:
+                        raise backend.Failure(checked['error'], checked.get('message', ''))
+                    if stop.is_set():
+                        raise backend.Failure('cancelled')
+                    if not session['dirty']:
+                        shutil.copyfile(working, working.with_name('saved.raw'))
+                    os.replace(candidate, working)
+                session.update(dirty=True, confirmed=True)
+                reply = checked
+                reply['result']['dirty'] = True
             elif op in ('systems_export', 'systems_import', 'discard'):
                 if not session or request.get('session') != session['token']:
                     raise backend.Failure('stale_session', 'Open the image again.')
@@ -316,6 +371,11 @@ def main():
                 baseline = working.with_name('saved.raw')
                 if op == 'discard':
                     if session['dirty']:
+                        checked = adapter().request({
+                            'v': 1, 'id': rid, 'op': 'list', 'image': str(baseline),
+                            'format': session['format'], 'container': 'raw'}, defs_override=session['definitions'])
+                        if not checked['ok']:
+                            raise backend.Failure(checked['error'], checked.get('message', ''))
                         os.replace(baseline, working)
                     session.update(dirty=False, confirmed=False)
                     if session['owner']:
@@ -364,7 +424,10 @@ def main():
                             if candidate.exists():
                                 candidate.unlink()
                         session.update(dirty=True, confirmed=True)
-                reply = dict(v=1, id=rid, ok=True, result=dict(dirty=session['dirty']))
+                result = dict(dirty=session['dirty'])
+                if op == 'discard' and 'checked' in locals():
+                    result['entries'] = checked['result']['entries']
+                reply = dict(v=1, id=rid, ok=True, result=result)
             elif op in ('save_plan', 'save'):
                 if not session or request.get('session') != session['token']:
                     raise backend.Failure('stale_session', 'Open the image again.')

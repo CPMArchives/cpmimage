@@ -52,6 +52,9 @@ private:
     void updateUserAreas();
     void chooseImage();
     void chooseSave(bool saveAs);
+    void chooseEdit(const QString &action);
+    bool confirmWrite();
+    bool dirty = false, writeConfirmed = false;
     QJsonObject pendingSave;
     void chooseExport();
     void editFilenameSettings();
