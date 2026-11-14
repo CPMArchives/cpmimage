@@ -1116,8 +1116,10 @@ void Window::readReply() {
         if (code == "destination_exists") message = "That destination already exists. Choose a new filename; nothing was overwritten.";
         else if (code == "cancelled") message = "Operation cancelled.";
         else if (code == "source_changed") {
-            if (operation == "export") session.clear();
-            message = reply["message"].toString();
+            if (operation == "export") {
+                session.clear();
+                message = "The source image changed. Open it again before exporting.";
+            } else message = reply["message"].toString();
         }
         else message = "Cannot complete the operation (" + code + "). " + reply["message"].toString();
         fail(message); return;
