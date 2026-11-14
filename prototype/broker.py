@@ -271,6 +271,7 @@ def main():
                         if geometry.get('boot_geometry'):
                             continue
                         try:
+                            missing = 0
                             if container in structured:
                                 # Reuse only the validated open path. Geometry alone
                                 # does not establish equivalence of physical mappings.
@@ -293,7 +294,8 @@ def main():
                                 if end == len(data):
                                     tier, evidence = 0, 'Exact RAW extent and readable directory'
                                 else:
-                                    tier, evidence = 1, 'Short RAW extent and readable directory'
+                                    tier, evidence = 1, 'Short RAW extent'
+                                    missing = end - len(data)
                         except backend.Failure as error:
                             if error.code == 'cancelled':
                                 raise
@@ -308,10 +310,14 @@ def main():
                             if any(not 0 <= entry['size'] <= capacity
                                    for entry in probe['result']['entries']):
                                 continue
+                            empty = not probe['result']['entries'] if missing else False
+                            if missing:
+                                directory_evidence = 'empty directory' if empty else 'populated directory'
+                                evidence += f' ({missing:,} bytes short) and {directory_evidence}'
                             maker, model, family = metadata.get(fmt, ('', '', ''))
-                            ranked.append((tier, fmt, dict(id=fmt, manufacturer=maker, model=model, family=family,
+                            ranked.append((tier, empty, missing, fmt, dict(id=fmt, manufacturer=maker, model=model, family=family,
                                 evidence=evidence, definition_sha256=catalogue.digest(definition))))
-                    candidates = [row for _, _, row in sorted(ranked)]
+                    candidates = [row for *_, row in sorted(ranked)]
                 result = dict(container=container, source_sha256=fingerprint, candidates=candidates,
                               sidecar_warning=warning,
                               detection_warning=('No verified container mapping found during detection. '
