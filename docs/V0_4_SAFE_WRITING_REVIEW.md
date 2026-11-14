@@ -21,3 +21,9 @@ Save stages and synchronizes output and recovery copies beside the destination. 
 - Unmodified cpmtools 2.23 linked with LibDsk opened the published DSK directly with the generated FDF and extracted the expected text records.
 
 The final targeted checks above ran on macOS. Windows and Debian results cover the earlier milestone smoke runs listed above.
+
+## Backup rotation follow-up
+
+The final `committed` record follows synchronized image, sidecar, and backup replacements. `outputs-published` records progress only. Interrupted saves retain the journal and block further publication to affected paths, including a shared FDF. Recovery is manual. Close affected sessions, preserve a copy of the journal, and compare live files with the manifest hashes before explicitly restoring or completing any replacement. Clear the recovery directory only after resolving the affected files. A failed commit synchronization can leave the marker visible, so inspect the live hashes when the app reports an uncertain commit. Successful commits remain successful if cleanup fails.
+
+Seven focused macOS ARM64 publication tests passed, including process termination during backup rotation, a rotation failure where restoration is unavailable, shared-sidecar recovery gating, and cleanup failure after commit.
