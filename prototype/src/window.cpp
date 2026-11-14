@@ -33,6 +33,7 @@
 #include <QAction>
 #include <QSettings>
 #include <QLineEdit>
+#include <QKeyEvent>
 #include <QInputDialog>
 #include <QCheckBox>
 #include <QProgressBar>
@@ -545,15 +546,19 @@ QJsonObject Window::initializeOptions(const QJsonObject &geometry) {
     }
     QLineEdit bootPath;
     bootPath.setReadOnly(true);
-    bootPath.setPlaceholderText("Preserve existing reserved bytes or use E5 on a new image");
-    QPushButton bootButton("Choose system-track binary…");
+    bootPath.setPlaceholderText("No system-track file selected");
+    QPushButton bootButton("Choose system-track file…");
     QCheckBox pad("Pad short input with E5");
     if (geometry["boot_sectors"].toInt() > 0) {
+        auto *bootDescription = new QLabel("Optional. Copy a binary file (such as a .bin) into the reserved system sectors.");
+        bootDescription->setWordWrap(true);
+        layout.addWidget(bootDescription);
         layout.addWidget(&bootButton);
         layout.addWidget(&bootPath);
         layout.addWidget(&pad);
         connect(&bootButton, &QPushButton::clicked, &dialog, [&] {
-            bootPath.setText(QFileDialog::getOpenFileName(&dialog, "Select system-track binary"));
+            bootPath.setText(QFileDialog::getOpenFileName(&dialog, "Choose file for reserved system sectors", {},
+                "Binary files (*.bin);;All files (*)"));
         });
     }
     QDialogButtonBox buttons(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
@@ -661,13 +666,28 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
     dialog.setWindowTitle("Choose disk format");
     dialog.resize(650, 480);
     auto *layout = new QVBoxLayout(&dialog);
-    auto *search = new QLineEdit;
+    class FormatSearch : public QLineEdit {
+    public:
+        QListWidget *results = nullptr;
+    protected:
+        void keyPressEvent(QKeyEvent *event) override {
+            if (event->key() == Qt::Key_Down && event->modifiers() == Qt::NoModifier &&
+                results && results->count()) {
+                results->setFocus(Qt::ShortcutFocusReason);
+                event->accept();
+                return;
+            }
+            QLineEdit::keyPressEvent(event);
+        }
+    };
+    auto *search = new FormatSearch;
     search->setPlaceholderText("Search disk definitions");
     layout->addWidget(search);
     auto *group = new QComboBox;
     group->addItems({"Plausible candidates", "All formats", "Manufacturer and model", "System family", "Favorites"});
     layout->addWidget(group);
     auto *list = new QListWidget;
+    search->results = list;
     layout->addWidget(list);
     auto *favorite = new QPushButton("Toggle favorite");
     layout->addWidget(favorite);

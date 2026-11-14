@@ -111,7 +111,8 @@ The current five-format restriction is an implementation limitation, **not** a p
 - A recognized utility selector **anywhere** on the command line always prevents GUI initialization. Multiple selectors or incompatible GUI-only options cause explicit errors, never GUI launch.
 - Build and package the pinned standalone cpmtools executables for each supported host platform. Preserve arguments, stdin/stdout/stderr, and exit codes, with explicit Windows console qualification.
 - Extend candidate discovery and evidence thresholds beyond the v0.3 checks.
-- Complete preferences, Image Information, progress/error presentation, and general workflow integration.
+- Complete preferences, progress/error presentation, and general workflow integration.
+- Provide a dedicated read-only Image Information (image-level Properties) window showing relevant image details, filesystem capacity and usage, geometry, container mapping, the selected disk definition, and available diagnostics and compatibility information. The window has no editing controls. Existing editing operations remain available through their existing UI workflows.
 - Finalize the narrow-sidebar file list with default Filename, Records, Size (bytes), Attributes columns; optional User and supported timestamps; numeric sorting, column-header Choose Columns, reorder/resize, and persistent layout. Display logical bytes as records × 128, not exact original length.
 - Add All above numbered user areas, automatically show User in Show All and restore the normal column configuration when leaving it; implement View → Show All User Areas and Ctrl/Cmd+Shift+A as a per-tab toggle returning to the previously selected user area and clearing selections on view switches.
 - Provide the five-button labeled toolbar (Open, New, Save | Import, Export), visible by default and persistently hideable via View → Toolbar. Keep sorting and other contextual commands off the toolbar.
@@ -152,6 +153,8 @@ The initial release is focused on filesystem and image management, not disk pres
 - Low-level track/sector and flux editing.
 - Advanced disk-image comparison, merging, and reconstruction.
 - Physical floppy-drive access.
+
+Editable Image Properties and a custom Disk Format Editor are exploratory post-v1.0 work with no implementation commitment. Future design shall distinguish reinterpreting existing image bytes, changing image contents or metadata through the working-image and Save workflow, and authoring new reusable disk definitions.
 
 The existing cpmtools CLI executables, including `fsck.cpm` and `fsed.cpm`, remain accessible in v1.0 headless mode.
 

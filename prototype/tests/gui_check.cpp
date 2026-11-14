@@ -178,9 +178,15 @@ private slots:
             auto *search = dialog->findChild<QLineEdit *>();
             auto *list = dialog->findChild<QListWidget *>();
             group->setCurrentIndex(1);
+            search->setText("ibm");
+            search->setFocus();
+            QTest::keyClick(search, Qt::Key_Down);
+            const auto firstRow = list->currentRow();
+            QTest::keyClick(list, Qt::Key_Down);
+            const bool keyboardNavigation = list->hasFocus() && list->currentRow() == firstRow + 1;
             search->setText("ibm-3740");
             const auto exact = list->findItems("ibm-3740", Qt::MatchExactly);
-            chose = exact.size() == 1;
+            chose = keyboardNavigation && exact.size() == 1;
             if (chose) list->setCurrentItem(exact.first());
             for (auto *button : dialog->findChildren<QPushButton *>())
                 if (button->text() == "Toggle favorite") button->click();

@@ -68,6 +68,12 @@ The following are explicitly excluded from 1.0:
 
 These features may be considered after 1.0 but shall not delay the initial release.
 
+Editable Image Properties and a custom Disk Format Editor are exploratory post-v1.0 work with no implementation commitment. Any future design shall distinguish:
+
+- Image reinterpretation, which changes the definition or mapping used to read existing image bytes.
+- Image content changes, which modify filesystem data or image metadata through the private working image and explicit Save.
+- New-format design, which creates or changes reusable disk definitions for later selection.
+
 ---
 
 ## 2. Supported Platforms and Distribution
@@ -406,7 +412,7 @@ Saving an image that depends on substituted data shall require an explicit, supp
 
 CP/M Image shall support viewing and editing IMD image comments.
 
-Comments shall be accessible through Image Information.
+Image Information shall display comments. The IMD comment editing action shall remain available outside the v0.8 read-only window.
 
 Users shall be able to modify or replace comments.
 
@@ -914,15 +920,18 @@ Persistent preferences shall include relevant format-catalogue settings, favorit
 
 ### 10.10 Image information
 
-The Image Information interface shall present relevant details, including:
+In v0.8, Image Information (image-level Properties) shall be a dedicated read-only window for the active image. It shall present relevant details, including:
 
 - Source-image location.
-- Selected disk definition.
-- Container type.
+- Selected disk definition, its source and applicable parameters.
+- Container type and applicable mapping from container tracks and sectors to the logical image.
 - Known physical geometry.
 - Filesystem capacity and usage.
 - Source identity or fingerprint where appropriate.
 - Container-specific metadata, including IMD comments.
+- Available diagnostics and compatibility limitations, including read-only restrictions where applicable.
+
+The window shall contain no editing controls. Existing editing operations shall remain available through their existing UI workflows. File Properties retains its supported file-attribute editing.
 
 Technical information shall remain accessible without dominating ordinary file-management workflows.
 
