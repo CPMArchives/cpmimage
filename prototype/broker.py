@@ -17,6 +17,7 @@ import threading
 import uuid
 
 
+
 MAX_IMAGE_BYTES = 128 * 1024 * 1024
 DSK_MAGIC = b'MV - CPCEMU Disk-File\r\nDisk-Info\r\n'
 
@@ -64,9 +65,15 @@ def main():
     parser.add_argument('--helper', type=Path, required=True)
     args = parser.parse_args()
     sys.path.insert(0, str(args.root / 'experiments/process-comparison'))
+    sys.path.insert(0, str(args.root / 'prototype'))
+    import catalogue
     import adapters as backend
     backend.HELPER = args.helper.resolve()
-    definitions = (args.root / 'fixtures/diskdefs').read_text(encoding='utf-8')
+    bundled_path = args.root / 'fixtures/diskdefs'
+    definitions = catalogue.definitions(catalogue.read_text(bundled_path), bundled=True)
+    definitions['amstrad'] = ''
+    catalogue_path = str(bundled_path)
+    metadata = json.loads((args.root / 'fixtures/diskdefs-metadata.json').read_text(encoding='utf-8'))
     descriptions = {}
     # Only internal command construction can select this guard; never a request.
     def guard(argv):
@@ -105,29 +112,130 @@ def main():
             raise backend.Failure('input_limit', 'Image exceeds the 128 MiB working image limit.')
         return data
 
+    def describe(fmt, definition, directory):
+        key = (fmt, catalogue.digest(definition))
+        if key not in descriptions:
+            (directory / 'diskdefs').write_text(definition, encoding='utf-8')
+            descriptions[key] = adapter().native(directory, 'describe', fmt)
+        return descriptions[key]
+
+    def validate_catalogue(blocks):
+        rows = []
+        with tempfile.TemporaryDirectory(prefix='cpmimage-catalogue-') as temp:
+            directory = Path(temp)
+            for fmt, definition in blocks.items():
+                try:
+                    geometry = describe(fmt, definition, directory)
+                except backend.Failure as error:
+                    if error.code != 'cancelled':
+                        raise backend.Failure('invalid_definition', f'{fmt}: {error.message}') from error
+                    raise
+                manufacturer, model, family = metadata.get(fmt, ('', '', ''))
+                rows.append(dict(id=fmt, manufacturer=manufacturer, model=model, family=family,
+                                 definition_sha256=catalogue.digest(definition), geometry=geometry))
+        return sorted(rows, key=lambda row: (row['id'].casefold(), row['id']))
+
+    def resolve_sidecar(source, directory):
+        path = None
+        try:
+            path = catalogue.sidecar(source)
+            if path is None:
+                return None
+            blocks = catalogue.definitions(catalogue.read_text(path))
+            if len(blocks) != 1:
+                raise catalogue.CatalogueError('An FDF must contain exactly one standalone definition.')
+            fmt, definition = next(iter(blocks.items()))
+            geometry = describe(fmt, definition, directory)
+        except (OSError, catalogue.CatalogueError, backend.Failure) as error:
+            if isinstance(error, backend.Failure) and error.code == 'cancelled':
+                raise
+            raise backend.Failure('invalid_sidecar', f'{path.name if path else source.name}: {error}') from error
+        return fmt, definition, geometry
+
     def perform(request):
-        nonlocal snapshot, session
+        nonlocal snapshot, session, definitions, catalogue_path
         rid = request['id']
         try:
             op = request.get('op')
-            if op not in ('open', 'export'):
-                raise backend.Failure('read_only', 'Only listing and export are available.')
-            if op == 'open':
+            if op == 'catalogue':
+                try:
+                    path = Path(request['path']).resolve(strict=True) if request.get('path') else bundled_path
+                    blocks = catalogue.definitions(catalogue.read_text(path), bundled=path == bundled_path)
+                except (OSError, catalogue.CatalogueError) as error:
+                    raise backend.Failure('invalid_catalogue', str(error)) from error
+                if path == bundled_path:
+                    blocks['amstrad'] = ''
+                rows = validate_catalogue(blocks)
+                definitions, catalogue_path = blocks, str(path)
+                reply = dict(v=1, id=rid, ok=True, result=dict(formats=rows, catalogue=catalogue_path))
+            elif op == 'inspect':
+                source = Path(request['image']).absolute()
+                data = read_image(source)
+                container = 'dsk' if data.startswith(DSK_MAGIC) else 'raw'
+                if data.startswith(b'EXTENDED CPC DSK File'):
+                    raise backend.Failure('unsupported_container', 'Extended CPCEMU DSK is outside the supported container scope.')
+                fingerprint = hashlib.sha256(data).hexdigest()
+                selected = None
+                warning = ''
+                with tempfile.TemporaryDirectory(prefix='cpmimage-inspect-') as temp:
+                    directory = Path(temp)
+                    if not request.get('explicit_format'):
+                        try:
+                            selected = resolve_sidecar(source, directory)
+                        except backend.Failure as error:
+                            if error.code != 'invalid_sidecar':
+                                raise
+                            warning = error.message
+                    candidates = []
+                    for fmt, definition in definitions.items():
+                        geometry = describe(fmt, definition, directory)
+                        if geometry.get('boot_geometry'):
+                            continue
+                        if container == 'dsk':
+                            try:
+                                check_standard_dsk(data, geometry, backend)
+                            except backend.Failure:
+                                continue
+                        else:
+                            try:
+                                if raw_extent(data, geometry, backend) != len(data):
+                                    continue
+                            except backend.Failure:
+                                continue
+                        candidates.append(dict(id=fmt, definition_sha256=catalogue.digest(definition)))
+                result = dict(container=container, source_sha256=fingerprint, candidates=candidates,
+                              sidecar_warning=warning)
+                if selected:
+                    fmt, definition, _ = selected
+                    result['sidecar'] = dict(id=fmt, definition_sha256=catalogue.digest(definition))
+                reply = dict(v=1, id=rid, ok=True, result=result)
+            elif op == 'open':
                 session = None
                 if snapshot:
                     snapshot.cleanup()
                     snapshot = None
-                source = Path(request['image']).resolve(strict=True)
+                source = Path(request['image']).absolute()
                 data = read_image(source)
+                fingerprint = hashlib.sha256(data).hexdigest()
+                if request.get('source_sha256', fingerprint) != fingerprint:
+                    raise backend.Failure('source_changed', 'The image changed after format selection. Open it again.')
                 fmt, container = request['format'], request['container']
                 if not isinstance(fmt, str) or not fmt or len(fmt) > 200 or '\0' in fmt:
                     raise backend.Failure('unknown_format', 'Invalid disk-definition identifier.')
                 snapshot = tempfile.TemporaryDirectory(prefix='cpmimage-open-')
                 directory = Path(snapshot.name)
-                (directory / 'diskdefs').write_text(definitions, encoding='utf-8')
-                if fmt not in descriptions:
-                    descriptions[fmt] = adapter().native(directory, 'describe', fmt)
-                geometry = descriptions[fmt]
+                sidecar_selection = resolve_sidecar(source, directory) if request.get('sidecar') else None
+                if sidecar_selection:
+                    selected, definition, geometry = sidecar_selection
+                    if selected != fmt:
+                        raise backend.Failure('invalid_sidecar', 'The matching FDF identifier changed.')
+                else:
+                    if fmt not in definitions:
+                        raise backend.Failure('unknown_format', f'{fmt} is absent from the selected catalogue.')
+                    definition = definitions[fmt]
+                    geometry = describe(fmt, definition, directory)
+                if request.get('definition_sha256', catalogue.digest(definition)) != catalogue.digest(definition):
+                    raise backend.Failure('definition_changed', 'The disk definition changed. Select it again.')
                 if container not in ('raw', 'dsk'):
                     raise backend.Failure('unsupported_container', 'Select RAW or standard CPCEMU DSK.')
                 if data.startswith(b'EXTENDED CPC DSK File'):
@@ -147,7 +255,7 @@ def main():
                 trimmed = image.stat().st_size < end
                 reply = adapter().request({
                     'v': 1, 'id': rid, 'op': 'list', 'image': str(image),
-                    'format': fmt, 'container': 'raw'}, defs_override=definitions)
+                    'format': fmt, 'container': 'raw'}, defs_override=definition)
                 if not reply['ok']:
                     respond(reply)
                     return
@@ -163,11 +271,11 @@ def main():
                             stream.write(b'\xe5' * chunk)
                             remaining -= chunk
                 token = str(uuid.uuid4())
-                fingerprint = hashlib.sha256(data).hexdigest()
                 session = dict(token=token, source=source, image=image, sha=fingerprint,
-                               format=fmt, container='raw', definitions=definitions)
-                reply['result'].update(session=token, source_sha256=fingerprint, unused_tail_filled=trimmed)
-            else:
+                               format=fmt, container='raw', definitions=definition)
+                reply['result'].update(session=token, source_sha256=fingerprint, unused_tail_filled=trimmed,
+                                       definition_sha256=catalogue.digest(definition))
+            elif op == 'export':
                 if not session or request.get('session') != session['token']:
                     raise backend.Failure('stale_session', 'Open the image again.')
                 if hashlib.sha256(read_image(session['source'])).hexdigest() != session['sha']:
@@ -176,6 +284,8 @@ def main():
                     'v': 1, 'id': rid, 'op': 'export', 'image': str(session['image']),
                     'format': session['format'], 'container': session['container'],
                     'name': request['name'], 'destination': request['destination']}, defs_override=session['definitions'])
+            else:
+                raise backend.Failure('read_only', 'Only read-only operations are available.')
             respond(reply)
         except backend.Failure as error:
             respond(dict(v=1, id=rid, ok=False, error=error.code, message=error.message))
