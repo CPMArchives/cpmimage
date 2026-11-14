@@ -225,6 +225,27 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     menuBar()->insertMenu(preferences->menuAction(),fileMenu);
     auto *openAction=fileMenu->addAction("Open image…");
     connect(openAction,&QAction::triggered,openButton,&QPushButton::click);
+    auto *newAction = fileMenu->addAction("New Image…");
+    newAction->setShortcut(QKeySequence::New);
+    connect(newAction, &QAction::triggered, this, [this, newAction] {
+        if (busy || !resolveEdits([newAction] { newAction->trigger(); })) return;
+        newImagePicker = true;
+        if (catalogueRows.isEmpty()) loadCatalogue();
+        else chooseFormat({}, false);
+    });
+    connect(fileMenu->addAction("Format Image…"), &QAction::triggered, this, [this] {
+        if (busy || session.isEmpty()) return;
+        const auto answer = QMessageBox::warning(this, "Format working image",
+            QString("Erase all filesystem contents in %1 using %2? Reserved system tracks will be preserved. Changes stay private until Save.")
+                .arg(QFileInfo(image).fileName(), format),
+            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+        if (answer != QMessageBox::Yes) return;
+        auto options = initializeOptions(imageGeometry);
+        if (options.isEmpty()) return;
+        options["op"] = "format_image";
+        options["session"] = session;
+        begin(options);
+    });
     auto *saveAction = fileMenu->addAction("Save");
     saveAction->setShortcut(QKeySequence::Save);
     auto *saveAsAction = fileMenu->addAction("Save As…");
@@ -339,7 +360,7 @@ void Window::sendPending() {
     if (!pending.isEmpty()) { process.write(pending); pending.clear(); }
 }
 void Window::resetImage() {
-    dirty = false; writeConfirmed = false;
+    dirty = false; writeConfirmed = false; unpublished = false;
     session.clear(); image.clear(); directoryEntries = {}; imageNote.clear();
     snapshotHash.clear(); exportDiagnostics.clear();
     { QSignalBlocker block(userAreas); userAreas->setCurrentItem(nullptr); userAreas->clearSelection(); }
@@ -506,13 +527,51 @@ void Window::chooseEdit(const QString &action) {
     request["confirmed"] = true;
     begin(request);
 }
+QJsonObject Window::initializeOptions(const QJsonObject &geometry) {
+    QDialog dialog(this);
+    dialog.setWindowTitle("Filesystem initialization");
+    QVBoxLayout layout(&dialog);
+    QLabel details(QString("%1 tracks · %2 sectors per track · %3 bytes per sector")
+        .arg(geometry["tracks"].toInt()).arg(geometry["sectors_per_track"].toInt())
+        .arg(geometry["sector_size"].toInt()));
+    QLineEdit label;
+    label.setMaxLength(11);
+    label.setPlaceholderText("Optional CP/M Plus disk label");
+    QCheckBox timestamps("Initialize CP/M Plus timestamps");
+    layout.addWidget(&details);
+    if (geometry["cpm_plus"].toBool()) {
+        layout.addWidget(&label);
+        layout.addWidget(&timestamps);
+    }
+    QLineEdit bootPath;
+    bootPath.setReadOnly(true);
+    bootPath.setPlaceholderText("Preserve existing reserved bytes or use E5 on a new image");
+    QPushButton bootButton("Choose system-track binary…");
+    QCheckBox pad("Pad short input with E5");
+    if (geometry["boot_sectors"].toInt() > 0) {
+        layout.addWidget(&bootButton);
+        layout.addWidget(&bootPath);
+        layout.addWidget(&pad);
+        connect(&bootButton, &QPushButton::clicked, &dialog, [&] {
+            bootPath.setText(QFileDialog::getOpenFileName(&dialog, "Select system-track binary"));
+        });
+    }
+    QDialogButtonBox buttons(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    layout.addWidget(&buttons);
+    connect(&buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(&buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    if (dialog.exec() != QDialog::Accepted) return {};
+    return {{"confirmed", true}, {"label", label.text()}, {"timestamps", timestamps.isChecked()},
+            {"boot_path", bootPath.text()}, {"pad", pad.isChecked()}};
+}
 void Window::chooseSave(bool saveAs) {
+    saveAs = saveAs || unpublished;
     if (busy || session.isEmpty()) return;
     QString destination, selectedFilter;
     if (saveAs) {
         destination = QFileDialog::getSaveFileName(this, "Save CP/M image as", image,
             "RAW disk images (*.raw *.img);;Standard CPCEMU DSK (*.dsk);;ImageDisk (*.imd);;JV3 (*.jv3);;DMK (*.dmk)", &selectedFilter, QFileDialog::DontConfirmOverwrite);
-        if (destination.isEmpty()) return;
+        if (destination.isEmpty()) { afterSave = {}; return; }
     }
     pendingSave = {{"op","save_plan"}, {"session",session}, {"destination",destination},
                    {"backups",settings->value("saveBackups",true).toBool()},
@@ -663,7 +722,17 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
         populate();
     });
     populate();
+    const bool creating = std::exchange(newImagePicker, false);
     if (dialog.exec() == QDialog::Accepted && list->currentItem()) {
+        if (creating) {
+            newDefinition = list->currentItem()->data(Qt::UserRole).toJsonObject();
+            auto options = initializeOptions(newDefinition["geometry"].toObject());
+            if (options.isEmpty()) return;
+            options["op"] = "new_image";
+            options["format"] = newDefinition["id"];
+            begin(options);
+            return;
+        }
         openDefinition(list->currentItem()->data(Qt::UserRole).toJsonObject(), false, switching);
     } else {
         requestedImage.clear();
@@ -1011,6 +1080,7 @@ void Window::cancel() {
 }
 void Window::fail(const QString &message) {
     afterSave = {};
+    newImagePicker = false;
     deadline.stop(); cancellationDeadline.stop(); error = message;
     if(batchActive) {
         if(batchInFlight && batchIndex<batch.items.size()) batch.items[batchIndex].outcome=
@@ -1045,7 +1115,12 @@ void Window::readReply() {
         QString message;
         if (code == "destination_exists") message = "That destination already exists. Choose a new filename; nothing was overwritten.";
         else if (code == "cancelled") message = "Operation cancelled.";
-        else if (code == "source_changed") { session.clear(); message = "The source image changed. Open it again before exporting."; }
+        else if (code == "source_changed") {
+            if (operation == "export") {
+                session.clear();
+                message = "The source image changed. Open it again before exporting.";
+            } else message = reply["message"].toString();
+        }
         else message = "Cannot complete the operation (" + code + "). " + reply["message"].toString();
         fail(message); return;
     }
@@ -1053,15 +1128,28 @@ void Window::readReply() {
     const QRegularExpression hash("^[0-9a-f]{64}$");
     auto invalid = [this] { stopReader(); resetImage(); fail("Invalid response schema from the image reader."); };
     if (!reply["result"].isObject()) { invalid(); return; }
-    if (operation == "edit" || operation == "imd_comment" || operation == "discard" || operation.startsWith("systems_")) {
+    if (operation == "new_image" || operation == "format_image" || operation == "edit" || operation == "imd_comment" || operation == "discard" || operation.startsWith("systems_")) {
         deadline.stop();
         cancellationDeadline.stop();
+        if (operation == "new_image") {
+            resetImage();
+            unpublished = true;
+            image = "Untitled";
+            format = newDefinition["id"].toString();
+            container = "raw";
+            source->setText(image);
+            formats->setText(format);
+            session = result["session"].toString();
+            writeConfirmed = true;
+            imageGeometry = result["geometry"].toObject();
+        } else if (result["closed"].toBool()) resetImage();
         dirty = result["dirty"].toBool();
         if (result["imd_comment"].isString()) imdComment = result["imd_comment"].toString();
         if (operation == "edit" || operation == "discard" || operation == "systems_import") writeConfirmed = dirty;
         if (result["entries"].isArray()) {
             directoryEntries = result["entries"].toArray();
             updateUserAreas();
+            if (!userAreas->currentItem() && !session.isEmpty()) userAreas->setCurrentRow(0);
             showUserArea();
         }
         setWindowTitle("cpmimage — " + QFileInfo(image).fileName() + (dirty ? " *" : ""));
@@ -1089,6 +1177,7 @@ void Window::readReply() {
             begin(pendingSave);
         } else {
             dirty = false;
+            unpublished = false;
             image = result["destination"].toString();
             container = result["container"].toString();
             snapshotHash = result["source_sha256"].toString();
@@ -1109,6 +1198,7 @@ void Window::readReply() {
             catalogueRows = result["formats"].toArray();
             activeCatalogue = result["catalogue"].toString();
             cataloguePath = activeCatalogue;
+            if (newImagePicker) { chooseFormat({}, false); return; }
             if (!requestedImage.isEmpty()) {
                 begin({{"op","inspect"}, {"image",requestedImage}, {"explicit_format",requestedFormat}});
             } else {
@@ -1169,6 +1259,7 @@ void Window::readReply() {
         if (!tail.isUndefined() && !tail.isBool()) { invalid(); return; }
         imageNote = tail.toBool() ? "Unused image tail filled with E5 in the temporary snapshot; original unchanged." : "None.";
         snapshotHash=result["source_sha256"].toString();
+        imageGeometry = result["geometry"].toObject();
         imdComment = result["imd_comment"].toString();
         retainSource = false;
         const auto definitionHash = result["definition_sha256"].toString();

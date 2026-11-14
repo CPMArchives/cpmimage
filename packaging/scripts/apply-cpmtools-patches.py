@@ -21,3 +21,9 @@ if 'cpmImageReadDefinition' not in (source/'cpmfs.c').read_text():
 
 if 'Cannot write RAW sector' not in (source/'device_libdsk.c').read_text():
  subprocess.run(['patch','-p1','-i',str(patch.parent/'cpmtools-2.23-writable-raw.patch')],cwd=source,check=True)
+
+if 'CPMIMAGE_FORMAT_HELPER' not in (source/'mkfs.cpm.c').read_text():
+ subprocess.run(['patch','-p1','-i',str(patch.parent/'cpmtools-2.23-mkfs-addressing.patch')],cwd=source,check=True)
+
+if 'after preparing the directory' not in (source/'cpmfs.c').read_text():
+ subprocess.run(['patch','-p1','-i',str(patch.parent/'cpmtools-2.23-mkfs-helper-geometry.patch')],cwd=source,check=True)

@@ -21,6 +21,37 @@ static int fail(const char *code,const char *message) {
 #ifdef CPMIMAGE_READ_ONLY
 extern int cpmImageReadDefinition(struct cpmSuperBlock *, const char *);
 
+#define CPMIMAGE_FORMAT_HELPER
+#include "mkfs.cpm.c"
+
+static int initialize(const char *path, const char *format, const char *label, int timestamps)
+{
+  struct cpmSuperBlock drive={0};
+  struct cpmInode root;
+  if (!strcmp(format,"amstrad")) return fail("unsupported_backend","Formatting requires a standalone disk definition");
+  if (cpmReadSuper(&drive,&root,format,0)<0) return fail("invalid_definition",boo);
+  if ((timestamps || *label) && !(drive.type & CPMFS_CPM3_OTHER))
+    return fail("unsupported_backend","Labels and timestamps require a supported CP/M Plus definition");
+  size_t reserved=(size_t)(drive.bootsec>=0 ? drive.bootsec : drive.boottrk*drive.sectrk)*drive.secLength;
+  char *boot=malloc(reserved ? reserved : 1);
+  FILE *input=fopen(path,"rb");
+  if (!input || !boot || fseek(input,(long)drive.offset,SEEK_SET) || fread(boot,1,reserved,input)!=reserved)
+  {
+    if (input) fclose(input);
+    free(boot);
+    return fail("image_incompatible","Cannot read reserved system bytes");
+  }
+  fclose(input);
+  /* mkfs initializes the upstream CP/M Plus records. The helper reader
+   * suppresses high user areas on CP/M Plus, so restore the formatter flags. */
+  if (drive.type & CPMFS_CPM3_OTHER) drive.type=CPMFS_DR3;
+  int result=mkfs(&drive,path,format,*label?label:"unlabeled",boot,timestamps,0);
+  free(boot);
+  if (result<0) return fail("format_failed",boo);
+  puts("{\"v\":1,\"ok\":true}");
+  return 0;
+}
+
 static int describe(const char *format)
 {
   struct cpmSuperBlock sb={0};
@@ -36,6 +67,7 @@ static int describe(const char *format)
       sb.secLength,sb.tracks,sb.sectrk,(long long)sb.offset,sb.blksiz,sb.maxdir,sb.dirblks,
       sb.bootsec>=0?sb.bootsec:sb.boottrk*sb.sectrk,sb.extents,sb.skew,sb.type);
   quoted(sb.libdskGeometry);
+  printf(",\"cpm_plus\":%s",(sb.type & CPMFS_CPM3_OTHER)?"true":"false");
   printf(",\"skew_table\":[");
   if (sb.skewtab)
     for (int i=0;i<sb.sectrk;++i) printf("%s%d",i?",":"",sb.skewtab[i]);
@@ -222,6 +254,8 @@ int main(int argc,char **argv) {
   if (argc==6 && (!strcmp(argv[1],"mapped-read") || !strcmp(argv[1],"mapped-write")) &&
       (!strcmp(argv[2],"imd") || !strcmp(argv[2],"jv3")))
     return mapped_transfer(argv[2],argv[3],argv[4],argv[5],!strcmp(argv[1],"mapped-write"));
+  if (argc==6 && !strcmp(argv[1],"initialize"))
+    return initialize(argv[2],argv[3],argv[4],!strcmp(argv[5],"1"));
   if (argc==3 && !strcmp(argv[1],"describe")) return describe(argv[2]);
   if (argc>=3 && !strcmp(argv[1],"describe-catalogue"))
   {

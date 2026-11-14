@@ -115,6 +115,21 @@ def main():
             raise backend.Failure('input_limit', 'Image exceeds the 128 MiB working image limit.')
         return data
 
+    def install_system_tracks(image, geometry, path, pad):
+        start = geometry.get('offset', 0)
+        size = geometry.get('boot_sectors', 0) * geometry.get('sector_size', 0)
+        if not size or start + size > image.stat().st_size:
+            raise backend.Failure('unsupported_backend', 'No accessible reserved system-track region.')
+        with Path(path).open('rb') as stream:
+            data = stream.read(size + 1)
+        if len(data) > size:
+            raise backend.Failure('input_limit', 'System-track input exceeds the reserved region.')
+        if len(data) < size and not pad:
+            raise backend.Failure('padding_required', 'Confirm E5 padding of the short system-track input.')
+        with image.open('r+b') as stream:
+            stream.seek(start)
+            stream.write(data.ljust(size, b'\xe5'))
+
     def describe(fmt, definition, directory):
         key = (fmt, catalogue.digest(definition))
         if key not in descriptions:
@@ -360,7 +375,81 @@ def main():
                                comment=inspect_imd(data)[1] if container == 'imd' else b'')
                 reply['result'].update(session=token, source_sha256=fingerprint, unused_tail_filled=trimmed,
                                        definition_sha256=catalogue.digest(definition),
-                                       imd_comment=session['comment'].decode('utf-8', errors='replace'))
+                                       imd_comment=session['comment'].decode('utf-8', errors='replace'), geometry=geometry)
+            elif op in ('new_image', 'format_image'):
+                creating = op == 'new_image'
+                if not creating and (not session or request.get('session') != session['token']):
+                    raise backend.Failure('stale_session', 'Open an image first.')
+                if request.get('confirmed') is not True:
+                    raise backend.Failure('confirmation_required', 'Confirm initialization first.')
+                fmt = request['format'] if creating else session['format']
+                if fmt == 'amstrad':
+                    raise backend.Failure('unsupported_backend', 'Formatting requires a standalone disk definition.')
+                definition = definitions.get(fmt) if creating else session['definitions']
+                if definition is None:
+                    raise backend.Failure('unknown_format', 'Select a catalogued disk definition.')
+                label = request.get('label', '')
+                if not isinstance(label, str) or len(label) > 11 or any(not 32 <= ord(c) <= 126 for c in label):
+                    raise backend.Failure('invalid_label', 'Use up to 11 printable ASCII characters.')
+                with tempfile.TemporaryDirectory(prefix='cpmimage-format-') as temp:
+                    folder = Path(temp)
+                    geometry = describe(fmt, definition, folder)
+                    capacity = geometry['offset'] + geometry['tracks'] * geometry['sectors_per_track'] * geometry['sector_size']
+                    if capacity > MAX_IMAGE_BYTES:
+                        raise backend.Failure('input_limit', 'The definition exceeds the working-image limit.')
+                    candidate = folder / 'working.raw'
+                    if creating:
+                        candidate.write_bytes(b'\xe5' * capacity)
+                    else:
+                        if session['image'].stat().st_size != capacity:
+                            raise backend.Failure('image_incompatible', 'Formatting would change the image capacity.')
+                        shutil.copyfile(session['image'], candidate)
+                    (folder / 'diskdefs').write_text(definition, encoding='utf-8')
+                    adapter().native(folder, 'initialize', candidate, fmt, label,
+                                     '1' if request.get('timestamps') is True else '0')
+                    if request.get('boot_path'):
+                        install_system_tracks(candidate, geometry, request['boot_path'], request.get('pad') is True)
+                    checked = adapter().request(dict(v=1,id=rid,op='list',image=str(candidate),
+                        format=fmt,container='raw'), defs_override=definition)
+                    if not checked['ok']:
+                        raise backend.Failure(checked['error'], checked.get('message', ''))
+                    if checked['result']['entries'] or candidate.stat().st_size != capacity:
+                        raise backend.Failure('format_failed', 'Initialized filesystem failed validation.')
+                    if stop.is_set():
+                        raise backend.Failure('cancelled')
+                    if creating:
+                        new_snapshot = tempfile.TemporaryDirectory(prefix='cpmimage-open-')
+                        working = Path(new_snapshot.name) / 'image.raw'
+                        try:
+                            shutil.copyfile(candidate, working)
+                        except BaseException:
+                            new_snapshot.cleanup()
+                            raise
+                        if session and session['owner']:
+                            session['owner'].close()
+                        if snapshot:
+                            snapshot.cleanup()
+                        snapshot = new_snapshot
+                        session = dict(token=str(uuid.uuid4()), source=None, image=working, sha=None,
+                            format=fmt, container='raw', definitions=definition, original_container='raw',
+                            owner=None, identity=None, geometry=geometry, dirty=True, confirmed=True,
+                            mapping=None, template=None, comment=b'')
+                    else:
+                        if session['source'] and session['owner'] is None:
+                            owner = Ownership(session['source'], Path.home() / '.cpmimage' / 'ownership')
+                            if owner.current != session['identity'] or file_hash(owner.path) != session['sha']:
+                                owner.close()
+                                raise backend.Failure('source_changed', 'The source changed. Open it again.')
+                            session['owner'] = owner
+                        working = session['image']
+                        if not session['dirty']:
+                            shutil.copyfile(working, working.with_name('saved.raw'))
+                        # Keep replacement on the working image's filesystem.
+                        staged = working.with_name('formatted.raw')
+                        shutil.copyfile(candidate, staged)
+                        os.replace(staged, working)
+                        session.update(dirty=True, confirmed=True)
+                reply = dict(v=1,id=rid,ok=True,result=dict(entries=[], dirty=True, session=session['token'], geometry=geometry))
             elif op == 'imd_comment':
                 if not session or request.get('session') != session['token'] or session['original_container'] != 'imd':
                     raise backend.Failure('stale_session', 'Open an IMD image.')
@@ -394,7 +483,7 @@ def main():
                         raise backend.Failure('invalid_edit', 'Only RO, SYS and ARC can be edited.')
                     argument = str(attributes)
                 working = session['image']
-                if not session['owner']:
+                if session['source'] and not session['owner']:
                     owner = Ownership(session['source'], Path.home() / '.cpmimage' / 'ownership')
                     if owner.current != session['identity'] or file_hash(owner.path) != session['sha']:
                         owner.close()
@@ -447,6 +536,12 @@ def main():
                 working = session['image']
                 baseline = working.with_name('saved.raw')
                 if op == 'discard':
+                    if session['dirty'] and not session['source']:
+                        session = None
+                        snapshot.cleanup()
+                        snapshot = None
+                        respond(dict(v=1,id=rid,ok=True,result=dict(closed=True,dirty=False)))
+                        return
                     if session['dirty']:
                         checked = adapter().request({
                             'v': 1, 'id': rid, 'op': 'list', 'image': str(baseline),
@@ -474,13 +569,7 @@ def main():
                     else:
                         if request.get('confirmed') is not True and not session['confirmed']:
                             raise backend.Failure('confirmation_required', 'Confirm the selected disk definition for writing.')
-                        with path.open('rb') as stream:
-                            data = stream.read(size + 1)
-                        if len(data) > size:
-                            raise backend.Failure('input_limit', 'System-track input exceeds the reserved region.')
-                        if len(data) < size and request.get('pad') is not True:
-                            raise backend.Failure('padding_required', 'Confirm E5 padding of the short system-track input.')
-                        if not session['owner']:
+                        if session['source'] and not session['owner']:
                             owner = Ownership(session['source'], Path.home() / '.cpmimage' / 'ownership')
                             if owner.current != session['identity'] or file_hash(owner.path) != session['sha']:
                                 owner.close()
@@ -489,9 +578,7 @@ def main():
                         candidate = working.with_name('edit.raw')
                         shutil.copyfile(working, candidate)
                         try:
-                            with candidate.open('r+b') as stream:
-                                stream.seek(start)
-                                stream.write(data.ljust(size, b'\xe5'))
+                            install_system_tracks(candidate, geo, path, request.get('pad') is True)
                             if stop.is_set():
                                 raise backend.Failure('cancelled')
                             if not session['dirty']:
@@ -509,9 +596,11 @@ def main():
                 if not session or request.get('session') != session['token']:
                     raise backend.Failure('stale_session', 'Open the image again.')
                 source = session['source']
+                if not source and not request.get('destination'):
+                    raise backend.Failure('invalid_destination', 'Choose a destination for the new image.')
                 destination = Path(request.get('destination') or source).absolute().resolve()
-                same = source.resolve() == destination
-                if not same and destination.exists() and os.path.samefile(source, destination):
+                same = source is not None and source.resolve() == destination
+                if source and not same and destination.exists() and os.path.samefile(source, destination):
                     raise backend.Failure('invalid_destination', 'Save As requires a separate file, not an alias of the source.')
                 expected = file_hash(destination)
                 recovery = recovery_directory(destination)
@@ -633,7 +722,7 @@ def main():
             elif op == 'export':
                 if not session or request.get('session') != session['token']:
                     raise backend.Failure('stale_session', 'Open the image again.')
-                if hashlib.sha256(read_image(session['source'])).hexdigest() != session['sha']:
+                if session['source'] and hashlib.sha256(read_image(session['source'])).hexdigest() != session['sha']:
                     raise backend.Failure('source_changed', 'The source changed. Open it again.')
                 reply = adapter().request({
                     'v': 1, 'id': rid, 'op': 'export', 'image': str(session['image']),
