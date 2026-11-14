@@ -51,7 +51,9 @@ The current five-format restriction is an implementation limitation, **not** a p
 ## v0.4 — Safe writing and file management
 
 - Introduce private mutable working images, dirty-state tracking, Discard, Save, and Save As.
+- Track selected versus explicitly confirmed-for-writing disk definitions separately per image session. Require confirmation before the first modification under an unconfirmed definition; changing definitions invalidates confirmation. Do not infer confirmation from read success, `.FDF`, or remembered format. Coordinate with `.FDF` warnings to avoid duplicate dialogs without suppressing mandatory write or integrity warnings.
 - Implement safe output publication and appropriate conflict, interruption, and concurrent-change handling.
+- Implement default-on, preference-disableable single-version `.BAK` backups for destination image bytes and existing `.FDF` files actually replaced. Do not rotate image backup for sidecar-only Save. Abort on required backup failure unless the user explicitly retries without backup. Specify and test non-atomic image/sidecar publication, interrupted saves, recovery, and truthful partial-failure reporting; never silently restore backups.
 - Design source identity and single-writer ownership using native file identity and locking, including symlink/hard-link aliases, source replacement during publication, crash recovery, and external-change revalidation; avoid indefinite stale lockouts.
 - Implement file import/export, rename, confirmed deferred deletion, supported RO/SYS/ARC Properties editing, optional text conversion, timestamp handling where supported, and filename collision safeguards.
 - Import valid CP/M filenames automatically; review names requiring 8.3 shortening/translation in one editable batch dialog, detecting within-batch and destination collisions. Use Replace/Skip/Cancel with Skip preselected and Apply to All for batch conflicts.
@@ -62,7 +64,7 @@ The current five-format restriction is an implementation limitation, **not** a p
 - Detect conflicting existing sidecars and define safe image-plus-sidecar publication/recovery behavior.
 - Treat `.FDF` as a record of the user-selected interpretation, not proof of the underlying disk format or a filesystem conversion. Implement a Confirm Disk Definition warning on first sidecar creation and when replacing a sidecar with a different definition; allow persistent suppression of routine warnings, but never suppress detected integrity warnings. Cancel must abort Save without publication.
 
-**Acceptance:** Edited images reopen correctly; unrelated contents and source images remain protected on failure; system-track bytes round-trip accurately; generated `.FDF` files can be parsed by independent unmodified cpmtools; first-save/changed-definition warnings, suppression preference, and cancellation behave as specified.
+**Acceptance:** Write confirmation is enforced before modification and invalidated by format changes; backup rotation and sidecar-only saves preserve the correct previous versions; failed backup/publication does not silently discard recoverable data; Save As preserves its source and switches the active tab only on success. Edited images reopen correctly; unrelated contents and source images remain protected on failure; system-track bytes round-trip accurately; generated `.FDF` files can be parsed by independent unmodified cpmtools; first-save/changed-definition warnings, suppression preference, and cancellation behave as specified.
 
 ## v0.5 — Container interoperability
 
