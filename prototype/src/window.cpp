@@ -8,6 +8,15 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QDir>
+#include <QApplication>
+#include <QClipboard>
+#include <QMimeData>
+#include <QDrag>
+#include <QDragEnterEvent>
+#include <QTemporaryDir>
+#include <QSaveFile>
+#include <memory>
+#include <QUrl>
 #include <QStandardPaths>
 #include <QKeySequence>
 #include <QHeaderView>
@@ -166,7 +175,16 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     areaLayout->addWidget(new QLabel("User areas"));
     areaLayout->addWidget(userAreas);
     splitter->addWidget(areaPane);
-    table = new QTableWidget(0, 4);
+    class FileTable : public QTableWidget {
+    public:
+        FileTable() : QTableWidget(0, 4) {}
+        std::function<void()> dragFiles;
+    protected:
+        void startDrag(Qt::DropActions) override { dragFiles(); }
+    };
+    auto *fileTable = new FileTable;
+    fileTable->dragFiles = [this] { offerFiles(true); };
+    table = fileTable;
     table->setObjectName("fileList");
     table->setAccessibleName("Files in selected user area");
     table->setHorizontalHeaderLabels({"Name", "Bytes", "Attributes", "User"});
@@ -263,6 +281,27 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
             begin({{"op","discard"}, {"session",session}});
     });
     auto *editMenu = menuBar()->addMenu("Edit");
+    auto *copy = editMenu->addAction("Copy Files");
+    copy->setShortcut(QKeySequence::Copy);
+    connect(copy, &QAction::triggered, this, [this] { offerFiles(false); });
+    auto *paste = editMenu->addAction("Paste Files");
+    paste->setShortcut(QKeySequence::Paste);
+    connect(paste, &QAction::triggered, this, [this] {
+        const auto *mime = QApplication::clipboard()->mimeData();
+        if (!mime) return;
+        QStringList paths;
+        for (const auto &url : mime->urls())
+            if (url.isLocalFile()) paths.append(url.toLocalFile());
+        importFiles(paths);
+    });
+    table->viewport()->setAcceptDrops(true);
+    userAreas->viewport()->setAcceptDrops(true);
+    table->viewport()->installEventFilter(this);
+    userAreas->viewport()->installEventFilter(this);
+    table->setDragEnabled(true);
+    table->setDragDropMode(QAbstractItemView::DragDrop);
+    table->viewport()->setAcceptDrops(true);
+
     auto *rename = editMenu->addAction("Rename…");
     rename->setShortcut(Qt::Key_F2);
     table->addAction(rename);
@@ -416,7 +455,7 @@ bool Window::confirmWrite() {
         QString("Edit the private working image using %1? Confirm that this is the intended interpretation.").arg(format),
         QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) == QMessageBox::Yes;
 }
-void Window::chooseEdit(const QString &action) {
+void Window::chooseEdit(const QString &action, QStringList paths) {
     if (busy || session.isEmpty()) return;
     QJsonObject request{{"op","edit"},{"session",session},{"action",action}};
     if (action.startsWith("systems_")) {
@@ -438,7 +477,7 @@ void Window::chooseEdit(const QString &action) {
     }
     bool accepted = false;
     if (action == "import") {
-        const auto paths = QFileDialog::getOpenFileNames(this, "Import files");
+        if (paths.isEmpty()) paths = QFileDialog::getOpenFileNames(this, "Import files");
         if (paths.isEmpty() || !userAreas->currentItem()) return;
         const QRegularExpression valid(R"CPM(^[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,8}(\.[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,3})?$)CPM");
         int area = userAreas->currentItem()->data(Qt::UserRole).toInt();
@@ -930,7 +969,7 @@ void Window::editFilenameSettings() {
 void Window::chooseExport() {
     const auto selected = table->selectionModel()->selectedRows();
     if (busy || session.isEmpty() || selected.isEmpty()) return;
-    if(selected.size()>1) { chooseBatch(false); return; }
+    if(userAreas->currentRow() == 0 || selected.size()>1) { chooseBatch(false); return; }
     QString directory = settings->value("exports/directory",QStandardPaths::writableLocation(QStandardPaths::DownloadLocation)).toString();
     if (!QDir(directory).exists()) directory = QDir::homePath();
     QString problem;
@@ -955,6 +994,71 @@ void Window::exportFile(const QString &destination) {
            {"destination", QFileInfo(destination).absoluteFilePath()},
            {"text", settings->value("textExport", false).toBool()}});
 }
+void Window::importFiles(const QStringList &paths) {
+    if (!paths.isEmpty()) chooseEdit("import", paths);
+}
+
+void Window::offerFiles(bool drag) {
+    if (busy || session.isEmpty()) return;
+    const auto entries = exportEntries(false);
+    if (entries.isEmpty()) return;
+    QTemporaryDir staging(QDir::temp().filePath("cpmimage-transfer-XXXXXX"));
+    if (!staging.isValid()) return;
+    auto plan = planExport(entries, staging.path(), -1, filenamePolicy);
+    if (!plan.error.isEmpty()) {
+        status->setText(plan.error);
+        return;
+    }
+    const auto directory = staging.path();
+    staging.setAutoRemove(false);
+    connect(this, &Window::completed, this, [this, drag, directory, plan](bool ok) {
+        if (!ok) {
+            QDir(directory).removeRecursively();
+            return;
+        }
+        QList<QUrl> urls;
+        for (const auto &item : plan.items) urls.append(QUrl::fromLocalFile(item.destination));
+        auto *mime = new QMimeData;
+        mime->setUrls(urls);
+        if (drag) {
+            auto *gesture = new QDrag(table);
+            gesture->setMimeData(mime);
+            gesture->exec(Qt::CopyAction);
+            gesture->deleteLater();
+        } else QApplication::clipboard()->setMimeData(mime);
+    }, Qt::SingleShotConnection);
+    startBatch(plan, false);
+}
+
+bool Window::eventFilter(QObject *watched, QEvent *event) {
+    if (watched == table->viewport() || watched == userAreas->viewport()) {
+        if (event->type() == QEvent::DragEnter || event->type() == QEvent::DragMove) {
+            auto *drag = static_cast<QDropEvent *>(event);
+            if (!busy && !session.isEmpty() && drag->mimeData()->hasUrls()) {
+                drag->setDropAction(Qt::CopyAction);
+                drag->accept();
+                return true;
+            }
+        }
+        if (event->type() == QEvent::Drop) {
+            auto *drop = static_cast<QDropEvent *>(event);
+            QStringList paths;
+            for (const auto &url : drop->mimeData()->urls())
+                if (url.isLocalFile()) paths.append(url.toLocalFile());
+            if (!busy && !session.isEmpty() && !paths.isEmpty()) {
+                if (watched == userAreas->viewport()) {
+                    if (auto *item = userAreas->itemAt(drop->position().toPoint()))
+                        userAreas->setCurrentItem(item);
+                }
+                drop->setDropAction(Qt::CopyAction);
+                drop->accept();
+                QTimer::singleShot(0, this, [this, paths] { importFiles(paths); });
+                return true;
+            }
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
+}
 QJsonArray Window::exportEntries(bool wholeArea) const {
     QJsonArray entries;
     if(wholeArea) {
@@ -971,6 +1075,103 @@ QJsonArray Window::exportEntries(bool wholeArea) const {
     }
     return entries;
 }
+void Window::exportFlat(const QJsonArray &entries, const QString &directory) {
+    auto staging = std::make_shared<QTemporaryDir>();
+    if (!staging->isValid()) return;
+    ExportPlan plan;
+    plan.directory = staging->path();
+    for (const auto &value : entries) {
+        const auto entry = value.toObject();
+        ExportItem item;
+        item.name = entry["name"].toString();
+        item.size = entry["size"].toInteger();
+        item.destination = staging->filePath(QString::number(plan.items.size()));
+        plan.items.append(item);
+    }
+    connect(this, &Window::completed, this, [this, staging, plan, directory](bool ok) {
+        if (!ok) return;
+        QStringList report;
+        QString applyAll;
+        for (const auto &item : plan.items) {
+            QFile input(item.destination);
+            if (!input.open(QIODevice::ReadOnly)) { report << item.name + " — Read failed"; continue; }
+            const auto payload = input.readAll();
+            auto name = filenamePolicy.translate(item.name.mid(2));
+            if (!FilenamePolicy::validateHostName(name).isEmpty()) {
+                report << item.name + " — Invalid destination name";
+                continue;
+            }
+            QString target;
+            while (true) {
+                const QDir folder(directory);
+                target = folder.filePath(name);
+                for (const auto &existing : folder.entryList(QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot)) {
+                    if (existing.compare(name, Qt::CaseInsensitive) == 0) {
+                        target = folder.filePath(existing);
+                        break;
+                    }
+                }
+                const QFileInfo info(target);
+                if (!info.exists() && !info.isSymLink()) {
+                    if (QFile::copy(item.destination, target)) report << item.name + " — Exported";
+                    else report << item.name + " — Write failed";
+                    break;
+                }
+                QFile current(target);
+                const bool regular = info.isFile() && !info.isSymLink();
+                if (regular && info.size() == payload.size() && current.open(QIODevice::ReadOnly)
+                    && current.readAll() == payload) {
+                    report << item.name + " — Consolidated identical contents";
+                    break;
+                }
+                current.close();
+                QString choice = applyAll;
+                if (choice.isEmpty()) {
+                    QMessageBox prompt(QMessageBox::Warning, "Export conflict", name + " already exists.",
+                                       QMessageBox::Cancel, this);
+                    auto *overwrite = prompt.addButton("Overwrite", QMessageBox::DestructiveRole);
+                    overwrite->setEnabled(regular);
+                    auto *skip = prompt.addButton("Skip", QMessageBox::RejectRole);
+                    auto *rename = prompt.addButton("Rename", QMessageBox::ActionRole);
+                    auto *all = new QCheckBox("Apply to All");
+                    prompt.setCheckBox(all);
+                    prompt.setDefaultButton(skip);
+                    prompt.exec();
+                    if (prompt.clickedButton() == overwrite) choice = "overwrite";
+                    else if (prompt.clickedButton() == skip) choice = "skip";
+                    else if (prompt.clickedButton() == rename) choice = "rename";
+                    else choice = "cancel";
+                    if (all->isChecked() && (choice == "overwrite" || choice == "skip")) applyAll = choice;
+                }
+                if (choice == "rename") {
+                    bool accepted = false;
+                    const auto replacement = QInputDialog::getText(this, "Rename export", "New filename",
+                        QLineEdit::Normal, name, &accepted);
+                    if (!accepted) choice = "cancel";
+                    else if (replacement.compare(name, Qt::CaseInsensitive) == 0 ||
+                             !FilenamePolicy::validateHostName(replacement).isEmpty()) {
+                        QMessageBox::warning(this, "Invalid export name", "Enter a distinct valid host filename.");
+                        continue;
+                    } else { name = replacement; continue; }
+                }
+                if (choice == "cancel") report << item.name + " — Cancelled";
+                else if (choice == "skip" || !regular) report << item.name + " — Skipped";
+                else {
+                    QSaveFile output(target);
+                    if (output.open(QIODevice::WriteOnly) && output.write(payload) == payload.size() && output.commit())
+                        report << item.name + " — Exported";
+                    else report << item.name + " — Write failed";
+                }
+                break;
+            }
+            if (report.last().endsWith(" — Cancelled")) break;
+        }
+        batchReport = report.join('\n');
+        status->setText("Flat export finished. See Export report.");
+    }, Qt::SingleShotConnection);
+    startBatch(plan, false);
+}
+
 void Window::chooseBatch(bool wholeArea) {
     if(busy || session.isEmpty() || !userAreas->currentItem()) return;
     const auto entries=exportEntries(wholeArea);
@@ -981,6 +1182,7 @@ void Window::chooseBatch(bool wholeArea) {
         const auto directory=QFileDialog::getExistingDirectory(this,wholeArea ? "Export user area" : "Export selected files",previous);
         if(directory.isEmpty()) return;
         previous=directory;
+        if (!wholeArea && userAreas->currentRow() == 0) { exportFlat(entries, directory); return; }
         const int area=wholeArea?userAreas->currentItem()->data(Qt::UserRole).toInt():-1;
         auto plan=planExport(entries,directory,area,filenamePolicy);
         if(!plan.error.isEmpty()) { QMessageBox::warning(this,"Cannot export",plan.error);return; }
@@ -1003,6 +1205,7 @@ void Window::exportSelection(const QString &directory,bool skipExisting) {
     if(busy || session.isEmpty()) return;
     const auto entries=exportEntries(false);
     if(entries.isEmpty()) return;
+    if (userAreas->currentRow() == 0) { exportFlat(entries, directory); return; }
     startBatch(planExport(entries,directory,-1,filenamePolicy),skipExisting);
 }
 void Window::exportUserArea(const QString &directory,bool skipExisting) {

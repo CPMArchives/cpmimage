@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "window.h"
+#include "workspace.h"
 #include <QCryptographicHash>
 #include <QFile>
 #include <QSignalSpy>
@@ -83,6 +83,63 @@ private slots:
         window.openImage(root+"/fixtures/ibm3740-truncated.raw","ibm-3740","raw");
         QVERIFY(done.wait(15000));QVERIFY(!done.takeFirst()[0].toBool());
         QVERIFY(!information->isEnabled());QVERIFY(name->toolTip().isEmpty());
+    }
+
+    void flatExportConsolidatesIdenticalHostFile() {
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                      qEnvironmentVariable("CPMIMAGE_HELPER"));
+        QSignalSpy done(&window, &Window::completed);
+        window.openImage(root + "/fixtures/ibm3740-independent.raw", "ibm-3740", "raw");
+        QVERIFY(done.wait(15000));
+        QVERIFY(done.takeFirst()[0].toBool());
+        auto *areas = window.findChild<QListWidget *>("userAreas");
+        auto *files = window.findChild<QTableWidget *>("fileList");
+        areas->setCurrentRow(0);
+        for (int row = 0; row < files->rowCount(); ++row)
+            if (files->item(row, 0)->data(Qt::UserRole).toString() == "00BINARY.BIN")
+                window.selectEntry(row);
+        QTemporaryDir output;
+        QVERIFY(output.isValid());
+        window.exportSelection(output.path());
+        QVERIFY(done.wait(15000));
+        QVERIFY(QFile::exists(output.filePath("BINARY.BIN")));
+        done.clear();
+        window.exportSelection(output.path());
+        QVERIFY(done.wait(15000));
+        QVERIFY(window.lastBatchReport().contains("Consolidated identical contents"));
+    }
+
+    void workspaceSwitchAndClose() {
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}});
+        workspace.show();
+        auto &first = workspace.addSession();
+        QSignalSpy firstDone(&first, &Window::completed);
+        first.openImage(root + "/fixtures/ibm3740-independent.raw", "ibm-3740", "raw");
+        auto &second = workspace.addSession();
+        QSignalSpy secondDone(&second, &Window::completed);
+        second.openImage(root + "/fixtures/ibm3740-empty.raw", "ibm-3740", "raw");
+        QTRY_COMPARE(firstDone.size(), 1);
+        QTRY_COMPARE(secondDone.size(), 1);
+        QVERIFY(firstDone.first().first().toBool());
+        QVERIFY(secondDone.first().first().toBool());
+        auto *tabs = workspace.findChild<QTabWidget *>();
+        QCOMPARE(tabs->currentWidget(), &second);
+        QCOMPARE(first.entryCount(), 1);
+        QCOMPARE(second.entryCount(), 0);
+        tabs->setCurrentWidget(&first);
+        auto *areas = first.findChild<QListWidget *>("userAreas");
+        areas->setCurrentRow(0);
+        tabs->setCurrentWidget(&second);
+        QVERIFY(second.close());
+        QCOMPARE(tabs->count(), 1);
+        QCOMPARE(tabs->currentWidget(), &first);
+        QCOMPARE(areas->currentRow(), 0);
+        QCOMPARE(first.entryCount(), 3);
+        QVERIFY(workspace.close());
+        QCOMPARE(tabs->count(), 0);
     }
 
     void saveWorkflow() {

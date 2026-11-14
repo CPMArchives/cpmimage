@@ -23,6 +23,7 @@ public:
     Window(QString root, QString python, QString helper, int deadlineMs = 30000, int graceMs = 2000, QString noticesPath = {}, QString settingsFile = {});
     ~Window() override;
     void openFromPicker();
+    void importFiles(const QStringList &paths);
     void openImage(const QString &path, const QString &format, const QString &container);
     void setCataloguePath(const QString &path) { cataloguePath = path; }
     void loadCatalogue(const QString &path = {});
@@ -42,6 +43,7 @@ signals:
     void exportProgress(int completed, int total);
 protected:
     void closeEvent(QCloseEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 private:
     void begin(QJsonObject request);
     void readReply();
@@ -57,7 +59,9 @@ private:
     void updateUserAreas();
     void chooseImage();
     void chooseSave(bool saveAs);
-    void chooseEdit(const QString &action);
+    void chooseEdit(const QString &action, QStringList paths = {});
+    void offerFiles(bool drag);
+    void exportFlat(const QJsonArray &entries, const QString &directory);
     bool confirmWrite();
     bool dirty = false, writeConfirmed = false;
     bool resolveEdits(std::function<void()> next);
