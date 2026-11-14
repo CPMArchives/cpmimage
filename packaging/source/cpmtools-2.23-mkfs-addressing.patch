@@ -1,0 +1,104 @@
+--- a/mkfs.cpm.c
++++ b/mkfs.cpm.c
+@@ -26,7 +26,7 @@
+   char firstbuf[128];
+   int fd;
+   unsigned int bytes;
+-  unsigned int trkbytes;
++  const char *err;
+   /*}}}*/
+ 
+   /* open image file */ /*{{{*/
+@@ -38,8 +38,17 @@
+   /*}}}*/
+   /* write system tracks */ /*{{{*/
+   /* this initialises only whole tracks, so it skew is not an issue */
+-  trkbytes=drive->secLength*drive->sectrk;
+-  for (i=0; i<trkbytes*drive->boottrk; i+=drive->secLength) if (write(fd, bootTracks+i, drive->secLength)!=(ssize_t)drive->secLength)
++  unsigned int reserved = drive->bootsec >= 0 ? drive->bootsec : drive->boottrk * drive->sectrk;
++  unsigned int partial=reserved%drive->sectrk;
++  for (i=0; i<partial; ++i)
++    if ((unsigned int)drive->skewtab[i]>=partial)
++    {
++      boo="Skew crosses the physical boot boundary";
++      close(fd);
++      return -1;
++    }
++  if (lseek(fd,drive->offset,SEEK_SET)==(off_t)-1 ||
++      (reserved && write(fd,bootTracks,(size_t)reserved*drive->secLength)!=(ssize_t)((size_t)reserved*drive->secLength)))
+   {
+     boo=strerror(errno);
+     close(fd);
+@@ -49,7 +58,7 @@
+   /* write directory */ /*{{{*/
+   memset(buf,0xe5,128);
+   bytes=drive->maxdir*32;
+-  if (bytes%trkbytes) bytes=((bytes+trkbytes)/trkbytes)*trkbytes;
++  bytes=((bytes+drive->blksiz-1)/drive->blksiz)*drive->blksiz;
+   if (timeStamps && (drive->type==CPMFS_P2DOS || drive->type==CPMFS_DR3)) buf[3*32]=0x21;
+   memcpy(firstbuf,buf,128);
+   if (drive->type==CPMFS_DR3)
+@@ -83,20 +92,26 @@
+       firstbuf[27]=firstbuf[31]=min;
+     }
+   }
+-  for (i=0; i<bytes; i+=128) if (write(fd, i==0 ? firstbuf : buf, 128)!=128)
+-  {
+-    boo=strerror(errno);
+-    close(fd);
+-    return -1;
+-  }
+-  /*}}}*/
+-  /* close image file */ /*{{{*/
++  for (i=0; i<bytes; i+=128)
++    memcpy((char *)drive->dir+i,i==0 ? firstbuf : buf,128);
+   if (close(fd)==-1)
+   {
+     boo=strerror(errno);
+     return -1;
+   }
+-  /*}}}*/
++#ifdef CPMIMAGE_FORMAT_HELPER
++  err=Device_open(&drive->dev,name,O_RDWR,"cpmimage-raw");
++#elif defined(HAVE_LIBDSK_H)
++  err=Device_open(&drive->dev,name,O_RDWR,"raw");
++#else
++  err=Device_open(&drive->dev,name,O_RDWR,NULL);
++#endif
++  if (err) { boo=err; return -1; }
++  err=Device_setGeometry(&drive->dev,drive->secLength,drive->sectrk,
++                         drive->tracks,drive->offset,drive->libdskGeometry);
++  if (err) { Device_close(&drive->dev); boo=err; return -1; }
++  drive->dirtyDirectory=1;
++  if (cpmUmount(drive)<0) return -1;
+   if (timeStamps && !(drive->type==CPMFS_P2DOS || drive->type==CPMFS_DR3)) /*{{{*/
+   {
+     int offset,j;
+@@ -150,6 +165,7 @@
+ }
+ /*}}}*/
+ 
++#ifndef CPMIMAGE_FORMAT_HELPER
+ const char cmd[]="mkfs.cpm";
+ 
+ int main(int argc, char *argv[]) /*{{{*/
+@@ -195,9 +211,10 @@
+     exit(1);
+   }
+   drive.dev.opened=0;
+-  cpmReadSuper(&drive,&root,format,uppercase);
+-  bootTrackSize=drive.boottrk*drive.secLength*drive.sectrk;
+-  if ((bootTracks=malloc(bootTrackSize))==(void*)0)
++  if (cpmReadSuper(&drive,&root,format,uppercase)<0)
++  { fprintf(stderr,"%s: %s\n",cmd,boo); return 1; }
++  bootTrackSize=(size_t)(drive.bootsec>=0 ? drive.bootsec : drive.boottrk*drive.sectrk)*drive.secLength;
++  if ((bootTracks=malloc(bootTrackSize ? bootTrackSize : 1))==(void*)0)
+   {
+     fprintf(stderr,"%s: can not allocate boot track buffer: %s\n",cmd,strerror(errno));
+     exit(1);
+@@ -230,3 +247,5 @@
+   else exit(0);
+ }
+ /*}}}*/
++
++#endif /* CPMIMAGE_FORMAT_HELPER */

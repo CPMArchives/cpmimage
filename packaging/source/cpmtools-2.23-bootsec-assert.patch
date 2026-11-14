@@ -1,0 +1,11 @@
+--- a/cpmfs.c
++++ b/cpmfs.c
+@@ -1049,7 +1049,7 @@
+ 
+   d->uppercase=uppercase;
+ 
+-  assert(d->boottrk>=0);
++  assert(d->boottrk>=0 || d->bootsec>=0);
+   assert(d->secLength>0);
+   assert(d->sectrk>0);
+   assert(d->tracks>0);
