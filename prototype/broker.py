@@ -70,7 +70,7 @@ def main():
     import catalogue
     from container_mapping import MappingError, PhysicalMapping, inspect_imd, transfer_dmk, dmk_template, replace_imd_comment, verify_jv3, derive_mapping
     from publication import fingerprint as file_hash, publish, recovery_directory, require_recovery_clear
-    from source_ownership import Ownership, identity
+    from source_ownership import Ownership, OwnershipError, identity
     import adapters as backend
     backend.HELPER = args.helper.resolve()
     bundled_path = args.root / 'fixtures/diskdefs'
@@ -734,6 +734,8 @@ def main():
             respond(reply)
         except backend.Failure as error:
             respond(dict(v=1, id=rid, ok=False, error=error.code, message=error.message))
+        except OwnershipError as error:
+            respond(dict(v=1, id=rid, ok=False, error='ownership', message=str(error)))
         except (OSError, KeyError, TypeError, ValueError) as error:
             respond(dict(v=1, id=rid, ok=False, error='request_or_io', message=str(error)))
 

@@ -120,8 +120,10 @@ private slots:
         const auto destination = temp.filePath("copy.raw");
         connect(&confirm, &QTimer::timeout, &window, [&] {
             if (auto *chooser = fileDialog()) {
-                chooser->selectFile(destination);
-                QMetaObject::invokeMethod(chooser, "accept");
+                if (auto *filename = chooser->findChild<QLineEdit *>("fileNameEdit")) {
+                    filename->setText(destination);
+                    QMetaObject::invokeMethod(chooser, "accept");
+                }
             }
         });
         confirm.start(20);
@@ -282,7 +284,7 @@ private slots:
         QVERIFY(QDir(areas.filePath("1")).exists());QVERIFY(QDir(areas.filePath("1")).isEmpty());
         QVERIFY(image.open(QIODevice::ReadOnly));QCOMPARE(image.readAll(),bytes);
         window.openImage(root+"/fixtures/ibm3740-independent.raw","ibm-3740","raw");QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
-        navigation->setCurrentRow(7);window.exportUserArea(areas.path());QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        navigation->setCurrentRow(8);window.exportUserArea(areas.path());QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
         QFile seven(areas.filePath("7/BINARY.BIN"));QVERIFY(seven.open(QIODevice::ReadOnly));
         QCOMPARE(QCryptographicHash::hash(seven.readAll(),QCryptographicHash::Sha256).toHex(),QByteArray("cd6816b77f68d70001fc3eaa4d42bdd67cb5973b3151cc5292ecc02a3daac6ab"));
     }

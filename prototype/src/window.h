@@ -22,7 +22,9 @@ class Window : public QMainWindow {
 public:
     Window(QString root, QString python, QString helper, int deadlineMs = 30000, int graceMs = 2000, QString noticesPath = {}, QString settingsFile = {});
     ~Window() override;
+    void openFromPicker();
     void openImage(const QString &path, const QString &format, const QString &container);
+    void setCataloguePath(const QString &path) { cataloguePath = path; }
     void loadCatalogue(const QString &path = {});
     void inspectImage(const QString &path, const QString &explicitFormat = {}, const QString &type = {});
     void exportFile(const QString &destination);
@@ -35,6 +37,8 @@ public:
     QString lastError() const { return error; }
 signals:
     void completed(bool success);
+    void sessionClosed();
+    void imagePicked(const QString &path);
     void exportProgress(int completed, int total);
 protected:
     void closeEvent(QCloseEvent *event) override;

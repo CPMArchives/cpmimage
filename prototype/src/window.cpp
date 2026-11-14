@@ -232,7 +232,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     connect(newAction, &QAction::triggered, this, [this, newAction] {
         if (busy || !resolveEdits([newAction] { newAction->trigger(); })) return;
         newImagePicker = true;
-        if (catalogueRows.isEmpty()) loadCatalogue();
+        if (catalogueRows.isEmpty()) loadCatalogue(cataloguePath);
         else chooseFormat({}, false);
     });
     connect(fileMenu->addAction("Format Image…"), &QAction::triggered, this, [this] {
@@ -624,6 +624,15 @@ bool Window::resolveEdits(std::function<void()> next) {
     return false;
 }
 void Window::chooseImage() {
+    if (receivers(SIGNAL(imagePicked(QString))) && (!session.isEmpty() || busy)) {
+        const auto path = QFileDialog::getOpenFileName(this, "Open CP/M image", image,
+            "Disk images (*.raw *.img *.dsk *.imd *.jv3 *.dmk);;All files (*)");
+        if (!path.isEmpty()) emit imagePicked(path);
+        return;
+    }
+    openFromPicker();
+}
+void Window::openFromPicker() {
     if (!resolveEdits([this] { chooseImage(); })) return;
     const QString path = QFileDialog::getOpenFileName(this, "Open CP/M image", image.isEmpty() ? QDir::homePath() : image,
         "Disk images (*.raw *.img *.dsk *.imd *.jv3 *.dmk);;All files (*)");
@@ -1345,5 +1354,5 @@ void Window::readReply() {
 void Window::closeEvent(QCloseEvent *event) {
     if (busy) { closing = true; cancel(); event->ignore(); }
     else if (!resolveEdits([this] { close(); })) event->ignore();
-    else { process.closeWriteChannel(); event->accept(); }
+    else { process.closeWriteChannel(); event->accept(); emit sessionClosed(); }
 }

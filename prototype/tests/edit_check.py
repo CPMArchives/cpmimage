@@ -12,6 +12,27 @@ from source_ownership import Ownership
 
 
 class EditCheck(unittest.TestCase):
+    def test_two_sessions_share_read_access_and_exclude_alias_writes(self):
+        first, second = CatalogueCheck(), CatalogueCheck()
+        for broker in (first, second):
+            broker.setUp()
+            self.addCleanup(broker.doCleanups)
+            self.addCleanup(broker.tearDown)
+        alias = first.directory / 'alias.raw'
+        os.link(first.image, alias)
+        tokens = []
+        for broker, path in ((first, first.image), (second, alias)):
+            opened = broker.request('open', image=str(path), format='ibm-3740', container='raw')
+            self.assertTrue(opened['ok'], opened)
+            tokens.append(opened['result']['session'])
+        options = dict(action='delete', name='00BINARY.BIN', confirmed=True)
+        self.assertTrue(first.request('edit', session=tokens[0], **options)['ok'])
+        blocked = second.request('edit', session=tokens[1], **options)
+        self.assertEqual(blocked.get('error'), 'ownership', blocked)
+        self.assertIn('ownership', blocked['message'])
+        self.assertTrue(first.request('discard', session=tokens[0])['ok'])
+        self.assertTrue(second.request('edit', session=tokens[1], **options)['ok'])
+
     def test_competing_saves_to_shared_sidecar(self):
         first, second = CatalogueCheck(), CatalogueCheck()
         for broker in (first, second):
