@@ -711,7 +711,7 @@ private slots:
                       qEnvironmentVariable("CPMIMAGE_HELPER"), 30000, 2000, {}, settingsPath);
         window.show(); QSignalSpy done(&window, &Window::completed);
         auto button = [&](const QString &prefix) -> QPushButton * {
-            for (auto *b : window.findChildren<QPushButton *>()) if (b->text().startsWith(prefix)) return b;
+            for (auto *b : window.findChildren<QPushButton *>()) if (b->text().startsWith(prefix) || b->accessibleName().startsWith(prefix)) return b;
             return nullptr;
         };
         QTimer watchdog; watchdog.setInterval(4000);

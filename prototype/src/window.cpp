@@ -185,6 +185,19 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     saveButton->setObjectName("toolbarSave");
     auto *importButton = new QPushButton("Import");
     importButton->setObjectName("toolbarImport");
+    for (const auto &[button, icon] : {
+             std::pair{openButton, "open"}, std::pair{newButton, "new"},
+             std::pair{saveButton, "save"}, std::pair{importButton, "import"},
+             std::pair{exportButton, "export"}}) {
+        button->setAccessibleName(button->text());
+        if (button->toolTip().isEmpty()) button->setToolTip(button->text());
+        button->setIcon(QIcon(QString(":/icons/toolbar/%1.png").arg(icon)));
+        button->setIconSize(QSize(64, 64));
+        button->setText({});
+        button->setFlat(true);
+        button->setStyleSheet("QPushButton { border: none; background: transparent; padding: 4px; }"
+                              "QPushButton:focus { background: palette(mid); }");
+    }
     toolbar->addWidget(openButton);
     toolbar->addWidget(newButton);
     toolbar->addWidget(saveButton);

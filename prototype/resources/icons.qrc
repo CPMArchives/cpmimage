@@ -1,6 +1,11 @@
 <RCC>
   <qresource prefix="/icons">
     <file>cpmimage.png</file>
+    <file>toolbar/open.png</file>
+    <file>toolbar/new.png</file>
+    <file>toolbar/save.png</file>
+    <file>toolbar/import.png</file>
+    <file>toolbar/export.png</file>
   </qresource>
   <qresource prefix="/help">
     <file alias="guide.md">../../docs/HELP.md</file>

@@ -3,6 +3,9 @@
 #include "window.h"
 #include "runtime_paths.h"
 #include <QTabWidget>
+#include <QTabBar>
+#include <QColor>
+#include <QToolButton>
 #include <QMenuBar>
 #include <QMenu>
 #include <QCloseEvent>
@@ -19,10 +22,32 @@ public:
         setAcceptDrops(true);
         tabs->setTabsClosable(true);
         tabs->setMovable(true);
+#ifdef Q_OS_MACOS
+        auto palette = tabs->tabBar()->palette();
+        const auto base = palette.color(QPalette::Button);
+        const auto ink = palette.color(QPalette::ButtonText);
+        const QColor selected((base.red() * 4 + ink.red()) / 5,
+                              (base.green() * 4 + ink.green()) / 5,
+                              (base.blue() * 4 + ink.blue()) / 5);
+        palette.setColor(QPalette::Highlight, selected);
+        palette.setColor(QPalette::HighlightedText, ink);
+        tabs->tabBar()->setPalette(palette);
+        tabs->tabBar()->setStyleSheet(
+            "QTabBar::tab { padding: 4px 9px; background: palette(button); color: palette(button-text); }"
+            "QTabBar::tab:selected { background: palette(highlight); color: palette(highlighted-text); }");
+#endif
+
         auto *workspace = new QMenu("Tabs", this);
         auto *create = workspace->addAction("New Tab");
         create->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
         connect(create, &QAction::triggered, this, [this] { addSession(); });
+        auto *newTab = new QToolButton(tabs);
+        newTab->setText("+");
+        newTab->setToolTip("New Tab");
+        newTab->setAccessibleName("New Tab");
+        newTab->setAutoRaise(true);
+        tabs->setCornerWidget(newTab, Qt::TopRightCorner);
+        connect(newTab, &QToolButton::clicked, create, &QAction::trigger);
         auto *closeTab = workspace->addAction("Close Tab");
         closeTab->setShortcut(QKeySequence::Close);
         connect(closeTab, &QAction::triggered, this, [this] {
