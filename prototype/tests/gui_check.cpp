@@ -85,6 +85,76 @@ private slots:
         QVERIFY(!information->isEnabled());QVERIFY(name->toolTip().isEmpty());
     }
 
+    void saveWorkflow() {
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        const auto path = temp.filePath("test.raw");
+        QVERIFY(QFile::copy(root + "/fixtures/ibm3740-independent.raw", path));
+        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+            qEnvironmentVariable("CPMIMAGE_HELPER"), 30000, 2000, {}, temp.filePath("settings.ini"));
+        window.show();
+        QSignalSpy done(&window, &Window::completed);
+        window.openImage(path, "ibm-3740", "raw");
+        QVERIFY(done.wait(15000));
+        QVERIFY(done.takeFirst()[0].toBool());
+        auto findAction = [&](const QString &label) -> QAction * {
+            for (auto *action : window.findChildren<QAction *>())
+                if (action->text() == label) return action;
+            return nullptr;
+        };
+        auto *save = findAction("Save");
+        auto *saveAs = findAction("Save As…");
+        auto *discard = findAction("Discard unsaved changes…");
+        auto *remove = findAction("Delete…");
+        QVERIFY(saveAs && discard && remove);
+        QVERIFY(save);
+        QTimer confirm;
+        connect(&confirm, &QTimer::timeout, &window, [&] {
+            auto *prompt = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+            if (prompt) {
+                if (auto *yes = prompt->button(QMessageBox::Yes)) yes->click();
+                else prompt->reject();
+            }
+        });
+        const auto destination = temp.filePath("copy.raw");
+        connect(&confirm, &QTimer::timeout, &window, [&] {
+            if (auto *chooser = fileDialog()) {
+                chooser->selectFile(destination);
+                QMetaObject::invokeMethod(chooser, "accept");
+            }
+        });
+        confirm.start(20);
+        save->trigger();
+        QVERIFY(done.wait(15000));
+        QVERIFY2(done.takeFirst()[0].toBool(), qPrintable(window.lastError()));
+        QVERIFY(QFile::exists(temp.filePath("test.FDF")));
+        QVERIFY(!QFile::exists(temp.filePath("test.raw.BAK")));
+        QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, true);
+        saveAs->trigger();
+        QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, false);
+        QVERIFY(done.wait(15000));
+        QVERIFY2(done.takeFirst()[0].toBool(), qPrintable(window.lastError()));
+        QVERIFY(QFile::exists(destination));
+        QVERIFY(window.windowTitle().contains("copy.raw"));
+        const auto entries = window.entryCount();
+        QVERIFY(entries > 0);
+        window.selectEntry(0);
+        remove->trigger();
+        QVERIFY(done.wait(15000));
+        QVERIFY2(done.takeFirst()[0].toBool(), qPrintable(window.lastError()));
+        QCOMPARE(window.entryCount(), entries - 1);
+        QVERIFY(window.windowTitle().endsWith("*"));
+        discard->trigger();
+        QVERIFY(done.wait(15000));
+        QVERIFY2(done.takeFirst()[0].toBool(), qPrintable(window.lastError()));
+        QCOMPARE(window.entryCount(), entries);
+        QVERIFY(!window.windowTitle().endsWith("*"));
+        QFile saved(destination), original(path);
+        QVERIFY(saved.open(QIODevice::ReadOnly) && original.open(QIODevice::ReadOnly));
+        QCOMPARE(saved.readAll(), original.readAll());
+    }
+
     void formatSelection() {
         QTemporaryDir temp;
         QVERIFY(temp.isValid());

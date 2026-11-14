@@ -2,6 +2,7 @@
 #include "window.h"
 #include <QCryptographicHash>
 #include <algorithm>
+#include <utility>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QFileDialog>
@@ -32,6 +33,8 @@
 #include <QAction>
 #include <QSettings>
 #include <QLineEdit>
+#include <QInputDialog>
+#include <QCheckBox>
 #include <QProgressBar>
 #include <QMessageBox>
 #include <QTextEdit>
@@ -67,6 +70,18 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     filenameSettings->setShortcut(QKeySequence::Preferences);
     addAction(filenameSettings);
     connect(filenameSettings, &QAction::triggered, this, &Window::editFilenameSettings);
+    for (const auto &option : QList<QPair<QString,QString>>{
+            {"Keep automatic save backups", "saveBackups"},
+            {"Save disk definitions beside images", "saveSidecar"},
+            {"Show routine disk-definition save warnings", "warnSaveSidecar"},
+            {"Convert single-file exports to text", "textExport"}}) {
+        auto *action = preferences->addAction(option.first);
+        action->setCheckable(true);
+        action->setChecked(settings->value(option.second, option.second != "textExport").toBool());
+        connect(action, &QAction::toggled, this, [this, option](bool checked) {
+            settings->setValue(option.second, checked);
+        });
+    }
     auto *formatFavorites = preferences->addAction("Format favorites…");
     connect(formatFavorites, &QAction::triggered, this, [this] {
         QStringList entries = settings->value("formatFavorites").toStringList();
@@ -115,8 +130,8 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     toolbar->addWidget(exportButton);
     toolbar->addWidget(areaExportButton);
     toolbar->addStretch();
-    auto *readOnly = new QLabel("Read-only");
-    readOnly->setToolTip("Browse and export. The source image is never edited.");
+    auto *readOnly = new QLabel("Private edits");
+    readOnly->setToolTip("Edits affect a private copy until you save.");
     toolbar->addWidget(readOnly);
     layout->addLayout(toolbar);
     auto *imageRow=new QHBoxLayout;
@@ -210,6 +225,30 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     menuBar()->insertMenu(preferences->menuAction(),fileMenu);
     auto *openAction=fileMenu->addAction("Open image…");
     connect(openAction,&QAction::triggered,openButton,&QPushButton::click);
+    auto *saveAction = fileMenu->addAction("Save");
+    saveAction->setShortcut(QKeySequence::Save);
+    auto *saveAsAction = fileMenu->addAction("Save As…");
+    saveAsAction->setShortcut(QKeySequence::SaveAs);
+    connect(saveAction, &QAction::triggered, this, [this] { chooseSave(false); });
+    connect(saveAsAction, &QAction::triggered, this, [this] { chooseSave(true); });
+    connect(fileMenu, &QMenu::aboutToShow, this, [this, saveAction, saveAsAction] {
+        saveAction->setEnabled(!busy && !session.isEmpty());
+        saveAsAction->setEnabled(!busy && !session.isEmpty());
+    });
+    connect(fileMenu->addAction("Discard unsaved changes…"), &QAction::triggered, this, [this] {
+        if (!busy && dirty && QMessageBox::question(this, "Discard edits", "Discard all unsaved changes?") == QMessageBox::Yes)
+            begin({{"op","discard"}, {"session",session}});
+    });
+    auto *editMenu = menuBar()->addMenu("Edit");
+    auto *rename = editMenu->addAction("Rename…");
+    rename->setShortcut(Qt::Key_F2);
+    table->addAction(rename);
+    connect(rename, &QAction::triggered, this, [this] { chooseEdit("rename"); });
+    for (const auto &item : QList<QPair<QString,QString>>{{"Import files…","import"},
+            {"Delete…","delete"},{"Move to user area…","move"},{"Properties…","attrs"},
+            {"Export system tracks…","systems_export"},{"Replace system tracks…","systems_import"}}) {
+        connect(editMenu->addAction(item.first), &QAction::triggered, this, [this, item] { chooseEdit(item.second); });
+    }
     auto *exportAction=fileMenu->addAction("Export selected…");
     connect(exportAction,&QAction::triggered,exportButton,&QPushButton::click);
     auto *areaAction=fileMenu->addAction("Export user area…");
@@ -300,6 +339,7 @@ void Window::sendPending() {
     if (!pending.isEmpty()) { process.write(pending); pending.clear(); }
 }
 void Window::resetImage() {
+    dirty = false; writeConfirmed = false;
     session.clear(); image.clear(); directoryEntries = {}; imageNote.clear();
     snapshotHash.clear(); exportDiagnostics.clear();
     { QSignalBlocker block(userAreas); userAreas->setCurrentItem(nullptr); userAreas->clearSelection(); }
@@ -336,7 +376,165 @@ void Window::setBusy(bool value) {
     imageInfoAction->setEnabled(!busy && !session.isEmpty());
     progress->setVisible(busy && batchActive);
 }
+bool Window::confirmWrite() {
+    return writeConfirmed || QMessageBox::question(this, "Confirm format for writing",
+        QString("Edit the private working image using %1? Confirm that this is the intended interpretation.").arg(format),
+        QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) == QMessageBox::Yes;
+}
+void Window::chooseEdit(const QString &action) {
+    if (busy || session.isEmpty()) return;
+    QJsonObject request{{"op","edit"},{"session",session},{"action",action}};
+    if (action.startsWith("systems_")) {
+        const bool importing = action == "systems_import";
+        const auto path = importing ? QFileDialog::getOpenFileName(this, "Select system-track binary")
+                                    : QFileDialog::getSaveFileName(this, "Export system tracks");
+        if (path.isEmpty()) return;
+        request["op"] = action;
+        request["path"] = path;
+        if (importing) {
+            if (QMessageBox::question(this, "Replace system tracks",
+                "Replace the reserved region? Short input will be padded with E5.",
+                QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes || !confirmWrite()) return;
+            request["pad"] = true;
+            request["confirmed"] = true;
+        }
+        begin(request);
+        return;
+    }
+    bool accepted = false;
+    if (action == "import") {
+        const auto paths = QFileDialog::getOpenFileNames(this, "Import files");
+        if (paths.isEmpty() || !userAreas->currentItem()) return;
+        const QRegularExpression valid(R"CPM(^[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,8}(\.[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,3})?$)CPM");
+        const int area = userAreas->currentItem()->data(Qt::UserRole).toInt();
+        const auto prefix = QString("%1").arg(area, 2, 10, QLatin1Char('0'));
+        QSet<QString> existing;
+        for (const auto &entry : directoryEntries) existing.insert(entry.toObject()["name"].toString());
+        QDialog review(this);
+        review.setWindowTitle("Review import");
+        QVBoxLayout layout(&review);
+        QTableWidget names(paths.size(), 2);
+        names.setHorizontalHeaderLabels({"Host file", "CP/M filename"});
+        names.horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+        for (int row = 0; row < paths.size(); ++row) {
+            const auto original = QFileInfo(paths[row]).fileName();
+            auto *host = new QTableWidgetItem(original);
+            host->setFlags(host->flags() & ~Qt::ItemIsEditable);
+            names.setItem(row, 0, host);
+            names.setItem(row, 1, new QTableWidgetItem(original.toUpper()));
+        }
+        QCheckBox text("Convert text to CP/M line endings and EOF marker");
+        QDialogButtonBox buttons(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        layout.addWidget(&names);
+        layout.addWidget(&text);
+        layout.addWidget(&buttons);
+        connect(&buttons, &QDialogButtonBox::rejected, &review, &QDialog::reject);
+        connect(&buttons, &QDialogButtonBox::accepted, &review, [&] {
+            QSet<QString> used;
+            for (int row = 0; row < paths.size(); ++row) {
+                const auto name = names.item(row, 1)->text().toUpper();
+                if (!valid.match(name).hasMatch() || used.contains(name)) {
+                    QMessageBox::warning(&review, "Check import names", "Give each file a distinct CP/M 8.3 name.");
+                    names.setCurrentCell(row, 1);
+                    return;
+                }
+                used.insert(name);
+            }
+            review.accept();
+        });
+        if (review.exec() != QDialog::Accepted) return;
+        QJsonArray items;
+        QString defaultConflict;
+        for (int row = 0; row < paths.size(); ++row) {
+            const auto key = prefix + names.item(row, 1)->text().toUpper();
+            const bool conflict = existing.contains(key);
+            auto choice = defaultConflict;
+            if (conflict && choice.isEmpty()) {
+                QMessageBox prompt(QMessageBox::Question, "Import conflict",
+                    key.mid(2) + " already exists.", QMessageBox::Cancel, this);
+                auto *replace = prompt.addButton("Replace", QMessageBox::AcceptRole);
+                auto *skip = prompt.addButton("Skip", QMessageBox::RejectRole);
+                prompt.setDefaultButton(skip);
+                auto *all = new QCheckBox("Apply to All");
+                prompt.setCheckBox(all);
+                prompt.exec();
+                if (prompt.clickedButton() == replace) choice = "replace";
+                else if (prompt.clickedButton() == skip) choice = "skip";
+                else return;
+                if (all->isChecked()) defaultConflict = choice;
+            }
+            if (conflict && choice == "skip") continue;
+            items.append(QJsonObject{{"name",key},{"path",paths[row]},{"replace",conflict},{"text",text.isChecked()}});
+        }
+        if (items.isEmpty()) return;
+        request["items"] = items;
+    } else {
+        const auto rows = table->selectionModel()->selectedRows();
+        if (rows.size() != 1) return;
+        const auto key = table->item(rows.first().row(),0)->data(Qt::UserRole).toString();
+        request["name"] = key;
+        if (action == "rename") {
+            auto name = QInputDialog::getText(this, "Rename", "CP/M filename", QLineEdit::Normal, key.mid(2), &accepted);
+            if (!accepted || name.toUpper() == key.mid(2)) return;
+            request["target"] = key.left(2) + name.toUpper();
+        } else if (action == "move") {
+            const auto area = QInputDialog::getInt(this, "Move file", "User area", key.left(2).toInt(), 0, 31, 1, &accepted);
+            if (!accepted || area == key.left(2).toInt()) return;
+            request["target"] = QString("%1").arg(area, 2, 10, QLatin1Char('0')) + key.mid(2);
+        } else if (action == "attrs") {
+            int attributes = 0;
+            for (const auto &entry : directoryEntries)
+                if (entry.toObject()["name"].toString() == key) attributes = entry.toObject()["attr"].toInt();
+            QDialog dialog(this);
+            dialog.setWindowTitle("Properties — " + key.mid(2));
+            QVBoxLayout layout(&dialog);
+            QCheckBox readOnly("Read-only"), system("System"), archive("Archive");
+            readOnly.setChecked(attributes & 256);
+            system.setChecked(attributes & 512);
+            archive.setChecked(attributes & 1024);
+            for (auto *check : {&readOnly,&system,&archive}) layout.addWidget(check);
+            QDialogButtonBox buttons(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+            layout.addWidget(&buttons);
+            connect(&buttons,&QDialogButtonBox::accepted,&dialog,&QDialog::accept);
+            connect(&buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
+            if (dialog.exec() != QDialog::Accepted) return;
+            request["attributes"] = (readOnly.isChecked()?256:0) | (system.isChecked()?512:0) | (archive.isChecked()?1024:0);
+        } else if (QMessageBox::question(this, "Delete file", "Delete " + key.mid(2) + " from the working image?",
+                   QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) return;
+    }
+    if (!confirmWrite()) return;
+    request["confirmed"] = true;
+    begin(request);
+}
+void Window::chooseSave(bool saveAs) {
+    if (busy || session.isEmpty()) return;
+    QString destination, selectedFilter;
+    if (saveAs) {
+        destination = QFileDialog::getSaveFileName(this, "Save CP/M image as", image,
+            "RAW disk images (*.raw *.img);;Standard CPCEMU DSK (*.dsk)", &selectedFilter, QFileDialog::DontConfirmOverwrite);
+        if (destination.isEmpty()) return;
+    }
+    pendingSave = {{"op","save_plan"}, {"session",session}, {"destination",destination},
+                   {"backups",settings->value("saveBackups",true).toBool()},
+                   {"sidecar",settings->value("saveSidecar",true).toBool()}};
+    if (saveAs) pendingSave["container"] = selectedFilter.startsWith("Standard") ? "dsk" : "raw";
+    begin(pendingSave);
+}
+bool Window::resolveEdits(std::function<void()> next) {
+    if (!dirty) return true;
+    const auto answer = QMessageBox::warning(this, "Unsaved changes", "Save changes before continuing?",
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Cancel);
+    if (answer == QMessageBox::Save) {
+        afterSave = std::move(next);
+        chooseSave(false);
+    } else if (answer == QMessageBox::Discard) {
+        afterSave = std::move(next);
+        begin({{"op","discard"}, {"session",session}});
+    }
+    return false;
+}
 void Window::chooseImage() {
+    if (!resolveEdits([this] { chooseImage(); })) return;
     const QString path = QFileDialog::getOpenFileName(this, "Open CP/M image", image.isEmpty() ? QDir::homePath() : image,
         "Disk images (*.raw *.img *.dsk);;All files (*)");
     if (path.isEmpty()) return;
@@ -392,6 +590,7 @@ void Window::openDefinition(const QJsonObject &definition, bool sidecar, bool sw
     begin(request);
 }
 void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
+    if (!resolveEdits([this] { formats->click(); })) return;
     QDialog dialog(this);
     dialog.setWindowTitle("Choose disk format");
     dialog.resize(650, 480);
@@ -619,7 +818,8 @@ void Window::exportFile(const QString &destination) {
     if (!problem.isEmpty()) { status->setText(problem); return; }
     begin({{"op", "export"}, {"session", session},
            {"name", table->item(row, 0)->data(Qt::UserRole).toString()},
-           {"destination", QFileInfo(destination).absoluteFilePath()}});
+           {"destination", QFileInfo(destination).absoluteFilePath()},
+           {"text", settings->value("textExport", false).toBool()}});
 }
 QJsonArray Window::exportEntries(bool wholeArea) const {
     QJsonArray entries;
@@ -735,7 +935,7 @@ void Window::showImageInformation() {
     int populated=0;
     for(int area=0;area<userAreas->count();++area)
         if(userAreas->item(area)->data(Qt::UserRole+1).toInt()>0) ++populated;
-    const auto details=QString("Source image: %1\nImage layout: %2\nFormat identifier: %3\nContainer: %4\nFiles: %5\nPopulated user areas: %6 of %9\n\nSnapshot SHA-256: %7\nRead-only normalization: %8\n\nRead-only: the source image is never edited.\nThe selected definition is an interpretation of the source image.\nExport retains CP/M record padding.")
+    const auto details=QString("Source image: %1\nImage layout: %2\nFormat identifier: %3\nContainer: %4\nFiles: %5\nPopulated user areas: %6 of %9\n\nSnapshot SHA-256: %7\nRead-only normalization: %8\n\nEdits affect a private copy until you save.\nThe selected definition is an interpretation of the source image.\nExport retains CP/M record padding.")
         .arg(image,formats->text(),format,container).arg(directoryEntries.size()).arg(populated).arg(snapshotHash,imageNote).arg(userAreas->count());
     QDialog dialog(this);dialog.setWindowTitle("Image information");dialog.resize(700,420);
     auto *layout=new QVBoxLayout(&dialog);
@@ -763,7 +963,8 @@ void Window::begin(QJsonObject request) {
     }
     setBusy(true);
     status->setText(operation == "open" ? "Reading image…" : operation == "catalogue" ? "Loading disk definitions…" :
-        operation == "inspect" ? "Checking image format…" : batchActive ?
+        operation == "inspect" ? "Checking image format…" :
+        operation == "save_plan" ? "Preparing save…" : operation == "save" ? "Publishing save…" : batchActive ?
         QString("Exporting %1 of %2: %3").arg(batchIndex+1).arg(batch.items.size()).arg(batch.items[batchIndex].name.mid(2)) : "Exporting selected file…");
     deadline.start(deadlineMs);
     pending = QJsonDocument(request).toJson(QJsonDocument::Compact) + '\n';
@@ -787,6 +988,7 @@ void Window::cancel() {
     status->setText("Cancelling…");
 }
 void Window::fail(const QString &message) {
+    afterSave = {};
     deadline.stop(); cancellationDeadline.stop(); error = message;
     if(batchActive) {
         if(batchInFlight && batchIndex<batch.items.size()) batch.items[batchIndex].outcome=
@@ -829,6 +1031,53 @@ void Window::readReply() {
     const QRegularExpression hash("^[0-9a-f]{64}$");
     auto invalid = [this] { stopReader(); resetImage(); fail("Invalid response schema from the image reader."); };
     if (!reply["result"].isObject()) { invalid(); return; }
+    if (operation == "edit" || operation == "discard" || operation.startsWith("systems_")) {
+        deadline.stop();
+        cancellationDeadline.stop();
+        dirty = result["dirty"].toBool();
+        if (operation != "systems_export") writeConfirmed = dirty;
+        if (result["entries"].isArray()) {
+            directoryEntries = result["entries"].toArray();
+            updateUserAreas();
+            showUserArea();
+        }
+        setWindowTitle("cpmimage — " + QFileInfo(image).fileName() + (dirty ? " *" : ""));
+        setBusy(false);
+        status->setText(dirty ? "Unsaved changes." : operation == "discard" ? "Changes discarded." : "System tracks exported.");
+        if (operation == "discard" && afterSave) QTimer::singleShot(0, this, std::exchange(afterSave, {}));
+        emit completed(true);
+        return;
+    }
+    if (operation == "save_plan" || operation == "save") {
+        deadline.stop();
+        cancellationDeadline.stop();
+        setBusy(false);
+        if (operation == "save_plan") {
+            bool replace = !pendingSave["destination"].toString().isEmpty() && result["expected"].isString();
+            if (replace && QMessageBox::question(this, "Replace image", "Replace the existing destination image?",
+                    QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) { afterSave = {}; return; }
+            if (result["sidecar_changed"].toBool() && settings->value("warnSaveSidecar", true).toBool() && QMessageBox::question(this, "Confirm Disk Definition",
+                    QString("Record %1 in the image's FDF? This records your interpretation and does not verify or convert the filesystem.").arg(format),
+                    QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) { afterSave = {}; return; }
+            pendingSave["op"] = "save";
+            pendingSave["plan"] = result;
+            pendingSave["replace"] = replace;
+            pendingSave["confirm_sidecar"] = true;
+            begin(pendingSave);
+        } else {
+            dirty = false;
+            image = result["destination"].toString();
+            container = result["container"].toString();
+            snapshotHash = result["source_sha256"].toString();
+            source->setText(QFileInfo(image).fileName());
+            source->setToolTip(image);
+            setWindowTitle("cpmimage — " + QFileInfo(image).fileName());
+            status->setText("Save completed.");
+            if (afterSave) QTimer::singleShot(0, this, std::exchange(afterSave, {}));
+            emit completed(true);
+        }
+        return;
+    }
     if (operation == "catalogue" || operation == "inspect") {
         deadline.stop(); cancellationDeadline.stop();
         setBusy(false);
@@ -931,5 +1180,6 @@ void Window::readReply() {
 }
 void Window::closeEvent(QCloseEvent *event) {
     if (busy) { closing = true; cancel(); event->ignore(); }
+    else if (!resolveEdits([this] { close(); })) event->ignore();
     else { process.closeWriteChannel(); event->accept(); }
 }

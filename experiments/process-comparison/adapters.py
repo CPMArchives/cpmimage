@@ -175,6 +175,8 @@ class Adapter:
    n=filename(e['name'],self.read_only)
    if n in entries or type(e.get('size'))!=int or not 0<=e['size']<=(128 * 1024 * 1024 if self.read_only else 16777216) or type(e.get('attr'))!=int or not 0<=e['attr']<=16383:raise Failure('protocol_invalid')
    entries[n]={'name':n,'size':e['size'],'attr':e['attr']}
+   if self.read_only:
+    entries[n].update({key:e[key] for key in ('atime','mtime','ctime') if type(e.get(key)) is int})
   return entries
  def export(self,image,fmt,container,cwd,name,path,entry):
   self.invoke('export',image,fmt,container,cwd,name,path)
@@ -215,7 +217,12 @@ class Adapter:
     else:
      if name not in entries:raise Failure('not_found')
      if op=='export':
-      out=cwd/'export';h=self.export(stage,fmt,container,cwd,name,out,entries[name]);result={'sha256':h,'size':out.stat().st_size}
+      out=cwd/'export';h=self.export(stage,fmt,container,cwd,name,out,entries[name])
+      if request.get('text') is True:
+       converted=out.read_bytes().split(b'\x1a',1)[0].replace(b'\r\n',b'\n')
+       out.write_bytes(converted)
+       h=digest(converted)
+      result={'sha256':h,'size':out.stat().st_size}
      else:
       target=filename(request['new_name'])
       if target in entries:raise Failure('name_collision')

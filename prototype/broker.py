@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import shutil
 import stat
 import sys
 import tempfile
@@ -67,6 +68,8 @@ def main():
     sys.path.insert(0, str(args.root / 'experiments/process-comparison'))
     sys.path.insert(0, str(args.root / 'prototype'))
     import catalogue
+    from publication import fingerprint as file_hash, publish, recovery_directory
+    from source_ownership import Ownership, identity
     import adapters as backend
     backend.HELPER = args.helper.resolve()
     bundled_path = args.root / 'fixtures/diskdefs'
@@ -236,11 +239,14 @@ def main():
                     result['sidecar'] = dict(id=fmt, definition_sha256=catalogue.digest(definition))
                 reply = dict(v=1, id=rid, ok=True, result=result)
             elif op == 'open':
+                if session and session['owner']:
+                    session['owner'].close()
                 session = None
                 if snapshot:
                     snapshot.cleanup()
                     snapshot = None
                 source = Path(request['image']).absolute()
+                source_identity = identity(source.stat())
                 data = read_image(source)
                 fingerprint = hashlib.sha256(data).hexdigest()
                 if request.get('source_sha256', fingerprint) != fingerprint:
@@ -298,9 +304,230 @@ def main():
                             remaining -= chunk
                 token = str(uuid.uuid4())
                 session = dict(token=token, source=source, image=image, sha=fingerprint,
-                               format=fmt, container='raw', definitions=definition)
+                               format=fmt, container='raw', definitions=definition,
+                               original_container=container, owner=None, identity=source_identity,
+                               geometry=geometry, dirty=False, confirmed=False)
                 reply['result'].update(session=token, source_sha256=fingerprint, unused_tail_filled=trimmed,
                                        definition_sha256=catalogue.digest(definition))
+            elif op == 'edit':
+                if not session or request.get('session') != session['token']:
+                    raise backend.Failure('stale_session', 'Open the image again.')
+                if not session['confirmed'] and request.get('confirmed') is not True:
+                    raise backend.Failure('confirmation_required', 'Confirm the selected disk definition for writing.')
+                action = request['action']
+                if action not in ('rename', 'delete', 'attrs', 'import', 'move'):
+                    raise backend.Failure('invalid_edit', 'Unknown editing operation.')
+                name = '' if action == 'import' else backend.filename(request['name'], True)
+                argument = '-'
+                if action in ('rename', 'move'):
+                    argument = backend.filename(request['target'], True)
+                    if action == 'move' and name[2:] != argument[2:]:
+                        raise backend.Failure('invalid_edit', 'Moving a file preserves its filename.')
+                    action = 'rename'
+                elif action == 'attrs':
+                    attributes = request['attributes']
+                    if type(attributes) is not int or attributes & ~0x700:
+                        raise backend.Failure('invalid_edit', 'Only RO, SYS and ARC can be edited.')
+                    argument = str(attributes)
+                working = session['image']
+                if not session['owner']:
+                    owner = Ownership(session['source'], Path.home() / '.cpmimage' / 'ownership')
+                    if owner.current != session['identity'] or file_hash(owner.path) != session['sha']:
+                        owner.close()
+                        raise backend.Failure('source_changed', 'The source changed. Open it again.')
+                    session['owner'] = owner
+                with tempfile.TemporaryDirectory(prefix='cpmimage-edit-', dir=working.parent) as temp:
+                    edit_dir = Path(temp)
+                    candidate = edit_dir / 'edited.raw'
+                    shutil.copyfile(working, candidate)
+                    (edit_dir / 'diskdefs').write_text(session['definitions'], encoding='utf-8')
+                    if action == 'import':
+                        items = request.get('items', [request])
+                        if not isinstance(items, list) or not 1 <= len(items) <= 256:
+                            raise backend.Failure('invalid_edit', 'Import batches support 1 to 256 files.')
+                        names = set()
+                        for item in items:
+                            target = backend.filename(item['name'], True)
+                            if target in names:
+                                raise backend.Failure('invalid_edit', f'Duplicate import name: {target}')
+                            names.add(target)
+                            host = Path(item['path'])
+                            info = host.stat()
+                            data = read_image(host)
+                            if item.get('text') is True:
+                                data = data.replace(b'\r\n', b'\n').replace(b'\r', b'\n').replace(b'\n', b'\r\n') + b'\x1a'
+                            staged = edit_dir / 'input.bin'
+                            staged.write_bytes(data)
+                            os.utime(staged, ns=(info.st_atime_ns, info.st_mtime_ns))
+                            if item.get('replace') is True:
+                                adapter().native(edit_dir, 'edit_delete', candidate, session['format'], 'raw', target, '-')
+                            adapter().native(edit_dir, 'edit_import', candidate, session['format'], 'raw', target, staged)
+                    else:
+                        adapter().native(edit_dir, 'edit_' + action, candidate, session['format'], 'raw', name, argument)
+                    checked = adapter().request({
+                        'v': 1, 'id': rid, 'op': 'list', 'image': str(candidate),
+                        'format': session['format'], 'container': 'raw'}, defs_override=session['definitions'])
+                    if not checked['ok']:
+                        raise backend.Failure(checked['error'], checked.get('message', ''))
+                    if stop.is_set():
+                        raise backend.Failure('cancelled')
+                    if not session['dirty']:
+                        shutil.copyfile(working, working.with_name('saved.raw'))
+                    os.replace(candidate, working)
+                session.update(dirty=True, confirmed=True)
+                reply = checked
+                reply['result']['dirty'] = True
+            elif op in ('systems_export', 'systems_import', 'discard'):
+                if not session or request.get('session') != session['token']:
+                    raise backend.Failure('stale_session', 'Open the image again.')
+                working = session['image']
+                baseline = working.with_name('saved.raw')
+                if op == 'discard':
+                    if session['dirty']:
+                        checked = adapter().request({
+                            'v': 1, 'id': rid, 'op': 'list', 'image': str(baseline),
+                            'format': session['format'], 'container': 'raw'}, defs_override=session['definitions'])
+                        if not checked['ok']:
+                            raise backend.Failure(checked['error'], checked.get('message', ''))
+                        os.replace(baseline, working)
+                    session.update(dirty=False, confirmed=False)
+                    if session['owner']:
+                        session['owner'].close()
+                        session['owner'] = None
+                else:
+                    geo = session['geometry']
+                    start = geo.get('offset', 0)
+                    size = geo.get('boot_sectors', 0) * geo.get('sector_size', 0)
+                    if not size or start + size > working.stat().st_size:
+                        raise backend.Failure('unsupported_backend', 'No accessible reserved system-track region.')
+                    path = Path(request['path'])
+                    if op == 'systems_export':
+                        with working.open('rb') as stream:
+                            stream.seek(start)
+                            data = stream.read(size)
+                        with path.open('xb') as stream:
+                            stream.write(data)
+                    else:
+                        if request.get('confirmed') is not True and not session['confirmed']:
+                            raise backend.Failure('confirmation_required', 'Confirm the selected disk definition for writing.')
+                        with path.open('rb') as stream:
+                            data = stream.read(size + 1)
+                        if len(data) > size:
+                            raise backend.Failure('input_limit', 'System-track input exceeds the reserved region.')
+                        if len(data) < size and request.get('pad') is not True:
+                            raise backend.Failure('padding_required', 'Confirm E5 padding of the short system-track input.')
+                        if not session['owner']:
+                            owner = Ownership(session['source'], Path.home() / '.cpmimage' / 'ownership')
+                            if owner.current != session['identity'] or file_hash(owner.path) != session['sha']:
+                                owner.close()
+                                raise backend.Failure('source_changed', 'The source changed. Open it again.')
+                            session['owner'] = owner
+                        candidate = working.with_name('edit.raw')
+                        shutil.copyfile(working, candidate)
+                        try:
+                            with candidate.open('r+b') as stream:
+                                stream.seek(start)
+                                stream.write(data.ljust(size, b'\xe5'))
+                            if stop.is_set():
+                                raise backend.Failure('cancelled')
+                            if not session['dirty']:
+                                shutil.copyfile(working, baseline)
+                            os.replace(candidate, working)
+                        finally:
+                            if candidate.exists():
+                                candidate.unlink()
+                        session.update(dirty=True, confirmed=True)
+                result = dict(dirty=session['dirty'])
+                if op == 'discard' and 'checked' in locals():
+                    result['entries'] = checked['result']['entries']
+                reply = dict(v=1, id=rid, ok=True, result=result)
+            elif op in ('save_plan', 'save'):
+                if not session or request.get('session') != session['token']:
+                    raise backend.Failure('stale_session', 'Open the image again.')
+                source = session['source']
+                destination = Path(request.get('destination') or source).absolute().resolve()
+                same = source.resolve() == destination
+                if not same and destination.exists() and os.path.samefile(source, destination):
+                    raise backend.Failure('invalid_destination', 'Save As requires a separate file, not an alias of the source.')
+                expected = file_hash(destination)
+                recovery = recovery_directory(destination)
+                if recovery.exists():
+                    raise backend.Failure('recovery_required', f'Review the interrupted save in {recovery}.')
+                if same and (identity(destination.stat()) != session['identity'] or expected != session['sha']):
+                    raise backend.Failure('source_changed', 'The source changed. Open it again or use Save As.')
+                output_container = request.get('container') or session['original_container']
+                if output_container not in ('raw', 'dsk') or (same and output_container != session['original_container']):
+                    raise backend.Failure('unsupported_container', 'Choose a supported container using Save As.')
+                sidecar = None
+                if request.get('sidecar', True):
+                    definition = session['definitions']
+                    if not definition:
+                        raise backend.Failure('unsupported_backend', 'This format has no standalone definition.')
+                    target = catalogue.sidecar(destination) or destination.with_suffix('.FDF')
+                    if target == destination:
+                        raise backend.Failure('invalid_destination', 'Choose an image filename distinct from its FDF.')
+                    previous = file_hash(target)
+                    digest = hashlib.sha256(definition.encode('utf-8')).hexdigest()
+                    if digest != previous:
+                        sidecar = (target, previous)
+                plan = dict(destination=str(destination), expected=expected, container=output_container,
+                            sidecar_changed=sidecar is not None,
+                            sidecar_path=str(sidecar[0]) if sidecar else None,
+                            sidecar_expected=sidecar[1] if sidecar else None,
+                            backups=request.get('backups', True))
+                if op == 'save':
+                    if request.get('plan') != plan:
+                        raise backend.Failure('save_plan_changed', 'Review the save again before publishing.')
+                    if not same and expected is not None and request.get('replace') is not True:
+                        raise backend.Failure('destination_exists', 'Confirm replacement of the existing image.')
+                    if sidecar and request.get('confirm_sidecar') is not True:
+                        raise backend.Failure('confirmation_required', 'Confirm publication of the selected definition.')
+                    owner = session['owner'] if same else None
+                    acquired = owner is None
+                    if acquired:
+                        owner = Ownership(source if same else destination, Path.home() / '.cpmimage' / 'ownership')
+                    try:
+                        if same and owner.current != session['identity']:
+                            raise backend.Failure('source_changed', 'The source identity changed.')
+                        with tempfile.TemporaryDirectory(prefix='cpmimage-save-') as temp:
+                            staged = None
+                            if sidecar:
+                                staged = Path(temp) / 'definition'
+                                staged.write_bytes(definition.encode('utf-8'))
+                            if stop.is_set():
+                                raise backend.Failure('cancelled')
+                            output = session['image'] if not same or session['dirty'] else None
+                            if output is not None:
+                                checked = adapter().request({
+                                    'v': 1, 'id': rid, 'op': 'list', 'image': str(output),
+                                    'format': session['format'], 'container': 'raw'}, defs_override=session['definitions'])
+                                if not checked['ok']:
+                                    raise backend.Failure(checked['error'], checked.get('message', ''))
+                            if output is not None and output_container == 'dsk':
+                                folder = Path(temp)
+                                encoded = folder / 'output.dsk'
+                                decoded = folder / 'verified.raw'
+                                adapter().native(folder, 'encode', output, encoded)
+                                check_standard_dsk(encoded.read_bytes(), session['geometry'], backend)
+                                adapter().native(folder, 'decode', encoded, decoded)
+                                if file_hash(decoded) != file_hash(output):
+                                    raise backend.Failure('image_incompatible', 'Encoded DSK failed its byte-for-byte RAW round trip.')
+                                output = encoded
+                            if sidecar:
+                                with Ownership(sidecar[0], Path.home() / '.cpmimage' / 'ownership') as sidecar_owner:
+                                    sidecar_owner.check(replacing=True)
+                                    publish(owner, expected, output, (*sidecar, staged), request.get('backups', True))
+                            else:
+                                publish(owner, expected, output, backups=request.get('backups', True))
+                    except BaseException:
+                        if acquired:
+                            owner.close()
+                        raise
+                    if session['owner'] and session['owner'] is not owner:
+                        session['owner'].close()
+                    session.update(owner=owner, source=owner.path, identity=owner.current, sha=file_hash(owner.path), dirty=False, original_container=output_container)
+                    plan['source_sha256'] = session['sha']
+                reply = dict(v=1, id=rid, ok=True, result=plan)
             elif op == 'export':
                 if not session or request.get('session') != session['token']:
                     raise backend.Failure('stale_session', 'Open the image again.')
@@ -309,7 +536,8 @@ def main():
                 reply = adapter().request({
                     'v': 1, 'id': rid, 'op': 'export', 'image': str(session['image']),
                     'format': session['format'], 'container': session['container'],
-                    'name': request['name'], 'destination': request['destination']}, defs_override=session['definitions'])
+                    'name': request['name'], 'destination': request['destination'],
+                    'text': request.get('text', False)}, defs_override=session['definitions'])
             else:
                 raise backend.Failure('read_only', 'Only read-only operations are available.')
             respond(reply)
@@ -359,6 +587,8 @@ def main():
         stop.set()
         if worker:
             worker.join()
+        if session and session['owner']:
+            session['owner'].close()
         if snapshot:
             snapshot.cleanup()
 

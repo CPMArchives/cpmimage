@@ -25,7 +25,7 @@ py=ROOT/'windows-runtime/offline-media/CPMImageTests/python'
 for name in ['python.exe','python3.dll','python313.dll','python313.zip','python313._pth','LICENSE.txt','_ctypes.pyd','libffi-8.dll','select.pyd','unicodedata.pyd']:
  shutil.copy2(py/name,runtime/name)
 for f in crt.glob('vcruntime*.dll'):shutil.copy2(f,runtime)
-for rel in ['prototype/broker.py','prototype/catalogue.py','prototype/helper_guard.py','experiments/process-comparison/adapters.py','experiments/process-comparison/windows_supervisor.py','fixtures/diskdefs','fixtures/diskdefs-metadata.json']:
+for rel in ['prototype/broker.py','prototype/catalogue.py','prototype/publication.py','prototype/source_ownership.py','prototype/helper_guard.py','experiments/process-comparison/adapters.py','experiments/process-comparison/windows_supervisor.py','fixtures/diskdefs','fixtures/diskdefs-metadata.json']:
  dst=out/'resources/cpmimage'/rel;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(ROOT/rel,dst)
 create(out/'notices','windows')
 with zipfile.ZipFile(BASE/'downloads/windows-package.zip','w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:

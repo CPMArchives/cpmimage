@@ -18,3 +18,6 @@ if 'CPMIMAGE_READ_ONLY_NAMES' not in (source/'cpmdir.h').read_text():
 
 if 'cpmImageReadDefinition' not in (source/'cpmfs.c').read_text():
  subprocess.run(['patch','-p1','-i',str(patch.parent/'cpmtools-2.23-diskdefs.patch')],cwd=source,check=True)
+
+if 'Cannot write RAW sector' not in (source/'device_libdsk.c').read_text():
+ subprocess.run(['patch','-p1','-i',str(patch.parent/'cpmtools-2.23-writable-raw.patch')],cwd=source,check=True)

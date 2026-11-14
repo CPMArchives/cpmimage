@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/stat.h>
 #include "cpmfs.h"
 const char cmd[]="cpmimage_helper";
 static void quoted(const char *s) {
@@ -67,7 +68,88 @@ static int decode(const char *image, const char *destination)
   puts("{\"v\":1,\"ok\":true}");
   return 0;
 }
+static int encode(const char *image, const char *destination)
+{
+  FILE *input=fopen(image,"rb");
+  if (!input) return fail("open","Cannot read staged RAW image");
+  DSK_GEOMETRY geometry;
+  DSK_PDRIVER disk=NULL;
+  dsk_err_t error=dg_stdformat(&geometry,FMT_AMPRO200,NULL,NULL);
+  if (!error) error=dsk_creat(&disk,destination,"dsk",NULL);
+  unsigned char bytes[512];
+  int bad=0;
+  for (unsigned track=0;track<40 && !error && !bad;++track)
+  {
+    DSK_FORMAT sectors[10];
+    for (unsigned sector=0;sector<10;++sector)
+      sectors[sector]=(DSK_FORMAT){track,0,sector+1,512};
+    error=dsk_pformat(disk,&geometry,track,0,sectors,0xe5);
+    for (unsigned sector=0;sector<10 && !error;++sector)
+    {
+      if (fread(bytes,1,sizeof bytes,input)!=sizeof bytes) { bad=1; break; }
+      error=dsk_pwrite(disk,&geometry,bytes,track,0,sector+1);
+    }
+  }
+  if (!bad && (fgetc(input)!=EOF || ferror(input))) bad=1;
+  fclose(input);
+  if (disk)
+  {
+    dsk_err_t closed=dsk_close(&disk);
+    if (!error) error=closed;
+  }
+  if (error || bad) return fail("image_incompatible",error?dsk_strerror(error):"RAW size differs from standard DSK geometry");
+  puts("{\"v\":1,\"ok\":true}");
+  return 0;
+}
+
 #endif
+static int edit(struct cpmSuperBlock *sb, struct cpmInode *root, const char *op,
+                const char *name, const char *argument)
+{
+  struct cpmInode ino;
+  int result=-1;
+  if (!strcmp(op,"edit_rename")) result=cpmRename(root,name,argument);
+  else if (!strcmp(op,"edit_delete")) result=cpmUnlink(root,name);
+  else if (!strcmp(op,"edit_attrs"))
+  {
+    if (cpmNamei(root,name,&ino)==0)
+    {
+      cpm_attr_t attributes;
+      if (cpmAttrGet(&ino,&attributes)==0)
+        result=cpmAttrSet(&ino,(attributes & ~0x700) | (atoi(argument) & 0x700));
+    }
+  }
+  else if (!strcmp(op,"edit_import"))
+  {
+    FILE *input=fopen(argument,"rb");
+    if (!input) { cpmUmount(sb); return fail("import","Cannot open staged input"); }
+    struct cpmFile file;
+    if (cpmCreat(root,name,&ino,0666)==0 && cpmOpen(&ino,&file,O_WRONLY)==0)
+    {
+      unsigned char bytes[4096];
+      size_t count;
+      result=0;
+      while ((count=fread(bytes,1,sizeof bytes,input))>0)
+        if (cpmWrite(&file,(const char *)bytes,count)!=(ssize_t)count) { result=-1; break; }
+      if (ferror(input) || cpmClose(&file)<0) result=-1;
+    }
+    if (result==0)
+    {
+      struct stat info;
+      if (stat(argument,&info)==0)
+      {
+        struct utimbuf times;
+        times.actime=info.st_atime;
+        times.modtime=info.st_mtime;
+        cpmUtime(&ino,&times);
+      }
+    }
+    fclose(input);
+  }
+  if (cpmUmount(sb)<0 || result<0) return fail("edit_failed",boo);
+  puts("{\"v\":1,\"ok\":true}");
+  return 0;
+}
 int main(int argc,char **argv) {
   struct cpmSuperBlock sb={0};struct cpmInode root,ino; const char *err;
 #ifdef CPMIMAGE_READ_ONLY
@@ -83,25 +165,28 @@ int main(int argc,char **argv) {
     puts("]}");
     return 0;
   }
+  if (argc==4 && !strcmp(argv[1],"encode")) return encode(argv[2],argv[3]);
   if (argc==4 && !strcmp(argv[1],"decode")) return decode(argv[2],argv[3]);
 #endif
   if(argc<5) return fail("arguments","expected operation, image, format, container");
   const char *op=argv[1];int rename=!strcmp(op,"rename");
+  int editing=!strncmp(op,"edit_",5) && argc==7 && !strcmp(argv[4],"raw");
 #ifdef CPMIMAGE_READ_ONLY
   if(rename) return fail("read_only","this helper supports listing and export only");
 #endif
-  if(strcmp(op,"list") && strcmp(op,"export") && !rename) return fail("operation","unsupported operation");
+  if(strcmp(op,"list") && strcmp(op,"export") && !rename && !editing) return fail("operation","unsupported operation");
   if((!strcmp(op,"list") && argc!=5) || ((!strcmp(op,"export")||rename) && argc!=7)) return fail("arguments","wrong argument count");
   const char *device=argv[4];
 #ifdef CPMIMAGE_READ_ONLY
   if (!strcmp(device,"raw")) device="cpmimage-raw";
 #endif
-  if((err=Device_open(&sb.dev,argv[2],rename?O_RDWR:O_RDONLY,device))) return fail("open",err);
+  if((err=Device_open(&sb.dev,argv[2],(rename||editing)?O_RDWR:O_RDONLY,device))) return fail("open",err);
   if(cpmReadSuper(&sb,&root,argv[3],0)<0)
   {
     Device_close(&sb.dev);
     return fail(boo && !strncmp(boo,"Missing ",8) ? "image_truncated" : "image_incompatible",boo);
   }
+  if(editing) return edit(&sb,&root,op,argv[5],argv[6]);
   if(!strcmp(op,"list")) {
     struct cpmFile dir;struct cpmDirent ent; struct cpmStatFS stats;
     struct {char name[16];long long size,atime,mtime,ctime;int attr;} entries[4096];int count=0,n;

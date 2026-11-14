@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include <QMainWindow>
+#include <functional>
 #include "filename_policy.h"
 #include "export_plan.h"
 #include <QJsonObject>
@@ -51,6 +52,13 @@ private:
     void updateSelectionStatus();
     void updateUserAreas();
     void chooseImage();
+    void chooseSave(bool saveAs);
+    void chooseEdit(const QString &action);
+    bool confirmWrite();
+    bool dirty = false, writeConfirmed = false;
+    bool resolveEdits(std::function<void()> next);
+    std::function<void()> afterSave;
+    QJsonObject pendingSave;
     void chooseExport();
     void editFilenameSettings();
     void chooseBatch(bool wholeArea);

@@ -71,6 +71,25 @@ class CatalogueCheck(unittest.TestCase):
         exported = self.request('export', session=opened['result']['session'], name='00BINARY.BIN', destination=str(output))
         self.assertTrue(exported['ok'], exported)
 
+    def test_save_as_publishes_standalone_sidecar(self):
+        original = self.image.read_bytes()
+        opened = self.request('open', image=str(self.image), format='ibm-3740', container='raw')
+        self.assertTrue(opened['ok'], opened)
+        destination = self.directory / 'copy.raw'
+        options = dict(session=opened['result']['session'], destination=str(destination))
+        planned = self.request('save_plan', **options)
+        self.assertTrue(planned['ok'], planned)
+        declined = self.request('save', plan=planned['result'], **options)
+        self.assertEqual(declined['error'], 'confirmation_required')
+        self.assertFalse(destination.exists())
+        saved = self.request('save', plan=planned['result'], confirm_sidecar=True, **options)
+        self.assertTrue(saved['ok'], saved)
+        self.assertEqual(destination.read_bytes(), original)
+        self.assertEqual(self.image.read_bytes(), original)
+        self.assertTrue(destination.with_suffix('.FDF').read_text().startswith('diskdef ibm-3740'))
+        reopened = self.request('inspect', image=str(destination))
+        self.assertEqual(reopened['result']['sidecar']['id'], 'ibm-3740')
+
     def test_candidate_ranking_uses_directory_evidence(self):
         selected = self.request('catalogue')
         self.assertTrue(selected['ok'], selected)
