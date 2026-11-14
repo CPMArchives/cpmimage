@@ -68,6 +68,7 @@ def main():
     sys.path.insert(0, str(args.root / 'experiments/process-comparison'))
     sys.path.insert(0, str(args.root / 'prototype'))
     import catalogue
+    from container_mapping import MappingError, PhysicalMapping, inspect_imd, transfer_dmk
     from publication import fingerprint as file_hash, publish, recovery_directory, require_recovery_clear
     from source_ownership import Ownership, identity
     import adapters as backend
@@ -157,6 +158,45 @@ def main():
             raise backend.Failure('invalid_sidecar', f'{path.name if path else source.name}: {error}') from error
         return fmt, definition, geometry
 
+    structured = ('imd', 'jv3', 'dmk')
+
+    def image_container(source, data):
+        if data.startswith(DSK_MAGIC):
+            return 'dsk'
+        if data.startswith(b'IMD '):
+            return 'imd'
+        extension = source.suffix.lower().lstrip('.')
+        return extension if extension in structured else 'raw'
+
+    def mapped_image(container, source, data, geometry, directory, raw, writing=False):
+        profile = source.with_name(source.name + '.mapping.json')
+        try:
+            mapping = PhysicalMapping.from_profile(json.loads(catalogue.read_text(profile)), geometry)
+            if container == 'dmk':
+                if writing:
+                    raise MappingError('Use a verified DMK template; RAW-to-DMK creation is unavailable.')
+                raw.write_bytes(transfer_dmk(data, mapping))
+                return mapping
+            if not writing and container == 'imd':
+                inventory, _ = inspect_imd(data)
+                mapping.verify_inventory(inventory)
+            transfer(container, mapping, directory, raw, data, writing)
+            return mapping
+        except (MappingError, OSError, ValueError) as error:
+            raise backend.Failure('physical_mapping', f'{profile.name}: {error}') from error
+
+    def transfer(container, mapping, directory, raw, data, writing):
+        map_path = directory / 'disk.map'
+        map_path.write_text(''.join(
+            ' '.join(map(str, (t.cylinder, t.head, t.mode, t.size, len(t.sectors), *t.sectors))) + '\n'
+            for t in mapping.tracks), encoding='ascii')
+        encoded = directory / ('image.' + container)
+        if not writing:
+            encoded.write_bytes(data)
+        adapter().native(directory, 'mapped-write' if writing else 'mapped-read',
+                         container, map_path, raw, encoded)
+        return encoded
+
     def perform(request):
         nonlocal snapshot, session, definitions
         rid = request['id']
@@ -176,7 +216,7 @@ def main():
             elif op == 'inspect':
                 source = Path(request['image']).absolute()
                 data = read_image(source)
-                container = 'dsk' if data.startswith(DSK_MAGIC) else 'raw'
+                container = image_container(source, data)
                 if data.startswith(b'EXTENDED CPC DSK File'):
                     raise backend.Failure('unsupported_container', 'Extended CPCEMU DSK is outside the supported container scope.')
                 fingerprint = hashlib.sha256(data).hexdigest()
@@ -197,7 +237,7 @@ def main():
                     candidates = []
                     raw = directory / 'candidate.raw'
                     ranked = []
-                    choices = () if selected or request.get('explicit_format') else sorted(definitions.items())
+                    choices = () if selected or request.get('explicit_format') or container in structured else sorted(definitions.items())
                     for fmt, definition in choices:
                         if stop.is_set():
                             raise backend.Failure('cancelled')
@@ -268,14 +308,18 @@ def main():
                     geometry = describe(fmt, definition, directory)
                 if request.get('definition_sha256', catalogue.digest(definition)) != catalogue.digest(definition):
                     raise backend.Failure('definition_changed', 'The disk definition changed. Select it again.')
-                if container not in ('raw', 'dsk'):
+                if container not in ('raw', 'dsk', *structured):
                     raise backend.Failure('unsupported_container', 'Select RAW or standard CPCEMU DSK.')
                 if data.startswith(b'EXTENDED CPC DSK File'):
                     raise backend.Failure('unsupported_container', 'Extended CPCEMU DSK is outside the supported container scope.')
                 if data.startswith(DSK_MAGIC) != (container == 'dsk'):
                     raise backend.Failure('container_mismatch', 'The image header does not match the selected container.')
                 image = directory / 'image.raw'
-                if container == 'dsk':
+                mapping = None
+                if container in structured:
+                    mapping = mapped_image(container, source, data, geometry, directory, image)
+                    end = image.stat().st_size
+                elif container == 'dsk':
                     check_standard_dsk(data, geometry, backend)
                     encoded = directory / 'source.dsk'
                     encoded.write_bytes(data)
@@ -306,7 +350,8 @@ def main():
                 session = dict(token=token, source=source, image=image, sha=fingerprint,
                                format=fmt, container='raw', definitions=definition,
                                original_container=container, owner=None, identity=source_identity,
-                               geometry=geometry, dirty=False, confirmed=False)
+                               geometry=geometry, dirty=False, confirmed=False, mapping=mapping,
+                               template=data if container == 'dmk' else None)
                 reply['result'].update(session=token, source_sha256=fingerprint, unused_tail_filled=trimmed,
                                        definition_sha256=catalogue.digest(definition))
             elif op == 'edit':
@@ -456,7 +501,7 @@ def main():
                 if same and (identity(destination.stat()) != session['identity'] or expected != session['sha']):
                     raise backend.Failure('source_changed', 'The source changed. Open it again or use Save As.')
                 output_container = request.get('container') or session['original_container']
-                if output_container not in ('raw', 'dsk') or (same and output_container != session['original_container']):
+                if output_container not in ('raw', 'dsk', *structured) or (same and output_container != session['original_container']):
                     raise backend.Failure('unsupported_container', 'Choose a supported container using Save As.')
                 sidecar = None
                 if request.get('sidecar', True):
@@ -513,6 +558,34 @@ def main():
                                 adapter().native(folder, 'decode', encoded, decoded)
                                 if file_hash(decoded) != file_hash(output):
                                     raise backend.Failure('image_incompatible', 'Encoded DSK failed its byte-for-byte RAW round trip.')
+                                output = encoded
+                            if output is not None and output_container in structured:
+                                folder = Path(temp)
+                                try:
+                                    profile = destination.with_name(destination.name + '.mapping.json')
+                                    mapping = PhysicalMapping.from_profile(
+                                        json.loads(catalogue.read_text(profile)), session['geometry'])
+                                    if session['mapping'] is not None and mapping != session['mapping']:
+                                        raise MappingError('Destination profile differs from the source RAW slot mapping.')
+                                    if output_container == 'dmk':
+                                        if session['template'] is None:
+                                            raise MappingError('DMK output requires a verified source template.')
+                                        encoded = folder / 'image.dmk'
+                                        encoded.write_bytes(transfer_dmk(session['template'], mapping, output.read_bytes()))
+                                    else:
+                                        encoded = transfer(output_container, mapping, folder, output, None, True)
+                                except (MappingError, OSError, ValueError) as error:
+                                    raise backend.Failure('physical_mapping', str(error)) from error
+                                verified = folder / 'verified.raw'
+                                encoded_bytes = encoded.read_bytes()
+                                if output_container == 'dmk':
+                                    verified.write_bytes(transfer_dmk(encoded_bytes, mapping))
+                                else:
+                                    if output_container == 'imd':
+                                        mapping.verify_inventory(inspect_imd(encoded_bytes)[0])
+                                    transfer(output_container, mapping, folder, verified, encoded_bytes, False)
+                                if file_hash(verified) != file_hash(output):
+                                    raise backend.Failure('image_incompatible', 'Container failed its RAW round trip.')
                                 output = encoded
                             if sidecar:
                                 with Ownership(sidecar[0], Path.home() / '.cpmimage' / 'ownership') as sidecar_owner:

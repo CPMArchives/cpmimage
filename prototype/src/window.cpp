@@ -511,13 +511,20 @@ void Window::chooseSave(bool saveAs) {
     QString destination, selectedFilter;
     if (saveAs) {
         destination = QFileDialog::getSaveFileName(this, "Save CP/M image as", image,
-            "RAW disk images (*.raw *.img);;Standard CPCEMU DSK (*.dsk)", &selectedFilter, QFileDialog::DontConfirmOverwrite);
+            "RAW disk images (*.raw *.img);;Standard CPCEMU DSK (*.dsk);;ImageDisk (*.imd);;JV3 (*.jv3);;DMK (*.dmk)", &selectedFilter, QFileDialog::DontConfirmOverwrite);
         if (destination.isEmpty()) return;
     }
     pendingSave = {{"op","save_plan"}, {"session",session}, {"destination",destination},
                    {"backups",settings->value("saveBackups",true).toBool()},
                    {"sidecar",settings->value("saveSidecar",true).toBool()}};
-    if (saveAs) pendingSave["container"] = selectedFilter.startsWith("Standard") ? "dsk" : "raw";
+    if (saveAs) {
+        QString type = "raw";
+        if (selectedFilter.startsWith("Standard")) type = "dsk";
+        else if (selectedFilter.startsWith("ImageDisk")) type = "imd";
+        else if (selectedFilter.startsWith("JV3")) type = "jv3";
+        else if (selectedFilter.startsWith("DMK")) type = "dmk";
+        pendingSave["container"] = type;
+    }
     begin(pendingSave);
 }
 bool Window::resolveEdits(std::function<void()> next) {
@@ -536,7 +543,7 @@ bool Window::resolveEdits(std::function<void()> next) {
 void Window::chooseImage() {
     if (!resolveEdits([this] { chooseImage(); })) return;
     const QString path = QFileDialog::getOpenFileName(this, "Open CP/M image", image.isEmpty() ? QDir::homePath() : image,
-        "Disk images (*.raw *.img *.dsk);;All files (*)");
+        "Disk images (*.raw *.img *.dsk *.imd *.jv3 *.dmk);;All files (*)");
     if (path.isEmpty()) return;
     inspectImage(path);
 }
