@@ -3,6 +3,9 @@
 #include "window.h"
 #include "runtime_paths.h"
 #include <QTabWidget>
+#include <QTabBar>
+#include <QColor>
+#include <QToolButton>
 #include <QMenuBar>
 #include <QMenu>
 #include <QCloseEvent>
@@ -19,21 +22,49 @@ public:
         setAcceptDrops(true);
         tabs->setTabsClosable(true);
         tabs->setMovable(true);
-        auto *workspace = new QMenu("Tabs", this);
-        auto *create = workspace->addAction("New Tab");
+#ifdef Q_OS_MACOS
+        auto palette = tabs->tabBar()->palette();
+        const auto base = palette.color(QPalette::Button);
+        const auto ink = palette.color(QPalette::ButtonText);
+        const QColor selected((base.red() * 4 + ink.red()) / 5,
+                              (base.green() * 4 + ink.green()) / 5,
+                              (base.blue() * 4 + ink.blue()) / 5);
+        palette.setColor(QPalette::Highlight, selected);
+        palette.setColor(QPalette::HighlightedText, ink);
+        tabs->tabBar()->setPalette(palette);
+        tabs->tabBar()->setStyleSheet(
+            "QTabBar::tab { padding: 4px 9px; background: palette(button); color: palette(button-text); }"
+            "QTabBar::tab:selected { background: palette(highlight); color: palette(highlighted-text); }");
+#endif
+
+        newTabAction = new QAction("New Tab", this);
+        auto *create = newTabAction;
         create->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
         connect(create, &QAction::triggered, this, [this] { addSession(); });
-        auto *closeTab = workspace->addAction("Close Tab");
+        auto *newTab = new QToolButton(tabs);
+        newTab->setText("+");
+        auto newTabFont = newTab->font();
+        newTabFont.setPixelSize(22);
+        newTab->setFont(newTabFont);
+        newTab->setMinimumSize(30, 26);
+        newTab->setToolTip("New Tab");
+        newTab->setAccessibleName("New Tab");
+        newTab->setAutoRaise(true);
+        tabs->setCornerWidget(newTab, Qt::TopRightCorner);
+        connect(newTab, &QToolButton::clicked, create, &QAction::trigger);
+        closeTabAction = new QAction("Close Tab", this);
+        auto *closeTab = closeTabAction;
         closeTab->setShortcut(QKeySequence::Close);
         connect(closeTab, &QAction::triggered, this, [this] {
             if (auto *page = tabs->currentWidget()) page->close();
         });
-        workspaceMenu = workspace;
-        auto *recent = workspace->addMenu("Recent Images");
-        auto *pinned = workspace->addMenu("Pinned Images");
+        auto *recent = new QMenu("Recent Images", this);
+        auto *pinned = new QMenu("Pinned Images", this);
+        recentImages = recent;
+        pinnedImages = pinned;
         connect(recent, &QMenu::aboutToShow, this, [this, recent] { populateImages(recent, "recentImages"); });
         connect(pinned, &QMenu::aboutToShow, this, [this, pinned] { populateImages(pinned, "pinnedImages"); });
-        pinAction = workspace->addAction("Pin Current Image");
+        pinAction = new QAction("Pin Current Image", this);
         connect(pinAction, &QAction::triggered, this, [this] {
             const auto path = tabs->currentWidget()->property("imagePath").toString();
             auto paths = settings.value("pinnedImages").toStringList();
@@ -61,6 +92,7 @@ public:
         auto *page = new Window(runtime.root, runtime.python, runtime.helper, 30000, 2000, runtime.notices);
         page->menuBar()->setNativeMenuBar(false);
         page->menuBar()->hide();
+        page->findChild<QWidget *>("imageName")->hide();
         tabs->setCurrentIndex(tabs->addTab(page, "Untitled"));
         connect(page, &QWidget::windowTitleChanged, this, [this, page](const QString &title) {
             tabs->setTabText(tabs->indexOf(page), title.section(" — ", 1));
@@ -127,14 +159,35 @@ private:
 
     void updateMenus() {
         for (auto *action : menuBar()->actions()) menuBar()->removeAction(action);
-        if (auto *page = qobject_cast<Window *>(tabs->currentWidget()))
-            for (auto *action : page->menuBar()->actions()) menuBar()->addAction(action);
-        menuBar()->addMenu(workspaceMenu);
+        if (auto *page = qobject_cast<Window *>(tabs->currentWidget())) {
+            const auto actions = page->menuBar()->actions();
+            for (const auto &title : {"File", "Edit", "View", "Settings", "Help"}) {
+                for (auto *action : actions) {
+                    auto *menu = action->menu();
+                    if (!menu || menu->title() != QLatin1String(title)) continue;
+                    if (QLatin1String(title) == "File" && !menu->actions().contains(pinAction)) {
+                        menu->addMenu(recentImages);
+                        menu->addMenu(pinnedImages);
+                        menu->addAction(pinAction);
+                    }
+                    if (QLatin1String(title) == "View" && !menu->actions().contains(newTabAction)) {
+                        if (!menu->actions().isEmpty()) menu->addSeparator();
+                        menu->addAction(newTabAction);
+                        menu->addAction(closeTabAction);
+                    }
+                    menuBar()->addAction(action);
+                    break;
+                }
+            }
+        }
         updatePin();
     }
     RuntimePaths runtime;
     QTabWidget *tabs = new QTabWidget;
-    QMenu *workspaceMenu = nullptr;
+    QAction *newTabAction = nullptr;
+    QAction *closeTabAction = nullptr;
+    QMenu *recentImages = nullptr;
+    QMenu *pinnedImages = nullptr;
     QAction *pinAction = nullptr;
     QSettings settings{"CPMArchives", "cpmimage"};
 };

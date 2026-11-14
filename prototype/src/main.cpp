@@ -20,7 +20,11 @@
 int main(int argc, char **argv) {
     if (const auto status = dispatchUtility(argc, argv)) return *status;
     QApplication app(argc, argv);
+#ifdef Q_OS_MACOS
+    QApplication::setWindowIcon(QIcon(":/icons/cpmimage-macos.png"));
+#else
     QApplication::setWindowIcon(QIcon(":/icons/cpmimage.png"));
+#endif
     QApplication::setApplicationName("cpmimage Review");
     QCommandLineParser parser;
     parser.setApplicationDescription("Browse and edit CP/M disk images");

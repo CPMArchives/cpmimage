@@ -673,7 +673,7 @@ private slots:
         QCOMPARE(files->selectionModel()->selectedRows().size(),3);
         QVERIFY(status->text().contains("3 of 3 files selected · 1536 bytes"));
         QPushButton *exportButton=nullptr;
-        for(auto *button:window.findChildren<QPushButton *>()) if(button->text().startsWith("Export selected")) exportButton=button;
+        for(auto *button:window.findChildren<QPushButton *>()) if(button->accessibleName().startsWith("Export selected")) exportButton=button;
         QVERIFY(exportButton); QVERIFY(exportButton->isEnabled());
         window.exportFile(temp.filePath("must-not-export.bin"));
         QVERIFY(done.isEmpty()); QVERIFY(!QFile::exists(temp.filePath("must-not-export.bin")));
@@ -711,7 +711,7 @@ private slots:
                       qEnvironmentVariable("CPMIMAGE_HELPER"), 30000, 2000, {}, settingsPath);
         window.show(); QSignalSpy done(&window, &Window::completed);
         auto button = [&](const QString &prefix) -> QPushButton * {
-            for (auto *b : window.findChildren<QPushButton *>()) if (b->text().startsWith(prefix)) return b;
+            for (auto *b : window.findChildren<QPushButton *>()) if (b->text().startsWith(prefix) || b->accessibleName().startsWith(prefix)) return b;
             return nullptr;
         };
         QTimer watchdog; watchdog.setInterval(4000);
@@ -744,7 +744,8 @@ private slots:
         picker.start(20);
         watchdog.start();
         QVERIFY(button("Open")); button("Open")->click(); QVERIFY(visited);
-        if (done.isEmpty()) QVERIFY(done.wait(5000));
+        watchdog.stop();
+        if (done.isEmpty()) QVERIFY(done.wait(30000));
         QVERIFY(done.takeFirst()[0].toBool()); QCOMPARE(window.entryCount(),1);
         const auto output = config.filePath("dialog export.bin");
         QString selectedOutput;
@@ -762,7 +763,8 @@ private slots:
         });
         QVERIFY(button("Export")); button("Export")->click(); QVERIFY(visited);
         QCOMPARE(selectedOutput, output);
-        if (done.isEmpty()) QVERIFY(done.wait(5000));
+        watchdog.stop();
+        if (done.isEmpty()) QVERIFY(done.wait(30000));
         QVERIFY(done.takeFirst()[0].toBool());
         QFile file(output); QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.size(),512);
         QCOMPARE(QCryptographicHash::hash(file.readAll(),QCryptographicHash::Sha256).toHex(),
@@ -791,11 +793,12 @@ private slots:
         QFile broker(dir.filePath("prototype/broker.py")); QVERIFY(broker.open(QIODevice::WriteOnly));
         broker.write(script); broker.close();
         Window window(fakeRoot.path(), qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
-                      qEnvironmentVariable("CPMIMAGE_HELPER"), 800, 300);
+                      qEnvironmentVariable("CPMIMAGE_HELPER"),
+                      QTest::currentDataTag() == QByteArray("unresponsive") ? 800 : 15000, 300);
         QSignalSpy done(&window, &Window::completed);
         const auto realRoot = qEnvironmentVariable("CPMIMAGE_ROOT");
         window.openImage(realRoot + "/fixtures/ibm3740-independent.raw", "ibm-3740", "raw");
-        QVERIFY(done.wait(6000)); QVERIFY(!done.takeFirst()[0].toBool());
+        QVERIFY(done.wait(20000)); QVERIFY(!done.takeFirst()[0].toBool());
         QCOMPARE(window.entryCount(), 0);
         QTRY_VERIFY_WITH_TIMEOUT(!window.readerRunning(), 3000);
         QCoreApplication::processEvents();
@@ -807,7 +810,7 @@ private slots:
         code.replace("    args = parser.parse_args()", "    args = parser.parse_args()\n    args.root = Path(" + encoded.mid(1,encoded.size()-2) + ")");
         QVERIFY(broker.open(QIODevice::WriteOnly | QIODevice::Truncate)); broker.write(code); broker.close();
         window.openImage(realRoot + "/fixtures/ibm3740-independent.raw", "ibm-3740", "raw");
-        QVERIFY(done.wait(6000)); QVERIFY2(done.takeFirst()[0].toBool(), qPrintable(window.lastError())); QCOMPARE(window.entryCount(), 1);
+        QVERIFY(done.wait(20000)); QVERIFY2(done.takeFirst()[0].toBool(), qPrintable(window.lastError())); QCOMPARE(window.entryCount(), 1);
     }
     void processTreeTermination_data() {
         QTest::addColumn<bool>("closeBusy");

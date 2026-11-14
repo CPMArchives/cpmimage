@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from pathlib import Path
-import os,shutil,subprocess,plistlib,re
+import os,shutil,subprocess,plistlib,re,tempfile
 from notices import BASE,ROOT,create
 from utility_bundle import install_utilities
 app=BASE/'dist/CPMImage-macOS-arm64/CPMImage.app'
@@ -8,7 +8,9 @@ if app.exists():shutil.rmtree(app)
 shutil.copytree(BASE/'app-macos/cpmimage-review.app',app,symlinks=True)
 info=app/'Contents/Info.plist'
 with info.open('rb') as stream: metadata=plistlib.load(stream)
-metadata.update(CFBundleIdentifier='org.cpmarchives.cpmimage.packagereview',CFBundleName='CPMImage Review',LSMinimumSystemVersion='14.4')
+old_executable = app/'Contents/MacOS'/metadata['CFBundleExecutable']
+old_executable.rename(old_executable.with_name('cpmimage'))
+metadata.update(CFBundleExecutable='cpmimage', CFBundleIdentifier='org.cpmarchives.cpmimage.packagereview',CFBundleName='CPMImage Review',LSMinimumSystemVersion='14.4')
 with info.open('wb') as stream: plistlib.dump(metadata,stream)
 resources=app/'Contents/Resources';resources.mkdir(exist_ok=True)
 backend=resources/'cpmimage'
@@ -54,4 +56,11 @@ for f in sorted(app.rglob('*'),key=lambda p:len(p.parts),reverse=True):
   subprocess.run(['codesign','--force','--sign','-',str(f)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 subprocess.run(['codesign','--force','--deep','--sign','-',str(app)],check=True)
 subprocess.run(['codesign','--verify','--deep','--strict',str(app)],check=True)
-print(app)
+with tempfile.TemporaryDirectory(prefix='cpmimage-dmg-') as temp:
+ staging = Path(temp)
+ shutil.copytree(app, staging/app.name, symlinks=True)
+ (staging/'Applications').symlink_to('/Applications')
+ dmg = app.parent.parent/'CPMImage-macOS-arm64.dmg'
+ subprocess.run(['hdiutil','create','-ov','-format','UDZO','-volname','CPMImage',
+                 '-srcfolder',str(staging),str(dmg)],check=True)
+print(dmg)

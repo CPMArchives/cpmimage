@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from pathlib import Path
-import os,shutil,subprocess
+import os,platform,shutil,subprocess
 from notices import BASE,ROOT,create
 from utility_bundle import install_utilities
-out=BASE/'dist/CPMImage-linux-arm64'
+architecture = {'aarch64': 'arm64', 'x86_64': 'x86-64'}.get(platform.machine())
+if architecture is None:
+ raise SystemExit('Unsupported package build architecture: ' + platform.machine())
+out=BASE/'dist'/f'CPMImage-linux-{architecture}'
 if out.exists():shutil.rmtree(out)
 for sub in ['bin','lib','libexec','share/cpmimage','plugins']: (out/sub).mkdir(parents=True,exist_ok=True)
 shutil.copy2(BASE/'app-linux/cpmimage-review',out/'bin/cpmimage')
