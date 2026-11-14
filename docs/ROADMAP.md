@@ -1,6 +1,6 @@
 # CP/M Image — Development Roadmap
 
-**Status:** Approved development sequence, reconciled with Engineering Specification 0.9  
+**Status:** Approved development sequence, reconciled with Engineering Specification 1.0  
 **Project:** CPMArchives/cpmimage  
 **Target release:** 1.0  
 **Date:** November 14, 2026
@@ -59,8 +59,9 @@ The current five-format restriction is an implementation limitation, **not** a p
 - Support independent export, import, and replacement of reserved system-track bytes on existing images. Use the selected disk definition to locate the region, protect filesystem data, validate size, and define short-input padding. The user, not CP/M Image, determines whether supplied system software is bootable or appropriate.
 - Generate or update an image-specific, standalone cpmtools-compatible `.FDF` on explicit Save or Save As by default, including an otherwise unmodified image; never create it merely on open, detection, or format selection. Provide a preference to disable automatic creation.
 - Detect conflicting existing sidecars and define safe image-plus-sidecar publication/recovery behavior.
+- Treat `.FDF` as a record of the user-selected interpretation, not proof of the underlying disk format or a filesystem conversion. Implement a Confirm Disk Definition warning on first sidecar creation and when replacing a sidecar with a different definition; allow persistent suppression of routine warnings, but never suppress detected integrity warnings. Cancel must abort Save without publication.
 
-**Acceptance:** Edited images reopen correctly; unrelated contents and source images remain protected on failure; system-track bytes round-trip accurately; generated `.FDF` files can be parsed by independent unmodified cpmtools.
+**Acceptance:** Edited images reopen correctly; unrelated contents and source images remain protected on failure; system-track bytes round-trip accurately; generated `.FDF` files can be parsed by independent unmodified cpmtools; first-save/changed-definition warnings, suppression preference, and cancellation behave as specified.
 
 ## v0.5 — Container interoperability
 
