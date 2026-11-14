@@ -184,3 +184,42 @@ def transfer_dmk(data, mapping, raw=None):
     if raw is not None and cursor != len(raw):
         raise MappingError('RAW payload is larger than the DMK mapping.')
     return bytes(output)
+
+
+def dmk_template(mapping):
+    """Build ordinary 250 kbps MFM tracks from an explicit physical mapping."""
+    from binascii import crc_hqx
+
+    cylinders = max(t.cylinder for t in mapping.tracks) + 1
+    heads = max(t.head for t in mapping.tracks) + 1
+    if cylinders > 255 or len(mapping.tracks) != cylinders * heads:
+        raise MappingError('DMK requires complete cylinder and head coverage.')
+    length = 0x1900
+    header = bytes((0, cylinders)) + length.to_bytes(2, 'little') + bytes((16 if heads == 1 else 0,)) + bytes(11)
+    output = bytearray(header)
+    for track in sorted(mapping.tracks, key=lambda row: (row.cylinder, row.head)):
+        if track.mode != 5 or len(track.sectors) > 64 or track.size not in (128, 256, 512, 1024):
+            raise MappingError('New DMK tracks require ordinary 250 kbps MFM geometry.')
+        body = bytearray(128)
+        body.extend(b'\x4e' * 80)
+        for index, sector in enumerate(track.sectors):
+            body.extend(b'\0' * 12 + b'\xa1' * 3)
+            body[index * 2:index * 2 + 2] = (0x8000 | len(body)).to_bytes(2, 'little')
+            ident = bytes((0xfe, track.cylinder, track.head, sector, track.size.bit_length() - 8))
+            body.extend(ident + crc_hqx(b'\xa1' * 3 + ident, 0xffff).to_bytes(2, 'big'))
+            body.extend(b'\x4e' * 22 + b'\0' * 12)
+            record = b'\xa1\xa1\xa1\xfb' + b'\xe5' * track.size
+            body.extend(record + crc_hqx(record, 0xffff).to_bytes(2, 'big') + b'\x4e' * 24)
+        if len(body) > length:
+            raise MappingError('Sector map exceeds the supported DMK track capacity.')
+        output.extend(body.ljust(length, b'\x4e'))
+    return bytes(output)
+
+
+def replace_imd_comment(data, comment):
+    if b'\0' in comment or b'\x1a' in comment or len(comment) > 60000:
+        raise MappingError('Invalid or oversized IMD comment.')
+    inspect_imd(data)
+    end = data.index(b'\x1a')
+    header = data[:end].split(b'\n', 1)[0].rstrip(b'\r')
+    return header + b'\r\n' + comment + data[end:]

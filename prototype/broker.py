@@ -68,7 +68,7 @@ def main():
     sys.path.insert(0, str(args.root / 'experiments/process-comparison'))
     sys.path.insert(0, str(args.root / 'prototype'))
     import catalogue
-    from container_mapping import MappingError, PhysicalMapping, inspect_imd, transfer_dmk
+    from container_mapping import MappingError, PhysicalMapping, inspect_imd, transfer_dmk, dmk_template, replace_imd_comment
     from publication import fingerprint as file_hash, publish, recovery_directory, require_recovery_clear
     from source_ownership import Ownership, identity
     import adapters as backend
@@ -351,9 +351,23 @@ def main():
                                format=fmt, container='raw', definitions=definition,
                                original_container=container, owner=None, identity=source_identity,
                                geometry=geometry, dirty=False, confirmed=False, mapping=mapping,
-                               template=data if container == 'dmk' else None)
+                               template=data if container == 'dmk' else None,
+                               comment=inspect_imd(data)[1] if container == 'imd' else b'')
                 reply['result'].update(session=token, source_sha256=fingerprint, unused_tail_filled=trimmed,
-                                       definition_sha256=catalogue.digest(definition))
+                                       definition_sha256=catalogue.digest(definition),
+                                       imd_comment=session['comment'].decode('utf-8', errors='replace'))
+            elif op == 'imd_comment':
+                if not session or request.get('session') != session['token'] or session['original_container'] != 'imd':
+                    raise backend.Failure('stale_session', 'Open an IMD image.')
+                comment = request['comment'].encode('utf-8')
+                if len(comment) > 60000 or b'\0' in comment or b'\x1a' in comment:
+                    raise backend.Failure('invalid_comment', 'Invalid or oversized IMD comment.')
+                if comment != session['comment']:
+                    if not session['dirty']:
+                        shutil.copyfile(session['image'], session['image'].with_name('saved.raw'))
+                    session.setdefault('saved_comment', session['comment'])
+                    session.update(comment=comment, dirty=True)
+                reply = dict(v=1, id=rid, ok=True, result=dict(dirty=session['dirty'], imd_comment=request['comment']))
             elif op == 'edit':
                 if not session or request.get('session') != session['token']:
                     raise backend.Failure('stale_session', 'Open the image again.')
@@ -435,7 +449,7 @@ def main():
                         if not checked['ok']:
                             raise backend.Failure(checked['error'], checked.get('message', ''))
                         os.replace(baseline, working)
-                    session.update(dirty=False, confirmed=False)
+                    session.update(dirty=False, confirmed=False, comment=session.pop('saved_comment', session['comment']))
                     if session['owner']:
                         session['owner'].close()
                         session['owner'] = None
@@ -482,7 +496,7 @@ def main():
                             if candidate.exists():
                                 candidate.unlink()
                         session.update(dirty=True, confirmed=True)
-                result = dict(dirty=session['dirty'])
+                result = dict(dirty=session['dirty'], imd_comment=session['comment'].decode('utf-8', errors='replace'))
                 if op == 'discard' and 'checked' in locals():
                     result['entries'] = checked['result']['entries']
                 reply = dict(v=1, id=rid, ok=True, result=result)
@@ -568,10 +582,9 @@ def main():
                                     if session['mapping'] is not None and mapping != session['mapping']:
                                         raise MappingError('Destination profile differs from the source RAW slot mapping.')
                                     if output_container == 'dmk':
-                                        if session['template'] is None:
-                                            raise MappingError('DMK output requires a verified source template.')
+                                        template = session['template'] or dmk_template(mapping)
                                         encoded = folder / 'image.dmk'
-                                        encoded.write_bytes(transfer_dmk(session['template'], mapping, output.read_bytes()))
+                                        encoded.write_bytes(transfer_dmk(template, mapping, output.read_bytes()))
                                     else:
                                         encoded = transfer(output_container, mapping, folder, output, None, True)
                                 except (MappingError, OSError, ValueError) as error:
@@ -582,6 +595,8 @@ def main():
                                     verified.write_bytes(transfer_dmk(encoded_bytes, mapping))
                                 else:
                                     if output_container == 'imd':
+                                        encoded_bytes = replace_imd_comment(encoded_bytes, session['comment'])
+                                        encoded.write_bytes(encoded_bytes)
                                         mapping.verify_inventory(inspect_imd(encoded_bytes)[0])
                                     transfer(output_container, mapping, folder, verified, encoded_bytes, False)
                                 if file_hash(verified) != file_hash(output):
@@ -600,6 +615,7 @@ def main():
                     if session['owner'] and session['owner'] is not owner:
                         session['owner'].close()
                     session.update(owner=owner, source=owner.path, identity=owner.current, sha=file_hash(owner.path), dirty=False, original_container=output_container)
+                    session.pop('saved_comment', None)
                     plan['source_sha256'] = session['sha']
                 reply = dict(v=1, id=rid, ok=True, result=plan)
             elif op == 'export':

@@ -90,7 +90,7 @@ private:
     QTableWidget *table;
     QListWidget *userAreas;
     QJsonArray directoryEntries;
-    QString imageNote;
+    QString imageNote, imdComment;
     FilenamePolicy filenamePolicy;
     QSettings *settings;
     QPushButton *areaExportButton, *reportButton, *imageInfoButton;
