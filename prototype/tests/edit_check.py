@@ -8,6 +8,39 @@ from catalogue_check import CatalogueCheck
 
 
 class EditCheck(unittest.TestCase):
+    def test_batch_text_and_dsk_roundtrip(self):
+        broker = CatalogueCheck()
+        broker.setUp()
+        self.addCleanup(broker.doCleanups)
+        self.addCleanup(broker.tearDown)
+        fixture = Path(os.environ['CPMIMAGE_ROOT']) / 'fixtures/ampro200-independent.dsk'
+        broker.image.write_bytes(fixture.read_bytes())
+        fmt = 'bettercpm-ampro-little-board'
+        opened = broker.request('open', image=str(broker.image), format=fmt, container='dsk')
+        self.assertTrue(opened['ok'], opened)
+        options = dict(session=opened['result']['session'])
+        text = broker.directory / 'text.txt'
+        text.write_bytes(b'A\nB\r\nC\r')
+        result = broker.request('edit', action='import', confirmed=True, **options, items=[
+            dict(name='00FIRST.TXT', path=str(text), text=True),
+            dict(name='00SECOND.TXT', path=str(text)),
+        ])
+        self.assertTrue(result['ok'], result)
+        destination = broker.directory / 'copy.dsk'
+        save = dict(destination=str(destination), container='dsk', **options)
+        plan = broker.request('save_plan', **save)
+        self.assertTrue(plan['ok'], plan)
+        result = broker.request('save', plan=plan['result'], confirm_sidecar=True, **save)
+        self.assertTrue(result['ok'], result)
+        self.assertEqual(broker.image.read_bytes(), fixture.read_bytes())
+        reopened = broker.request('open', image=str(destination), format=fmt, container='dsk')
+        self.assertTrue(reopened['ok'], reopened)
+        output = broker.directory / 'converted.txt'
+        result = broker.request('export', session=reopened['result']['session'],
+                                name='00FIRST.TXT', destination=str(output))
+        self.assertTrue(result['ok'], result)
+        self.assertTrue(output.read_bytes().startswith(b'A\r\nB\r\nC\r\n\x1a'))
+
     def test_edit_save_and_reopen(self):
         broker = CatalogueCheck()
         broker.setUp()

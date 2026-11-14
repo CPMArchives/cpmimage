@@ -67,6 +67,40 @@ static int decode(const char *image, const char *destination)
   puts("{\"v\":1,\"ok\":true}");
   return 0;
 }
+static int encode(const char *image, const char *destination)
+{
+  FILE *input=fopen(image,"rb");
+  if (!input) return fail("open","Cannot read staged RAW image");
+  DSK_GEOMETRY geometry;
+  DSK_PDRIVER disk=NULL;
+  dsk_err_t error=dg_stdformat(&geometry,FMT_AMPRO200,NULL,NULL);
+  if (!error) error=dsk_creat(&disk,destination,"dsk",NULL);
+  unsigned char bytes[512];
+  int bad=0;
+  for (unsigned track=0;track<40 && !error && !bad;++track)
+  {
+    DSK_FORMAT sectors[10];
+    for (unsigned sector=0;sector<10;++sector)
+      sectors[sector]=(DSK_FORMAT){track,0,sector+1,512};
+    error=dsk_pformat(disk,&geometry,track,0,sectors,0xe5);
+    for (unsigned sector=0;sector<10 && !error;++sector)
+    {
+      if (fread(bytes,1,sizeof bytes,input)!=sizeof bytes) { bad=1; break; }
+      error=dsk_pwrite(disk,&geometry,bytes,track,0,sector+1);
+    }
+  }
+  if (!bad && (fgetc(input)!=EOF || ferror(input))) bad=1;
+  fclose(input);
+  if (disk)
+  {
+    dsk_err_t closed=dsk_close(&disk);
+    if (!error) error=closed;
+  }
+  if (error || bad) return fail("image_incompatible",error?dsk_strerror(error):"RAW size differs from standard DSK geometry");
+  puts("{\"v\":1,\"ok\":true}");
+  return 0;
+}
+
 #endif
 static int edit(struct cpmSuperBlock *sb, struct cpmInode *root, const char *op,
                 const char *name, const char *argument)
@@ -119,6 +153,7 @@ int main(int argc,char **argv) {
     puts("]}");
     return 0;
   }
+  if (argc==4 && !strcmp(argv[1],"encode")) return encode(argv[2],argv[3]);
   if (argc==4 && !strcmp(argv[1],"decode")) return decode(argv[2],argv[3]);
 #endif
   if(argc<5) return fail("arguments","expected operation, image, format, container");

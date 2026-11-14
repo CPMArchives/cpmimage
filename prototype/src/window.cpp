@@ -232,7 +232,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     rename->setShortcut(Qt::Key_F2);
     table->addAction(rename);
     connect(rename, &QAction::triggered, this, [this] { chooseEdit("rename"); });
-    for (const auto &item : QList<QPair<QString,QString>>{{"Import file…","import"},
+    for (const auto &item : QList<QPair<QString,QString>>{{"Import files…","import"},
             {"Delete…","delete"},{"Move to user area…","move"},{"Properties…","attrs"},
             {"Export system tracks…","systems_export"},{"Replace system tracks…","systems_import"}}) {
         connect(editMenu->addAction(item.first), &QAction::triggered, this, [this, item] { chooseEdit(item.second); });
@@ -391,23 +391,71 @@ void Window::chooseEdit(const QString &action) {
     }
     bool accepted = false;
     if (action == "import") {
-        const auto path = QFileDialog::getOpenFileName(this, "Import file");
-        if (path.isEmpty() || !userAreas->currentItem()) return;
-        const auto name = QInputDialog::getText(this, "Import file", "CP/M filename", QLineEdit::Normal,
-            QFileInfo(path).fileName().toUpper(), &accepted).toUpper();
-        if (!accepted) return;
+        const auto paths = QFileDialog::getOpenFileNames(this, "Import files");
+        if (paths.isEmpty() || !userAreas->currentItem()) return;
+        const QRegularExpression valid(R"CPM(^[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,8}(\.[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,3})?$)CPM");
         const int area = userAreas->currentItem()->data(Qt::UserRole).toInt();
-        const auto key = QString("%1").arg(area, 2, 10, QLatin1Char('0')) + name;
-        for (const auto &entry : directoryEntries) {
-            if (entry.toObject()["name"].toString() == key) {
-                if (QMessageBox::question(this, "Import conflict", "Replace the existing file?",
-                    QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::No) != QMessageBox::Yes) return;
-                request["replace"] = true;
-                break;
-            }
+        const auto prefix = QString("%1").arg(area, 2, 10, QLatin1Char('0'));
+        QSet<QString> existing;
+        for (const auto &entry : directoryEntries) existing.insert(entry.toObject()["name"].toString());
+        QDialog review(this);
+        review.setWindowTitle("Review import");
+        QVBoxLayout layout(&review);
+        QTableWidget names(paths.size(), 2);
+        names.setHorizontalHeaderLabels({"Host file", "CP/M filename"});
+        names.horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+        for (int row = 0; row < paths.size(); ++row) {
+            const auto original = QFileInfo(paths[row]).fileName();
+            auto *host = new QTableWidgetItem(original);
+            host->setFlags(host->flags() & ~Qt::ItemIsEditable);
+            names.setItem(row, 0, host);
+            names.setItem(row, 1, new QTableWidgetItem(original.toUpper()));
         }
-        request["name"] = key;
-        request["path"] = path;
+        QCheckBox text("Convert text to CP/M line endings and EOF marker");
+        QDialogButtonBox buttons(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        layout.addWidget(&names);
+        layout.addWidget(&text);
+        layout.addWidget(&buttons);
+        connect(&buttons, &QDialogButtonBox::rejected, &review, &QDialog::reject);
+        connect(&buttons, &QDialogButtonBox::accepted, &review, [&] {
+            QSet<QString> used;
+            for (int row = 0; row < paths.size(); ++row) {
+                const auto name = names.item(row, 1)->text().toUpper();
+                if (!valid.match(name).hasMatch() || used.contains(name)) {
+                    QMessageBox::warning(&review, "Check import names", "Give each file a distinct CP/M 8.3 name.");
+                    names.setCurrentCell(row, 1);
+                    return;
+                }
+                used.insert(name);
+            }
+            review.accept();
+        });
+        if (review.exec() != QDialog::Accepted) return;
+        QJsonArray items;
+        QString defaultConflict;
+        for (int row = 0; row < paths.size(); ++row) {
+            const auto key = prefix + names.item(row, 1)->text().toUpper();
+            const bool conflict = existing.contains(key);
+            auto choice = defaultConflict;
+            if (conflict && choice.isEmpty()) {
+                QMessageBox prompt(QMessageBox::Question, "Import conflict",
+                    key.mid(2) + " already exists.", QMessageBox::Cancel, this);
+                auto *replace = prompt.addButton("Replace", QMessageBox::AcceptRole);
+                auto *skip = prompt.addButton("Skip", QMessageBox::RejectRole);
+                prompt.setDefaultButton(skip);
+                auto *all = new QCheckBox("Apply to All");
+                prompt.setCheckBox(all);
+                prompt.exec();
+                if (prompt.clickedButton() == replace) choice = "replace";
+                else if (prompt.clickedButton() == skip) choice = "skip";
+                else return;
+                if (all->isChecked()) defaultConflict = choice;
+            }
+            if (conflict && choice == "skip") continue;
+            items.append(QJsonObject{{"name",key},{"path",paths[row]},{"replace",conflict},{"text",text.isChecked()}});
+        }
+        if (items.isEmpty()) return;
+        request["items"] = items;
     } else {
         const auto rows = table->selectionModel()->selectedRows();
         if (rows.size() != 1) return;
@@ -448,15 +496,16 @@ void Window::chooseEdit(const QString &action) {
 }
 void Window::chooseSave(bool saveAs) {
     if (busy || session.isEmpty()) return;
-    QString destination;
+    QString destination, selectedFilter;
     if (saveAs) {
         destination = QFileDialog::getSaveFileName(this, "Save CP/M image as", image,
-            "RAW disk images (*.raw *.img *.dsk);;All files (*)", nullptr, QFileDialog::DontConfirmOverwrite);
+            "RAW disk images (*.raw *.img);;Standard CPCEMU DSK (*.dsk)", &selectedFilter, QFileDialog::DontConfirmOverwrite);
         if (destination.isEmpty()) return;
     }
     pendingSave = {{"op","save_plan"}, {"session",session}, {"destination",destination},
                    {"backups",settings->value("saveBackups",true).toBool()},
                    {"sidecar",settings->value("saveSidecar",true).toBool()}};
+    if (saveAs) pendingSave["container"] = selectedFilter.startsWith("Standard") ? "dsk" : "raw";
     begin(pendingSave);
 }
 bool Window::resolveEdits(std::function<void()> next) {
@@ -1005,6 +1054,7 @@ void Window::readReply() {
         } else {
             dirty = false;
             image = result["destination"].toString();
+            container = result["container"].toString();
             snapshotHash = result["source_sha256"].toString();
             source->setText(QFileInfo(image).fileName());
             source->setToolTip(image);

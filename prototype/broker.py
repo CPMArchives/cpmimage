@@ -312,14 +312,12 @@ def main():
             elif op == 'edit':
                 if not session or request.get('session') != session['token']:
                     raise backend.Failure('stale_session', 'Open the image again.')
-                if session['original_container'] != 'raw':
-                    raise backend.Failure('unsupported_container', 'File editing currently requires RAW.')
                 if not session['confirmed'] and request.get('confirmed') is not True:
                     raise backend.Failure('confirmation_required', 'Confirm the selected disk definition for writing.')
                 action = request['action']
                 if action not in ('rename', 'delete', 'attrs', 'import', 'move'):
                     raise backend.Failure('invalid_edit', 'Unknown editing operation.')
-                name = backend.filename(request['name'], True)
+                name = '' if action == 'import' else backend.filename(request['name'], True)
                 argument = '-'
                 if action in ('rename', 'move'):
                     argument = backend.filename(request['target'], True)
@@ -344,13 +342,25 @@ def main():
                     shutil.copyfile(working, candidate)
                     (edit_dir / 'diskdefs').write_text(session['definitions'], encoding='utf-8')
                     if action == 'import':
-                        data = read_image(Path(request['path']))
-                        staged = edit_dir / 'input.bin'
-                        staged.write_bytes(data)
-                        argument = str(staged)
-                        if request.get('replace') is True:
-                            adapter().native(edit_dir, 'edit_delete', candidate, session['format'], 'raw', name, '-')
-                    adapter().native(edit_dir, 'edit_' + action, candidate, session['format'], 'raw', name, argument)
+                        items = request.get('items', [request])
+                        if not isinstance(items, list) or not 1 <= len(items) <= 256:
+                            raise backend.Failure('invalid_edit', 'Import batches support 1 to 256 files.')
+                        names = set()
+                        for item in items:
+                            target = backend.filename(item['name'], True)
+                            if target in names:
+                                raise backend.Failure('invalid_edit', f'Duplicate import name: {target}')
+                            names.add(target)
+                            data = read_image(Path(item['path']))
+                            if item.get('text') is True:
+                                data = data.replace(b'\r\n', b'\n').replace(b'\r', b'\n').replace(b'\n', b'\r\n') + b'\x1a'
+                            staged = edit_dir / 'input.bin'
+                            staged.write_bytes(data)
+                            if item.get('replace') is True:
+                                adapter().native(edit_dir, 'edit_delete', candidate, session['format'], 'raw', target, '-')
+                            adapter().native(edit_dir, 'edit_import', candidate, session['format'], 'raw', target, staged)
+                    else:
+                        adapter().native(edit_dir, 'edit_' + action, candidate, session['format'], 'raw', name, argument)
                     checked = adapter().request({
                         'v': 1, 'id': rid, 'op': 'list', 'image': str(candidate),
                         'format': session['format'], 'container': 'raw'}, defs_override=session['definitions'])
@@ -442,8 +452,9 @@ def main():
                     raise backend.Failure('recovery_required', f'Review the interrupted save in {recovery}.')
                 if same and (identity(destination.stat()) != session['identity'] or expected != session['sha']):
                     raise backend.Failure('source_changed', 'The source changed. Open it again or use Save As.')
-                if (not same or session['dirty']) and session['original_container'] != 'raw':
-                    raise backend.Failure('unsupported_container', 'Save As currently requires a RAW source.')
+                output_container = request.get('container') or session['original_container']
+                if output_container not in ('raw', 'dsk') or (same and output_container != session['original_container']):
+                    raise backend.Failure('unsupported_container', 'Choose a supported container using Save As.')
                 sidecar = None
                 if request.get('sidecar', True):
                     definition = session['definitions']
@@ -456,7 +467,7 @@ def main():
                     digest = hashlib.sha256(definition.encode('utf-8')).hexdigest()
                     if digest != previous:
                         sidecar = (target, previous)
-                plan = dict(destination=str(destination), expected=expected,
+                plan = dict(destination=str(destination), expected=expected, container=output_container,
                             sidecar_changed=sidecar is not None,
                             sidecar_path=str(sidecar[0]) if sidecar else None,
                             sidecar_expected=sidecar[1] if sidecar else None,
@@ -489,6 +500,16 @@ def main():
                                     'format': session['format'], 'container': 'raw'}, defs_override=session['definitions'])
                                 if not checked['ok']:
                                     raise backend.Failure(checked['error'], checked.get('message', ''))
+                            if output is not None and output_container == 'dsk':
+                                folder = Path(temp)
+                                encoded = folder / 'output.dsk'
+                                decoded = folder / 'verified.raw'
+                                adapter().native(folder, 'encode', output, encoded)
+                                check_standard_dsk(encoded.read_bytes(), session['geometry'], backend)
+                                adapter().native(folder, 'decode', encoded, decoded)
+                                if file_hash(decoded) != file_hash(output):
+                                    raise backend.Failure('image_incompatible', 'Encoded DSK failed its byte-for-byte RAW round trip.')
+                                output = encoded
                             publish(owner, expected, output,
                                     (*sidecar, staged) if sidecar else None, request.get('backups', True))
                     except BaseException:
@@ -497,7 +518,7 @@ def main():
                         raise
                     if session['owner'] and session['owner'] is not owner:
                         session['owner'].close()
-                    session.update(owner=owner, source=owner.path, identity=owner.current, sha=file_hash(owner.path), dirty=False)
+                    session.update(owner=owner, source=owner.path, identity=owner.current, sha=file_hash(owner.path), dirty=False, original_container=output_container)
                     plan['source_sha256'] = session['sha']
                 reply = dict(v=1, id=rid, ok=True, result=plan)
             elif op == 'export':

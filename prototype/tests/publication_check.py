@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -42,6 +43,36 @@ class PublicationCheck(unittest.TestCase):
         self.assertEqual(self.sidecar.read_bytes(), b'original definition')
         self.assertEqual((journal / 'old-0').read_bytes(), b'original image')
         self.assertEqual((journal / 'new-1').read_bytes(), b'edited')
+
+    def test_process_exit_mid_publication_retains_journal_and_releases_lock(self):
+        worker = """
+import os,sys
+from pathlib import Path
+sys.path.insert(0,sys.argv[1])
+from publication import publish, fingerprint
+from source_ownership import Ownership
+root=Path(sys.argv[2])
+image, sidecar, staged=(root/name for name in ('disk.raw','disk.FDF','edited'))
+replace=os.replace
+def interrupted(src,dst):
+    if dst==sidecar:
+        os._exit(73)
+    replace(src,dst)
+os.replace=interrupted
+with Ownership(image,root/'locks') as owner:
+    publish(owner,fingerprint(image),staged,(sidecar,fingerprint(sidecar),staged))
+"""
+        module = str(Path(__file__).resolve().parents[1])
+        process = subprocess.run([sys.executable, '-B', '-c', worker, module, str(self.root)], timeout=15)
+        self.assertEqual(process.returncode, 73)
+        with Ownership(self.image, self.root / 'locks') as owner:
+            with self.assertRaisesRegex(PublicationError, 'previous interrupted save'):
+                publish(owner, fingerprint(self.image), self.stage)
+        journal = recovery_directory(self.image)
+        self.assertTrue((journal / 'manifest.json').is_file())
+        self.assertEqual((journal / 'old-0').read_bytes(), b'original image')
+        self.assertEqual((journal / 'new-1').read_bytes(), b'edited')
+        self.assertEqual(self.sidecar.read_bytes(), b'original definition')
 
     def test_backup_failure_preserves_image(self):
         self.image.with_suffix('.raw.BAK').mkdir()
