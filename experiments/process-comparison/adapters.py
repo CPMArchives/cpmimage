@@ -120,10 +120,10 @@ class Adapter:
   if p.returncode<0:raise Failure('backend_crash',str(p.returncode))
   return p.returncode,bytes(out['stdout']),bytes(out['stderr'])
  def native(self,cwd,*args):
-  op_is_description=args[0]=='describe'
+  op_is_description=args[0] in ('describe','describe-catalogue')
   rc,out,err=self.child([HELPER,*args],cwd)
-  if op_is_description and rc and not out:
-   message=err.decode(errors="replace").strip()
+  if op_is_description and rc and (not out or args[0]=='describe-catalogue'):
+   message=err.decode(errors="replace").strip() or "Incomplete disk definition"
    raise Failure("unknown_format" if ": unknown format " in message else "invalid_definition",message)
   try:r=json.loads(out)
   except (ValueError,UnicodeError):raise Failure('backend_exit' if rc else 'protocol_invalid',err.decode(errors='replace'))

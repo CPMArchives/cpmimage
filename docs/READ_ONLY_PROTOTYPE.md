@@ -10,20 +10,11 @@ The GUI and broker reject operations outside listing/export. Existing export des
 
 POSIX process sessions and the helper guard contain child processes; Windows uses kill-on-close Job Objects. GUI deadlines, cancellation grace periods, response bounds, schema checks, and broker-restart tests cover failure recovery. No image file is edited by the application.
 
-## Explicit supported layouts
+## Selecting formats
 
-| Selection | Container |
-|---|---|
-| IBM 3740 | raw |
-| BetterCP/M CPMSIM layout | raw |
-| TRS-80 Model II layout (`bcm2ss`) | raw |
-| BetterCP/M Model 4 layout | raw |
-| Ampro Little Board layout | raw |
-| Ampro Little Board backend test case | standard CPCEMU DSK |
+Open an image to view ranked candidates or choose from the full diskdefs catalogue. The format button lets you reinterpret the same open source. File → Load diskdefs catalogue selects an external replacement catalogue. See [v0.3 implementation and validation](V0_3_DISKDEFS_REVIEW.md) for sidecar precedence, command-line options and format/container limits.
 
-The last structured-container case is a tested backend combination; it is not currently a separate GUI format choice. A `.DSK` extension does not identify a container. No automatic detection, arbitrary diskdefs selection, compressed containers, physical disks, or unsupported format combinations are promised.
-
-Short IBM3740 raw images are accepted only when sector-aligned and every directory and allocated sector is present. Only an unallocated missing tail is filled with E5 in a temporary snapshot. The original length/hash are retained. Missing file or directory sectors are rejected.
+Sector-aligned short RAW images are accepted when every directory and allocated sector is present. The broker fills only an unused missing tail with E5 in its temporary snapshot and retains the original length and hash.
 
 ## Final-track correction
 
@@ -33,11 +24,11 @@ This does not add general geometry detection or settle a long-term public backen
 
 ## Browsing and export
 
-The v0.2 UI supports one image, a resizable left pane containing all user areas 0–15, and a sortable Name/Bytes/Attributes table filtered to the selected area. Populated areas have a centered plus on their folder icon. Selection count/byte totals are visible. Changing layout clears the session, listing, selection and populated markers.
+The v0.2 UI supports one image, a resizable left pane containing all user areas 0–15, and a sortable Name/Bytes/Attributes table filtered to the selected area. Populated areas have a centered plus on their folder icon. Selection count/byte totals are visible. Changing layout refreshes the listing and selection while keeping the source image open.
 
 The primary toolbar contains Open image, Export selected and Export user area, with a Read-only indicator. The layout selector and Image information button occupy a separate row. The filename appears above the browser and in the window title; the full path is also available as its tooltip. Cancel appears only during an operation, batch progress appears during transfer, and Export report is shown when a report is available.
 
-**Image information…**, also available from File, contains the full source path, selected layout and identifiers, container, total file/populated-area counts, snapshot SHA-256, temporary E5-tail normalization note, read-only/manual-format/record-padding details and the last completed export's byte count and hash. The dialog is selectable plain text, unavailable until an image is open and while operations run. Image reset clears its cached snapshot/export details. Technical hashes and normalization details no longer occupy the everyday browser or export-success status.
+**Image information…**, also available from File, contains the full source path, selected layout and identifiers, container, total file/populated-area counts, snapshot SHA-256, temporary E5-tail normalization note, read-only/format-interpretation/record-padding details and the last completed export's byte count and hash. The dialog is selectable plain text, unavailable until an image is open and while operations run. Image reset clears its cached snapshot/export details. Technical hashes and normalization details no longer occupy the everyday browser or export-success status.
 
 CP/M names remain uppercase. Single-file export suggests the displayed filename without a user-area prefix. Configurable translations default to `/ → _`, `: → ~` and `\ → ^` on every host OS. Source names are displayed unchanged; translation applies only to export suggestions. No reverse import mapping is implemented. See [filename policy](FILENAME_POLICY_NOTES.md).
 
@@ -47,4 +38,4 @@ Preflight checks all planned translated names before creating files or a numbere
 
 Files export sequentially with progress and Cancel. Completed exports are retained on cancellation. Interrupted extraction stays in private staging and is cleaned up through the existing adapter. A failure stops the batch and marks remaining entries not attempted; a later export can skip completed destinations. **Export report…** gives counts and a per-file exported/skipped/failed/cancelled/not-attempted result. Reports are retained in memory for the current application run.
 
-Tabs, automatic format detection, arbitrary diskdefs, image mutation, and future import/creation/drag-and-drop workflows remain outside this implementation. Full binary-package requalification and native Windows/Linux desktop checks for this slice remain outstanding.
+Tabs, image mutation, import, image creation and drag-and-drop remain future work.

@@ -25,7 +25,7 @@ static int describe(const char *format)
   struct cpmSuperBlock sb={0};
   if (!strcmp(format,"amstrad"))
   {
-    puts("{\"v\":1,\"ok\":true,\"boot_geometry\":true}");
+    fputs("{\"v\":1,\"ok\":true,\"boot_geometry\":true}",stdout);
     return 0;
   }
   if (cpmImageReadDefinition(&sb,format)<0) return fail("invalid_definition","Incomplete definition");
@@ -38,7 +38,7 @@ static int describe(const char *format)
   printf(",\"skew_table\":[");
   if (sb.skewtab)
     for (int i=0;i<sb.sectrk;++i) printf("%s%d",i?",":"",sb.skewtab[i]);
-  puts("]}");
+  fputs("]}",stdout);
   free(sb.skewtab);
   return 0;
 }
@@ -72,6 +72,17 @@ int main(int argc,char **argv) {
   struct cpmSuperBlock sb={0};struct cpmInode root,ino; const char *err;
 #ifdef CPMIMAGE_READ_ONLY
   if (argc==3 && !strcmp(argv[1],"describe")) return describe(argv[2]);
+  if (argc>=3 && !strcmp(argv[1],"describe-catalogue"))
+  {
+    fputs("{\"v\":1,\"ok\":true,\"definitions\":[",stdout);
+    for (int i=2;i<argc;++i)
+    {
+      if (i>2) putchar(',');
+      if (describe(argv[i])) return 2;
+    }
+    puts("]}");
+    return 0;
+  }
   if (argc==4 && !strcmp(argv[1],"decode")) return decode(argv[2],argv[3]);
 #endif
   if(argc<5) return fail("arguments","expected operation, image, format, container");

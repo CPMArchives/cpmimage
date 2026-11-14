@@ -71,6 +71,16 @@ class CatalogueCheck(unittest.TestCase):
         exported = self.request('export', session=opened['result']['session'], name='00BINARY.BIN', destination=str(output))
         self.assertTrue(exported['ok'], exported)
 
+    def test_candidate_ranking_uses_directory_evidence(self):
+        selected = self.request('catalogue')
+        self.assertTrue(selected['ok'], selected)
+        result = self.request('inspect', image=str(self.image))
+        self.assertTrue(result['ok'], result)
+        candidates = result['result']['candidates']
+        self.assertIn('ibm-3740', [row['id'] for row in candidates])
+        ranking = [(row['evidence'] == 'Geometry and empty directory', row['id']) for row in candidates]
+        self.assertEqual(ranking, sorted(ranking))
+
     def test_fdf_is_discovered_and_bound_to_content(self):
         path = self.image.with_suffix('.FDF')
         path.write_text(CUSTOM)

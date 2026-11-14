@@ -22,6 +22,7 @@
 #include <QAction>
 #include <QDialogButtonBox>
 #include <QMessageBox>
+#include <memory>
 #include <QTextEdit>
 
 static QFileDialog *fileDialog() {
@@ -64,7 +65,7 @@ private slots:
             return text;
         };
         auto details=dialogText(false);
-        QVERIFY(details.contains(QFileInfo(source).absoluteFilePath()));QVERIFY(details.contains("IBM 3740"));
+        QVERIFY(details.contains(QFileInfo(source).absoluteFilePath()));QVERIFY(details.contains("ibm-3740"));
         QVERIFY(details.contains("Container: raw"));QVERIFY(details.contains("Files: 3"));
         QVERIFY(details.contains("Populated user areas: 3 of 16"));
         QFile original(source);QVERIFY(original.open(QIODevice::ReadOnly));const auto bytes=original.readAll();
@@ -79,11 +80,73 @@ private slots:
         window.openImage(trimmed.fileName(),"ibm-3740","raw");QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
         details=dialogText(false);QVERIFY(details.contains("tail filled with E5"));QVERIFY(!details.contains("Last completed export"));
         QVERIFY(!window.findChild<QLabel *>("selectionStatus")->text().contains("tail"));
-        window.findChild<QComboBox *>()->setCurrentIndex(1);
-        QVERIFY(!information->isEnabled());QVERIFY(!action->isEnabled());QCOMPARE(name->text(),QString("No image open"));
         window.openImage(root+"/fixtures/ibm3740-truncated.raw","ibm-3740","raw");
         QVERIFY(done.wait(15000));QVERIFY(!done.takeFirst()[0].toBool());
         QVERIFY(!information->isEnabled());QVERIFY(name->toolTip().isEmpty());
+    }
+
+    void formatSelection() {
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        const auto path = temp.filePath("test.raw");
+        QVERIFY(QFile::copy(root + "/fixtures/ibm3740-independent.raw", path));
+        auto window = std::make_unique<Window>(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+            qEnvironmentVariable("CPMIMAGE_HELPER"), 30000, 2000, QString(), temp.filePath("settings.ini"));
+        window->show();
+        QSignalSpy done(window.get(), &Window::completed);
+        window->loadCatalogue();
+        QVERIFY(done.wait(30000));
+        QVERIFY2(done.takeFirst()[0].toBool(), qPrintable(window->lastError()));
+
+        QTimer picker;
+        bool chose = false;
+        connect(&picker, &QTimer::timeout, window.get(), [&] {
+            auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            if (!dialog || dialog->windowTitle() != "Choose disk format") return;
+            auto *group = dialog->findChild<QComboBox *>();
+            auto *search = dialog->findChild<QLineEdit *>();
+            auto *list = dialog->findChild<QListWidget *>();
+            group->setCurrentIndex(1);
+            search->setText("ibm-3740");
+            const auto exact = list->findItems("ibm-3740", Qt::MatchExactly);
+            chose = exact.size() == 1;
+            if (chose) list->setCurrentItem(exact.first());
+            for (auto *button : dialog->findChildren<QPushButton *>())
+                if (button->text() == "Toggle favorite") button->click();
+            dialog->accept();
+            picker.stop();
+        });
+        picker.start(20);
+        window->inspectImage(path);
+        QVERIFY(done.wait(30000));
+        QVERIFY2(done.takeFirst()[0].toBool(), qPrintable(window->lastError()));
+        QVERIFY(chose);
+        const auto *source = window->findChild<QLabel *>("imageName");
+        QCOMPARE(source->text(), QString("test.raw"));
+        auto *format = window->findChild<QPushButton *>("chooseFormat");
+        QCOMPARE(format->text(), QString("ibm-3740"));
+        QSettings saved(temp.filePath("settings.ini"), QSettings::IniFormat);
+        QCOMPARE(saved.value("formatFavorites").toStringList(), QStringList{"ibm-3740"});
+
+        // Reopening uses the remembered choice and skips the picker.
+        window->inspectImage(path);
+        QVERIFY(done.wait(30000));
+        QVERIFY2(done.takeFirst()[0].toBool(), qPrintable(window->lastError()));
+
+        // An incompatible reinterpretation keeps the source selected and disables export.
+        QTimer::singleShot(50, window.get(), [&] {
+            auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            if (!dialog) return;
+            dialog->findChild<QLineEdit *>()->setText("apple-do");
+            dialog->accept();
+        });
+        format->click();
+        QVERIFY(done.wait(30000));
+        QVERIFY(!done.takeFirst()[0].toBool());
+        QCOMPARE(source->text(), QString("test.raw"));
+        QVERIFY(format->isEnabled());
+        QCOMPARE(window->entryCount(), 0);
     }
 
     void exportPlanning() {
@@ -385,11 +448,6 @@ private slots:
                 areas->item(1)->icon().pixmap(24,24).toImage());
         areas->setCurrentItem(areas->item(7));
         QVERIFY(status->text().contains("1 of 1 files selected · 256 bytes"));
-        // A format transition invalidates every old row, selection and populated marker.
-        window.findChild<QComboBox *>()->setCurrentIndex(1);
-        QCOMPARE(files->rowCount(), 0); QVERIFY(!areas->currentItem());
-        QVERIFY(!areas->isEnabled()); QVERIFY(!window.readerRunning());
-        for (int area=0; area<16; ++area) QCOMPARE(areas->item(area)->data(Qt::UserRole+1).toInt(),0);
         window.openImage(root + "/fixtures/ibm3740-empty.raw", "ibm-3740", "raw");
         QVERIFY(done.wait(15000)); QVERIFY(done.takeFirst()[0].toBool());
         QVERIFY(areas->isEnabled()); QCOMPARE(files->rowCount(),0);
@@ -460,7 +518,7 @@ private slots:
         };
         QTimer watchdog; watchdog.setInterval(4000);
         connect(&watchdog, &QTimer::timeout, &window, [] {
-            if (auto *dialog = fileDialog()) dialog->reject();
+            if (auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget())) dialog->reject();
         }); watchdog.start();
         QTemporaryDir fixtureDirectory; QVERIFY(fixtureDirectory.isValid());
         QVERIFY(QFile::copy(root + "/fixtures/ibm3740-independent.raw", fixtureDirectory.filePath("fixture.raw")));
@@ -471,6 +529,20 @@ private slots:
             visited = true; dialog->setDirectory(fixtureDirectory.path()); dialog->selectFile("fixture.raw");
             QTimer::singleShot(300, dialog, [dialog, &fixtureDirectory] { if (auto *edit = dialog->findChild<QLineEdit *>("fileNameEdit")) { edit->setText(fixtureDirectory.filePath("fixture.raw")); QTest::keyClick(edit, Qt::Key_Return); } });
         });
+        QTimer picker;
+        connect(&picker, &QTimer::timeout, &window, [&] {
+            auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            if (!dialog || dialog->windowTitle() != "Choose disk format") return;
+            dialog->findChild<QComboBox *>()->setCurrentIndex(1);
+            auto *list = dialog->findChild<QListWidget *>();
+            const auto items = list->findItems("ibm-3740", Qt::MatchExactly);
+            if (items.size() == 1) {
+                list->setCurrentItem(items.first());
+                dialog->accept();
+            } else dialog->reject();
+            picker.stop();
+        });
+        picker.start(20);
         QVERIFY(button("Open")); button("Open")->click(); QVERIFY(visited);
         if (done.isEmpty()) QVERIFY(done.wait(5000));
         QVERIFY(done.takeFirst()[0].toBool()); QCOMPARE(window.entryCount(),1);

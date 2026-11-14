@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "window.h"
+#include <QCryptographicHash>
+#include <algorithm>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QFileDialog>
@@ -65,6 +67,19 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     filenameSettings->setShortcut(QKeySequence::Preferences);
     addAction(filenameSettings);
     connect(filenameSettings, &QAction::triggered, this, &Window::editFilenameSettings);
+    auto *formatFavorites = preferences->addAction("Format favorites…");
+    connect(formatFavorites, &QAction::triggered, this, [this] {
+        QStringList entries = settings->value("formatFavorites").toStringList();
+        entries.sort(Qt::CaseInsensitive);
+        for (auto &entry : entries) {
+            const bool available = std::any_of(catalogueRows.begin(), catalogueRows.end(), [&](const auto &row) {
+                return row.toObject()["id"].toString() == entry;
+            });
+            if (!available) entry += " (unavailable in this catalogue)";
+        }
+        QMessageBox::information(this, "Format favorites",
+            entries.isEmpty() ? QString("No favorites saved.") : entries.join('\n'));
+    });
     auto *help = menuBar()->addMenu("Help");
     auto *licenses = help->addAction("License notices…");
     connect(licenses, &QAction::triggered, this, [this, noticesPath] {
@@ -83,15 +98,8 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     auto *central = new QWidget(this);
     auto *layout = new QVBoxLayout(central);
     auto *toolbar = new QHBoxLayout;
-    formats = new QComboBox;
-    const QList<QStringList> choices = {
-        {"IBM 3740 · raw", "ibm-3740", "raw"},
-        {"BetterCP/M CPMSIM · raw", "bettercpm-default", "raw"},
-        {"BetterCP/M Model II · raw", "bcm2ss", "raw"},
-        {"BetterCP/M Model 4 · raw", "bettercpm-mm-80t-ds-data", "raw"},
-        {"Ampro Little Board · raw", "bettercpm-ampro-little-board", "raw"},
-        {"Ampro Little Board · standard DSK", "bettercpm-ampro-little-board", "dsk"}};
-    for (const auto &choice : choices) formats->addItem(choice[0], choice.mid(1));
+    formats = new QPushButton("Choose format…");
+    formats->setObjectName("chooseFormat");
 
     openButton = new QPushButton("Open image…");
     exportButton = new QPushButton("Export selected…");
@@ -113,8 +121,6 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     layout->addLayout(toolbar);
     auto *imageRow=new QHBoxLayout;
     imageRow->addWidget(new QLabel("Image layout:"));
-    formats->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
-    formats->setMinimumContentsLength(18);
     imageRow->addWidget(formats,1);
     imageInfoButton=new QPushButton("Image information…");
     imageInfoButton->setObjectName("imageInformation");
@@ -166,7 +172,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     table->addAction(selectAll);
     connect(selectAll, &QAction::triggered, table, &QTableWidget::selectAll);
 
-    status = new QLabel("Choose the image layout, then open an image.");
+    status = new QLabel("Open an image to choose its disk definition.");
     status->setObjectName("selectionStatus");
     status->setTextFormat(Qt::PlainText);
     status->setWordWrap(true);
@@ -221,11 +227,17 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         setBusy(busy); updateSelectionStatus();
     });
     connect(userAreas, &QListWidget::currentItemChanged, this, [this] { showUserArea(); });
-    connect(formats, &QComboBox::currentIndexChanged, this, [this] {
-        if (process.state() != QProcess::NotRunning) {
-            stopReader(); process.waitForFinished(2000);
-        }
-        resetImage(); status->setText("Layout changed. Open the image again.");
+    externalCatalogueAction = fileMenu->addAction("Load diskdefs catalogue…");
+    bundledCatalogueAction = fileMenu->addAction("Use bundled diskdefs");
+    connect(externalCatalogueAction, &QAction::triggered, this, [this] {
+        const auto path = QFileDialog::getOpenFileName(this, "Load diskdefs catalogue", cataloguePath);
+        if (!path.isEmpty()) loadCatalogue(path);
+    });
+    connect(bundledCatalogueAction, &QAction::triggered, this, [this] { loadCatalogue(); });
+    connect(formats, &QPushButton::clicked, this, [this] {
+        inspectedHash = snapshotHash;
+        inspectedContainer = container;
+        chooseFormat({}, true);
     });
     connect(&process, &QProcess::readyReadStandardOutput, this, &Window::readReply);
     // Discard diagnostics continuously; they never become unbounded retained UI state.
@@ -302,12 +314,15 @@ void Window::resetImage() {
     }
     updateUserAreas();
     source->setText("No image open"); source->setToolTip({});
+    formats->setText("Choose format…");
     setWindowTitle("cpmimage — Review prototype"); setBusy(busy);
 }
 void Window::setBusy(bool value) {
     busy = value;
     openButton->setEnabled(!busy);
-    formats->setEnabled(!busy);
+    formats->setEnabled(!busy && !image.isEmpty() && !catalogueRows.isEmpty());
+    externalCatalogueAction->setEnabled(!busy);
+    bundledCatalogueAction->setEnabled(!busy);
     table->setEnabled(!busy && !session.isEmpty());
     userAreas->setEnabled(!busy && !session.isEmpty());
     const int selected = table->selectionModel()->selectedRows().size();
@@ -324,24 +339,144 @@ void Window::chooseImage() {
     const QString path = QFileDialog::getOpenFileName(this, "Open CP/M image", image.isEmpty() ? QDir::homePath() : image,
         "Disk images (*.raw *.img *.dsk);;All files (*)");
     if (path.isEmpty()) return;
-    const auto choice = formats->currentData().toStringList();
-    openImage(path, choice[0], choice[1]);
+    inspectImage(path);
+}
+void Window::loadCatalogue(const QString &path) {
+    if (busy) return;
+    begin({{"op", "catalogue"}, {"path", path}});
+}
+void Window::inspectImage(const QString &path, const QString &explicitFormat, const QString &type) {
+    if (busy) return;
+    requestedImage = QFileInfo(path).absoluteFilePath();
+    requestedFormat = explicitFormat;
+    requestedContainer = type;
+    if (catalogueRows.isEmpty() || process.state() == QProcess::NotRunning) {
+        loadCatalogue(cataloguePath);
+        return;
+    }
+    begin({{"op", "inspect"}, {"image", requestedImage}, {"explicit_format", requestedFormat}});
 }
 void Window::openImage(const QString &path, const QString &fmt, const QString &type) {
     if (busy) return;
-    for (int index = 0; index < formats->count(); ++index) {
-        if (formats->itemData(index).toStringList() == QStringList{fmt,type}) {
-            QSignalBlocker block(formats); formats->setCurrentIndex(index); break;
-        }
-    }
-    resetImage(); image = QFileInfo(path).absoluteFilePath(); format = fmt; container = type;
+    requestedImage.clear();
+    retainSource = false;
+    resetImage();
+    image = QFileInfo(path).absoluteFilePath();
+    format = fmt;
+    container = type;
+    formats->setText(fmt);
     source->setText(QFileInfo(image).fileName()); source->setToolTip(image);
     begin({{"op", "open"}, {"image", image}, {"format", fmt}, {"container", type}});
+}
+static QString associationKey(const QString &image, const QString &catalogue) {
+    return "imageFormats/" + QString::fromLatin1(QCryptographicHash::hash(
+        (QDir::cleanPath(image) + '\n' + catalogue).toUtf8(), QCryptographicHash::Sha256).toHex());
+}
+void Window::openDefinition(const QJsonObject &definition, bool sidecar, bool switching) {
+    const QString path = switching ? image : requestedImage;
+    requestedImage.clear();
+    const auto fingerprint = inspectedHash;
+    resetImage();
+    image = path;
+    format = definition["id"].toString();
+    container = inspectedContainer;
+    snapshotHash = fingerprint;
+    formats->setText(format);
+    source->setText(QFileInfo(image).fileName()); source->setToolTip(image);
+    retainSource = switching;
+    QJsonObject request{{"op","open"}, {"image",image}, {"format",format}, {"container",container},
+                        {"sidecar",sidecar}};
+    if (!fingerprint.isEmpty()) request["source_sha256"] = fingerprint;
+    if (definition.contains("definition_sha256")) request["definition_sha256"] = definition["definition_sha256"];
+    begin(request);
+}
+void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
+    QDialog dialog(this);
+    dialog.setWindowTitle("Choose disk format");
+    dialog.resize(650, 480);
+    auto *layout = new QVBoxLayout(&dialog);
+    auto *search = new QLineEdit;
+    search->setPlaceholderText("Search disk definitions");
+    layout->addWidget(search);
+    auto *group = new QComboBox;
+    group->addItems({"Plausible candidates", "All formats", "Manufacturer and model", "System family", "Favorites"});
+    layout->addWidget(group);
+    auto *list = new QListWidget;
+    layout->addWidget(list);
+    auto *favorite = new QPushButton("Toggle favorite");
+    layout->addWidget(favorite);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Open | QDialogButtonBox::Cancel);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    connect(list, &QListWidget::itemDoubleClicked, &dialog, &QDialog::accept);
+    auto updateButtons = [&] {
+        const bool enabled = list->currentItem();
+        buttons->button(QDialogButtonBox::Open)->setEnabled(enabled);
+        favorite->setEnabled(enabled);
+    };
+    connect(list, &QListWidget::currentItemChanged, &dialog, updateButtons);
+    const auto candidates = inspection["candidates"].toArray();
+    const QString favoritesKey = "formatFavorites";
+    auto favorites = settings->value(favoritesKey).toStringList();
+    auto populate = [&] {
+        const auto selected = list->currentItem() ? list->currentItem()->data(Qt::UserRole).toJsonObject()["id"].toString()
+                                                  : (switching ? format : QString());
+        list->clear();
+        const int mode = group->currentIndex();
+        const auto rows = mode == 0 ? candidates : catalogueRows;
+        for (const auto &value : rows) {
+            const auto row = value.toObject();
+            const auto id = row["id"].toString();
+            if (mode == 4 && !favorites.contains(id)) continue;
+            const auto maker = row["manufacturer"].toString().isEmpty() ? QString("Unclassified") : row["manufacturer"].toString();
+            const auto model = row["model"].toString();
+            const auto family = row["family"].toString().isEmpty() ? QString("Unclassified") : row["family"].toString();
+            if (!(id + " " + maker + " " + model + " " + family).contains(search->text(), Qt::CaseInsensitive)) continue;
+            QString label = id;
+            if (mode == 2) label = maker + " / " + model + " — " + id;
+            if (mode == 3) label = family + " — " + id;
+            if (mode == 0 && row.contains("evidence")) label += " — " + row["evidence"].toString();
+            auto *item = new QListWidgetItem(label, list);
+            item->setData(Qt::UserRole, row);
+            if (favorites.contains(id)) item->setToolTip("Favorite");
+            if (id == selected) list->setCurrentItem(item);
+        }
+        if (mode != 0) list->sortItems();
+        if (!list->currentItem() && list->count()) list->setCurrentRow(0);
+        updateButtons();
+    };
+    group->setCurrentIndex(candidates.isEmpty() ? 1 : 0);
+    connect(group, &QComboBox::currentIndexChanged, &dialog, populate);
+    connect(search, &QLineEdit::textChanged, &dialog, populate);
+    connect(favorite, &QPushButton::clicked, &dialog, [&] {
+        auto id = list->currentItem()->data(Qt::UserRole).toJsonObject()["id"].toString();
+        if (!favorites.removeAll(id)) favorites.append(id);
+        settings->setValue(favoritesKey, favorites);
+        populate();
+    });
+    populate();
+    if (dialog.exec() == QDialog::Accepted && list->currentItem()) {
+        openDefinition(list->currentItem()->data(Qt::UserRole).toJsonObject(), false, switching);
+    } else {
+        requestedImage.clear();
+        status->setText("Format selection cancelled.");
+        emit completed(false);
+    }
 }
 int Window::entryCount() const { return table->rowCount(); }
 void Window::selectEntry(int row) { table->selectRow(row); }
 void Window::updateUserAreas() {
-    for (int area = 0; area < 16; ++area) {
+    int areas = 16;
+    for (const auto &value : directoryEntries)
+        areas = qMax(areas, value.toObject()["name"].toString().left(2).toInt() + 1);
+    while (userAreas->count() > areas) delete userAreas->takeItem(userAreas->count() - 1);
+    while (userAreas->count() < areas) {
+        const int area = userAreas->count();
+        auto *item = new QListWidgetItem(QString::number(area), userAreas);
+        item->setData(Qt::UserRole, area);
+    }
+    for (int area = 0; area < areas; ++area) {
         int count = 0;
         for (const auto &value : directoryEntries)
             if (value.toObject()["name"].toString().left(2).toInt() == area) ++count;
@@ -597,10 +732,10 @@ void Window::finishBatch() {
 void Window::showImageInformation() {
     if(busy || session.isEmpty()) return;
     int populated=0;
-    for(int area=0;area<16;++area)
+    for(int area=0;area<userAreas->count();++area)
         if(userAreas->item(area)->data(Qt::UserRole+1).toInt()>0) ++populated;
-    const auto details=QString("Source image: %1\nImage layout: %2\nFormat identifier: %3\nContainer: %4\nFiles: %5\nPopulated user areas: %6 of 16\n\nSnapshot SHA-256: %7\nRead-only normalization: %8\n\nRead-only: the source image is never edited.\nLayout selection is manual; no automatic format detection.\nExport retains CP/M record padding.")
-        .arg(image,formats->currentText(),format,container).arg(directoryEntries.size()).arg(populated).arg(snapshotHash,imageNote);
+    const auto details=QString("Source image: %1\nImage layout: %2\nFormat identifier: %3\nContainer: %4\nFiles: %5\nPopulated user areas: %6 of %9\n\nSnapshot SHA-256: %7\nRead-only normalization: %8\n\nRead-only: the source image is never edited.\nThe selected definition is an interpretation of the source image.\nExport retains CP/M record padding.")
+        .arg(image,formats->text(),format,container).arg(directoryEntries.size()).arg(populated).arg(snapshotHash,imageNote).arg(userAreas->count());
     QDialog dialog(this);dialog.setWindowTitle("Image information");dialog.resize(700,420);
     auto *layout=new QVBoxLayout(&dialog);
     auto *text=new QTextEdit;text->setObjectName("imageInformationText");text->setReadOnly(true);
@@ -626,7 +761,8 @@ void Window::begin(QJsonObject request) {
         fail("The image reader is restarting. Open the image again."); return;
     }
     setBusy(true);
-    status->setText(operation == "open" ? "Reading image…" : batchActive ?
+    status->setText(operation == "open" ? "Reading image…" : operation == "catalogue" ? "Loading disk definitions…" :
+        operation == "inspect" ? "Checking image format…" : batchActive ?
         QString("Exporting %1 of %2: %3").arg(batchIndex+1).arg(batch.items.size()).arg(batch.items[batchIndex].name.mid(2)) : "Exporting selected file…");
     deadline.start(deadlineMs);
     pending = QJsonDocument(request).toJson(QJsonDocument::Compact) + '\n';
@@ -657,7 +793,9 @@ void Window::fail(const QString &message) {
         batchInFlight=false; finishBatch(); return;
     }
     setBusy(false);
-    if (operation == "open") resetImage();
+    if (operation == "open" && !retainSource) resetImage();
+    if (operation == "catalogue" || operation == "inspect") requestedImage.clear();
+    retainSource = false;
     status->setText(message); emit completed(false);
     if (closing) close();
 }
@@ -690,6 +828,49 @@ void Window::readReply() {
     const QRegularExpression hash("^[0-9a-f]{64}$");
     auto invalid = [this] { stopReader(); resetImage(); fail("Invalid response schema from the image reader."); };
     if (!reply["result"].isObject()) { invalid(); return; }
+    if (operation == "catalogue" || operation == "inspect") {
+        deadline.stop(); cancellationDeadline.stop();
+        setBusy(false);
+        if (operation == "catalogue") {
+            if (!result["formats"].isArray() || result["catalogue"].toString().isEmpty()) { invalid(); return; }
+            catalogueRows = result["formats"].toArray();
+            activeCatalogue = result["catalogue"].toString();
+            cataloguePath = activeCatalogue;
+            if (!requestedImage.isEmpty()) {
+                begin({{"op","inspect"}, {"image",requestedImage}, {"explicit_format",requestedFormat}});
+            } else {
+                setBusy(false);
+                status->setText(QString("Loaded %1 disk definitions.").arg(catalogueRows.size()));
+                emit completed(true);
+            }
+            return;
+        }
+        inspectedHash = result["source_sha256"].toString();
+        inspectedContainer = requestedContainer.isEmpty() ? result["container"].toString() : requestedContainer;
+        if (!hash.match(inspectedHash).hasMatch() || !result["candidates"].isArray()) { invalid(); return; }
+        const auto warning = result["sidecar_warning"].toString();
+        if (!warning.isEmpty()) QMessageBox::warning(this, "Invalid image sidecar", warning);
+        if (!requestedFormat.isEmpty()) {
+            openDefinition({{"id",requestedFormat}}, false, false);
+            return;
+        }
+        if (result["sidecar"].isObject()) {
+            openDefinition(result["sidecar"].toObject(), true, false);
+            return;
+        }
+        const auto record = settings->value(associationKey(requestedImage, activeCatalogue)).toStringList();
+        if (record.size() == 4 && record[0] == inspectedHash && record[3] == inspectedContainer) {
+            for (const auto &value : catalogueRows) {
+                auto row = value.toObject();
+                if (row["id"].toString() == record[1] && row["definition_sha256"].toString() == record[2]) {
+                    openDefinition(row, false, false);
+                    return;
+                }
+            }
+        }
+        chooseFormat(result, false);
+        return;
+    }
     if (operation == "open") {
         if (!result["entries"].isArray() || result["session"].toString().isEmpty()) {
             stopReader(); fail("Incomplete directory response."); return;
@@ -698,13 +879,13 @@ void Window::readReply() {
         if (rows.size() > 4096 || result["session"].toString().size() > 128 ||
             !hash.match(result["source_sha256"].toString()).hasMatch()) { invalid(); return; }
         QSet<QString> names;
-        const QRegularExpression filename(QString::fromLatin1(R"CPM(^(0[0-9]|1[0-5])[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,8}(\.[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,3})?$)CPM"));
+        const QRegularExpression filename(QString::fromLatin1(R"CPM(^([012][0-9]|3[01])[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,8}(\.[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,3})?$)CPM"));
         for (const auto &row : rows) {
             const auto e = row.toObject(); const auto n = e["name"].toString();
             const double size = e["size"].toDouble(-1), attr = e["attr"].toDouble(-1);
             if (!row.isObject() || !filename.match(n).hasMatch() || names.contains(n) ||
                 size < 0 || size > 16777216 || std::floor(size) != size ||
-                attr < 0 || attr > 2047 || std::floor(attr) != attr || (int(attr) & ~0x70f)) {
+                attr < 0 || attr > 16143 || std::floor(attr) != attr || (int(attr) & ~0x3f0f)) {
                 invalid(); return;
             }
             names.insert(n);
@@ -715,6 +896,12 @@ void Window::readReply() {
         if (!tail.isUndefined() && !tail.isBool()) { invalid(); return; }
         imageNote = tail.toBool() ? "Unused image tail filled with E5 in the temporary snapshot; original unchanged." : "None.";
         snapshotHash=result["source_sha256"].toString();
+        retainSource = false;
+        const auto definitionHash = result["definition_sha256"].toString();
+        if (!activeCatalogue.isEmpty() && hash.match(definitionHash).hasMatch()) {
+            settings->setValue(associationKey(image, activeCatalogue),
+                               QStringList{snapshotHash, format, definitionHash, container});
+        }
         source->setText(QFileInfo(image).fileName()); source->setToolTip(image);
         setWindowTitle("cpmimage — "+QFileInfo(image).fileName());
         updateUserAreas();

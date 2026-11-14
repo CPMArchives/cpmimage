@@ -72,7 +72,6 @@ def main():
     bundled_path = args.root / 'fixtures/diskdefs'
     definitions = catalogue.definitions(catalogue.read_text(bundled_path), bundled=True)
     definitions['amstrad'] = ''
-    catalogue_path = str(bundled_path)
     metadata = json.loads((args.root / 'fixtures/diskdefs-metadata.json').read_text(encoding='utf-8'))
     descriptions = {}
     # Only internal command construction can select this guard; never a request.
@@ -123,16 +122,19 @@ def main():
         rows = []
         with tempfile.TemporaryDirectory(prefix='cpmimage-catalogue-') as temp:
             directory = Path(temp)
-            for fmt, definition in blocks.items():
-                try:
-                    geometry = describe(fmt, definition, directory)
-                except backend.Failure as error:
-                    if error.code != 'cancelled':
-                        raise backend.Failure('invalid_definition', f'{fmt}: {error.message}') from error
-                    raise
-                manufacturer, model, family = metadata.get(fmt, ('', '', ''))
-                rows.append(dict(id=fmt, manufacturer=manufacturer, model=model, family=family,
-                                 definition_sha256=catalogue.digest(definition), geometry=geometry))
+            (directory / 'diskdefs').write_text(''.join(blocks.values()), encoding='utf-8')
+            identifiers = list(blocks)
+            for start in range(0, len(identifiers), 32):
+                chunk = identifiers[start:start + 32]
+                parsed = adapter().native(directory, 'describe-catalogue', *chunk)['definitions']
+                if not isinstance(parsed, list) or len(parsed) != len(chunk):
+                    raise backend.Failure("protocol_invalid", "Incomplete disk definition response.")
+                for fmt, geometry in zip(chunk, parsed):
+                    digest = catalogue.digest(blocks[fmt])
+                    descriptions[fmt, digest] = geometry
+                    manufacturer, model, family = metadata.get(fmt, ('', '', ''))
+                    rows.append(dict(id=fmt, manufacturer=manufacturer, model=model, family=family,
+                                     definition_sha256=digest, geometry=geometry))
         return sorted(rows, key=lambda row: (row['id'].casefold(), row['id']))
 
     def resolve_sidecar(source, directory):
@@ -153,7 +155,7 @@ def main():
         return fmt, definition, geometry
 
     def perform(request):
-        nonlocal snapshot, session, definitions, catalogue_path
+        nonlocal snapshot, session, definitions
         rid = request['id']
         try:
             op = request.get('op')
@@ -166,8 +168,8 @@ def main():
                 if path == bundled_path:
                     blocks['amstrad'] = ''
                 rows = validate_catalogue(blocks)
-                definitions, catalogue_path = blocks, str(path)
-                reply = dict(v=1, id=rid, ok=True, result=dict(formats=rows, catalogue=catalogue_path))
+                definitions = blocks
+                reply = dict(v=1, id=rid, ok=True, result=dict(formats=rows, catalogue=str(path)))
             elif op == 'inspect':
                 source = Path(request['image']).absolute()
                 data = read_image(source)
@@ -177,6 +179,9 @@ def main():
                 fingerprint = hashlib.sha256(data).hexdigest()
                 selected = None
                 warning = ''
+                if not request.get('explicit_format') and not all((key, catalogue.digest(value)) in descriptions
+                    for key, value in definitions.items()):
+                    validate_catalogue(definitions)
                 with tempfile.TemporaryDirectory(prefix='cpmimage-inspect-') as temp:
                     directory = Path(temp)
                     if not request.get('explicit_format'):
@@ -187,7 +192,12 @@ def main():
                                 raise
                             warning = error.message
                     candidates = []
-                    for fmt, definition in definitions.items():
+                    raw = directory / 'candidate.raw'
+                    ranked = []
+                    choices = () if selected or request.get('explicit_format') else sorted(definitions.items())
+                    for fmt, definition in choices:
+                        if stop.is_set():
+                            raise backend.Failure('cancelled')
                         geometry = describe(fmt, definition, directory)
                         if geometry.get('boot_geometry'):
                             continue
@@ -202,7 +212,23 @@ def main():
                                     continue
                             except backend.Failure:
                                 continue
-                        candidates.append(dict(id=fmt, definition_sha256=catalogue.digest(definition)))
+                        if not raw.exists():
+                            if container == 'dsk':
+                                encoded = directory / 'source.dsk'
+                                encoded.write_bytes(data)
+                                adapter().native(directory, 'decode', encoded, raw)
+                            else:
+                                raw.write_bytes(data)
+                        probe = adapter().request({
+                            'v': 1, 'id': rid, 'op': 'list', 'image': str(raw),
+                            'format': fmt, 'container': 'raw'}, defs_override=definition)
+                        if probe['ok']:
+                            populated = bool(probe['result']['entries'])
+                            label = 'Geometry and nonempty directory' if populated else 'Geometry and empty directory'
+                            maker, model, family = metadata.get(fmt, ('', '', ''))
+                            ranked.append((not populated, fmt, dict(id=fmt, manufacturer=maker, model=model, family=family,
+                                evidence=label, definition_sha256=catalogue.digest(definition))))
+                    candidates = [row for _, _, row in sorted(ranked)]
                 result = dict(container=container, source_sha256=fingerprint, candidates=candidates,
                               sidecar_warning=warning)
                 if selected:
