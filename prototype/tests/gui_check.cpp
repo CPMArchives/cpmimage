@@ -85,6 +85,39 @@ private slots:
         QVERIFY(!information->isEnabled());QVERIFY(name->toolTip().isEmpty());
     }
 
+    void saveWorkflow() {
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        const auto path = temp.filePath("test.raw");
+        QVERIFY(QFile::copy(root + "/fixtures/ibm3740-independent.raw", path));
+        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+            qEnvironmentVariable("CPMIMAGE_HELPER"), 30000, 2000, {}, temp.filePath("settings.ini"));
+        window.show();
+        QSignalSpy done(&window, &Window::completed);
+        window.openImage(path, "ibm-3740", "raw");
+        QVERIFY(done.wait(15000));
+        QVERIFY(done.takeFirst()[0].toBool());
+        QAction *save = nullptr;
+        for (auto *action : window.findChildren<QAction *>())
+            if (action->text() == "Save") save = action;
+        QVERIFY(save);
+        QTimer confirm;
+        connect(&confirm, &QTimer::timeout, &window, [&] {
+            auto *prompt = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+            if (prompt) {
+                if (auto *yes = prompt->button(QMessageBox::Yes)) yes->click();
+                else prompt->reject();
+            }
+        });
+        confirm.start(20);
+        save->trigger();
+        QVERIFY(done.wait(15000));
+        QVERIFY2(done.takeFirst()[0].toBool(), qPrintable(window.lastError()));
+        QVERIFY(QFile::exists(temp.filePath("test.FDF")));
+        QVERIFY(!QFile::exists(temp.filePath("test.raw.BAK")));
+    }
+
     void formatSelection() {
         QTemporaryDir temp;
         QVERIFY(temp.isValid());

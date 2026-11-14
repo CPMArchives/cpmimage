@@ -215,7 +215,12 @@ class Adapter:
     else:
      if name not in entries:raise Failure('not_found')
      if op=='export':
-      out=cwd/'export';h=self.export(stage,fmt,container,cwd,name,out,entries[name]);result={'sha256':h,'size':out.stat().st_size}
+      out=cwd/'export';h=self.export(stage,fmt,container,cwd,name,out,entries[name])
+      if request.get('text') is True:
+       converted=out.read_bytes().split(b'\x1a',1)[0].replace(b'\r\n',b'\n')
+       out.write_bytes(converted)
+       h=digest(converted)
+      result={'sha256':h,'size':out.stat().st_size}
      else:
       target=filename(request['new_name'])
       if target in entries:raise Failure('name_collision')

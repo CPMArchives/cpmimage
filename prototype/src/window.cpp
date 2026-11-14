@@ -73,10 +73,11 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     for (const auto &option : QList<QPair<QString,QString>>{
             {"Keep automatic save backups", "saveBackups"},
             {"Save disk definitions beside images", "saveSidecar"},
-            {"Show routine disk-definition save warnings", "warnSaveSidecar"}}) {
+            {"Show routine disk-definition save warnings", "warnSaveSidecar"},
+            {"Convert single-file exports to text", "textExport"}}) {
         auto *action = preferences->addAction(option.first);
         action->setCheckable(true);
-        action->setChecked(settings->value(option.second, true).toBool());
+        action->setChecked(settings->value(option.second, option.second != "textExport").toBool());
         connect(action, &QAction::toggled, this, [this, option](bool checked) {
             settings->setValue(option.second, checked);
         });
@@ -129,8 +130,8 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     toolbar->addWidget(exportButton);
     toolbar->addWidget(areaExportButton);
     toolbar->addStretch();
-    auto *readOnly = new QLabel("Read-only");
-    readOnly->setToolTip("Browse and export. The source image is never edited.");
+    auto *readOnly = new QLabel("Private edits");
+    readOnly->setToolTip("Edits affect a private copy until you save.");
     toolbar->addWidget(readOnly);
     layout->addLayout(toolbar);
     auto *imageRow=new QHBoxLayout;
@@ -817,7 +818,8 @@ void Window::exportFile(const QString &destination) {
     if (!problem.isEmpty()) { status->setText(problem); return; }
     begin({{"op", "export"}, {"session", session},
            {"name", table->item(row, 0)->data(Qt::UserRole).toString()},
-           {"destination", QFileInfo(destination).absoluteFilePath()}});
+           {"destination", QFileInfo(destination).absoluteFilePath()},
+           {"text", settings->value("textExport", false).toBool()}});
 }
 QJsonArray Window::exportEntries(bool wholeArea) const {
     QJsonArray entries;
@@ -933,7 +935,7 @@ void Window::showImageInformation() {
     int populated=0;
     for(int area=0;area<userAreas->count();++area)
         if(userAreas->item(area)->data(Qt::UserRole+1).toInt()>0) ++populated;
-    const auto details=QString("Source image: %1\nImage layout: %2\nFormat identifier: %3\nContainer: %4\nFiles: %5\nPopulated user areas: %6 of %9\n\nSnapshot SHA-256: %7\nRead-only normalization: %8\n\nRead-only: the source image is never edited.\nThe selected definition is an interpretation of the source image.\nExport retains CP/M record padding.")
+    const auto details=QString("Source image: %1\nImage layout: %2\nFormat identifier: %3\nContainer: %4\nFiles: %5\nPopulated user areas: %6 of %9\n\nSnapshot SHA-256: %7\nRead-only normalization: %8\n\nEdits affect a private copy until you save.\nThe selected definition is an interpretation of the source image.\nExport retains CP/M record padding.")
         .arg(image,formats->text(),format,container).arg(directoryEntries.size()).arg(populated).arg(snapshotHash,imageNote).arg(userAreas->count());
     QDialog dialog(this);dialog.setWindowTitle("Image information");dialog.resize(700,420);
     auto *layout=new QVBoxLayout(&dialog);

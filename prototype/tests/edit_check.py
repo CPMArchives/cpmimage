@@ -35,6 +35,13 @@ class EditCheck(unittest.TestCase):
         result = broker.request('save', plan=plan['result'], confirm_sidecar=True, **save)
         self.assertTrue(result['ok'], result)
         self.assertEqual(broker.image.read_bytes(), fixture.read_bytes())
+        tools = os.environ.get('CPMIMAGE_UPSTREAM_TOOLS')
+        if tools:
+            (broker.directory / 'diskdefs').write_bytes(destination.with_suffix('.FDF').read_bytes())
+            independent = broker.directory / 'independent.txt'
+            subprocess.run([str(Path(tools) / 'cpmcp'), '-f', fmt, '-T', 'dsk', str(destination),
+                            '0:first.txt', str(independent)], cwd=broker.directory, check=True)
+            self.assertTrue(independent.read_bytes().startswith(b'A\r\nB\r\nC\r\n\x1a'))
         reopened = broker.request('open', image=str(destination), format=fmt, container='dsk')
         self.assertTrue(reopened['ok'], reopened)
         output = broker.directory / 'converted.txt'

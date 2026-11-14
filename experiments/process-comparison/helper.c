@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/stat.h>
 #include "cpmfs.h"
 const char cmd[]="cpmimage_helper";
 static void quoted(const char *s) {
@@ -131,6 +132,17 @@ static int edit(struct cpmSuperBlock *sb, struct cpmInode *root, const char *op,
       while ((count=fread(bytes,1,sizeof bytes,input))>0)
         if (cpmWrite(&file,(const char *)bytes,count)!=(ssize_t)count) { result=-1; break; }
       if (ferror(input) || cpmClose(&file)<0) result=-1;
+    }
+    if (result==0)
+    {
+      struct stat info;
+      if (stat(argument,&info)==0)
+      {
+        struct utimbuf times;
+        times.actime=info.st_atime;
+        times.modtime=info.st_mtime;
+        cpmUtime(&ino,&times);
+      }
     }
     fclose(input);
   }

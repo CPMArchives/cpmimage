@@ -351,11 +351,14 @@ def main():
                             if target in names:
                                 raise backend.Failure('invalid_edit', f'Duplicate import name: {target}')
                             names.add(target)
-                            data = read_image(Path(item['path']))
+                            host = Path(item['path'])
+                            info = host.stat()
+                            data = read_image(host)
                             if item.get('text') is True:
                                 data = data.replace(b'\r\n', b'\n').replace(b'\r', b'\n').replace(b'\n', b'\r\n') + b'\x1a'
                             staged = edit_dir / 'input.bin'
                             staged.write_bytes(data)
+                            os.utime(staged, ns=(info.st_atime_ns, info.st_mtime_ns))
                             if item.get('replace') is True:
                                 adapter().native(edit_dir, 'edit_delete', candidate, session['format'], 'raw', target, '-')
                             adapter().native(edit_dir, 'edit_import', candidate, session['format'], 'raw', target, staged)
@@ -510,8 +513,12 @@ def main():
                                 if file_hash(decoded) != file_hash(output):
                                     raise backend.Failure('image_incompatible', 'Encoded DSK failed its byte-for-byte RAW round trip.')
                                 output = encoded
-                            publish(owner, expected, output,
-                                    (*sidecar, staged) if sidecar else None, request.get('backups', True))
+                            if sidecar:
+                                with Ownership(sidecar[0], Path.home() / '.cpmimage' / 'ownership') as sidecar_owner:
+                                    sidecar_owner.check(replacing=True)
+                                    publish(owner, expected, output, (*sidecar, staged), request.get('backups', True))
+                            else:
+                                publish(owner, expected, output, backups=request.get('backups', True))
                     except BaseException:
                         if acquired:
                             owner.close()
@@ -529,7 +536,8 @@ def main():
                 reply = adapter().request({
                     'v': 1, 'id': rid, 'op': 'export', 'image': str(session['image']),
                     'format': session['format'], 'container': session['container'],
-                    'name': request['name'], 'destination': request['destination']}, defs_override=session['definitions'])
+                    'name': request['name'], 'destination': request['destination'],
+                    'text': request.get('text', False)}, defs_override=session['definitions'])
             else:
                 raise backend.Failure('read_only', 'Only read-only operations are available.')
             respond(reply)
