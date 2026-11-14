@@ -114,3 +114,73 @@ def inspect_imd(data):
     if not tracks:
         raise MappingError('IMD contains no tracks.')
     return tracks, comment if separator else b''
+
+
+def transfer_dmk(data, mapping, raw=None):
+    """Read or update ordinary MFM DMK sectors using a verified track mapping.
+
+    Writes retain the source track representation and update only payload CRCs.
+    """
+    from binascii import crc_hqx
+
+    if len(data) < 16 or data[0] not in (0, 255):
+        raise MappingError('Invalid DMK header.')
+    cylinders = data[1]
+    length = int.from_bytes(data[2:4], 'little')
+    heads = 1 if data[4] & 16 else 2
+    if (not cylinders or length <= 128 or len(data) != 16 + cylinders * heads * length
+            or len(mapping.tracks) != cylinders * heads or data[4] & ~16 or any(data[5:16])):
+        raise MappingError('Unsupported DMK geometry or header options.')
+    if raw is not None and data[0]:
+        raise MappingError('DMK source is write protected.')
+    output = bytearray(data) if raw is not None else bytearray()
+    cursor = 0
+    for track in mapping.tracks:
+        if track.cylinder >= cylinders or track.head >= heads or track.mode < 3:
+            raise MappingError('DMK requires a verified MFM track mapping.')
+        base = 16 + (track.cylinder * heads + track.head) * length
+        limit = base + length
+        pointers = []
+        for index in range(base, base + 128, 2):
+            value = int.from_bytes(data[index:index + 2], 'little')
+            if not value:
+                break
+            offset = value & 0x3fff
+            if value & 0xc000 != 0x8000 or not 128 <= offset < length:
+                raise MappingError('Unsupported DMK density or ID pointer.')
+            pointers.append(base + offset)
+        if len(pointers) != len(track.sectors) or pointers != sorted(set(pointers)):
+            raise MappingError('Missing or ambiguous DMK ID pointers.')
+        slots = {}
+        for position, end in zip(pointers, pointers[1:] + [limit]):
+            if position + 7 > end or data[position:position + 3] != bytes((0xfe, track.cylinder, track.head)):
+                raise MappingError('DMK sector address differs from the mapping.')
+            _, _, _, sector, shift = data[position:position + 5]
+            if (sector in slots or shift > 6 or 128 << shift != track.size
+                    or crc_hqx(b'\xa1' * 3 + data[position:position + 7], 0xffff)):
+                raise MappingError('Ambiguous or damaged DMK sector ID.')
+            mark = data.find(b'\xa1\xa1\xa1\xfb', position + 7, end)
+            deleted = data.find(b'\xa1\xa1\xa1\xf8', position + 7, end)
+            if mark < 0 or 0 <= deleted < mark or mark + 6 + track.size > end:
+                raise MappingError('Missing or unsupported DMK data mark.')
+            start = mark + 4
+            finish = start + track.size
+            if crc_hqx(data[mark:finish + 2], 0xffff):
+                raise MappingError('Damaged DMK data CRC.')
+            slots[sector] = (start, finish)
+        if set(slots) != set(track.sectors):
+            raise MappingError('DMK sector IDs differ from the mapping.')
+        for sector in track.sectors:
+            start, finish = slots[sector]
+            if raw is None:
+                output.extend(data[start:finish])
+            else:
+                chunk = raw[cursor:cursor + track.size]
+                if len(chunk) != track.size:
+                    raise MappingError('RAW payload is shorter than the DMK mapping.')
+                output[start:finish] = chunk
+                output[finish:finish + 2] = crc_hqx(output[start - 4:finish], 0xffff).to_bytes(2, 'big')
+                cursor += track.size
+    if raw is not None and cursor != len(raw):
+        raise MappingError('RAW payload is larger than the DMK mapping.')
+    return bytes(output)
