@@ -1,6 +1,6 @@
 # CP/M Image — Engineering Specification
 
-**Version:** 0.9  
+**Version:** 1.0  
 **Status:** Approved engineering baseline  
 **Project:** CPMArchives/cpmimage  
 **Target release:** 1.0  
@@ -249,6 +249,10 @@ When opening an image, CP/M Image shall search beside it for a matching `.FDF` f
 A generated sidecar shall contain a complete, standalone cpmtools-compatible disk definition, including its identifier and any inherited parameters needed to interpret the image. It shall be independently usable by unmodified cpmtools without CP/M Image-specific syntax.
 
 An explicit Save or Save As shall by default create or update the image's sidecar using the selected disk definition, even if the image has no content changes. Merely opening, detecting, or selecting a format shall not create a sidecar. The sidecar shall be generated only as part of an explicit image-save workflow. Users may disable automatic sidecar generation in preferences. An existing sidecar that conflicts with the selected definition shall not be silently overwritten. Saving the image and sidecar shall follow a documented failure-recovery policy that avoids silently leaving inconsistent results.
+
+An `.FDF` records the **disk definition selected for interpretation**, not a verified identification of the image's actual filesystem format. Selecting a different definition, saving, or generating an `.FDF` shall not be described as converting the image to that disk format. A selected definition may be wrong even when the directory appears plausible. CP/M Image shall perform available structural and write-safety checks and report detected inconsistencies, but shall not claim to prove historical format identity. The user is responsible for selecting an appropriate definition.
+
+When an explicit Save or Save As would create an `.FDF` for the first time, the application shall present a **Confirm Disk Definition** warning before publication, identifying the selected definition and explaining that the sidecar records the selection without verifying or converting the actual filesystem. The same warning shall appear when saving would replace an existing `.FDF` with a **different definition**. It shall not repeat on later saves when the definition is unchanged. The warning shall offer Continue Save and Cancel, and a persistent **Don't show this warning again** preference for these routine warnings. Cancel shall abort the entire Save operation without modifying the destination. Actual detected filesystem-integrity warnings shall never be suppressed by this preference.
 
 Format-selection precedence is: (1) explicit `/f=FORMAT`, (2) matching `.FDF` sidecar, (3) remembered format, (4) normal selection or detection. Explicitly opening an image with a different format shall not itself rewrite the sidecar. Invalid sidecars shall be reported.
 
