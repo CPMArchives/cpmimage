@@ -701,7 +701,14 @@ private slots:
         // Native platform dialogs are checked separately on the desktop.
         QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, true);
         const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
-        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"), qEnvironmentVariable("CPMIMAGE_HELPER"));
+        QTemporaryDir config;
+        QVERIFY(config.isValid());
+        const auto settingsPath = config.filePath("settings.ini");
+        QSettings settings(settingsPath, QSettings::IniFormat);
+        settings.setValue("exports/directory", config.path());
+        settings.sync();
+        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                      qEnvironmentVariable("CPMIMAGE_HELPER"), 30000, 2000, {}, settingsPath);
         window.show(); QSignalSpy done(&window, &Window::completed);
         auto button = [&](const QString &prefix) -> QPushButton * {
             for (auto *b : window.findChildren<QPushButton *>()) if (b->text().startsWith(prefix)) return b;
@@ -710,7 +717,8 @@ private slots:
         QTimer watchdog; watchdog.setInterval(4000);
         connect(&watchdog, &QTimer::timeout, &window, [] {
             if (auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget())) dialog->reject();
-        }); watchdog.start();
+        });
+        watchdog.setSingleShot(true);
         QTemporaryDir fixtureDirectory; QVERIFY(fixtureDirectory.isValid());
         QVERIFY(QFile::copy(root + "/fixtures/ibm3740-independent.raw", fixtureDirectory.filePath("fixture.raw")));
         bool visited = false;
@@ -734,19 +742,26 @@ private slots:
             picker.stop();
         });
         picker.start(20);
+        watchdog.start();
         QVERIFY(button("Open")); button("Open")->click(); QVERIFY(visited);
         if (done.isEmpty()) QVERIFY(done.wait(5000));
         QVERIFY(done.takeFirst()[0].toBool()); QCOMPARE(window.entryCount(),1);
-        QTemporaryDir destination; QVERIFY(destination.isValid());
-        const auto output = destination.filePath("dialog export.bin");
+        const auto output = config.filePath("dialog export.bin");
+        QString selectedOutput;
         visited = false;
+        watchdog.start();
         QTimer::singleShot(100, &window, [&] {
             auto *dialog = fileDialog();
             if (!dialog) return;
-            visited = QDir(dialog->directory()).exists() && !dialog->selectedFiles().isEmpty() && QFileInfo(dialog->selectedFiles().first()).fileName()=="BINARY.BIN"; dialog->setDirectory(destination.path());
-            QTimer::singleShot(300, dialog, [dialog, &output] { if (auto *edit = dialog->findChild<QLineEdit *>("fileNameEdit")) { edit->setText(output); QTest::keyClick(edit, Qt::Key_Return); } });
+            visited = dialog->selectedFiles() == QStringList{config.filePath("BINARY.BIN")};
+            auto *edit = dialog->findChild<QLineEdit *>("fileNameEdit");
+            if (!edit) return;
+            edit->setText(QFileInfo(output).fileName());
+            selectedOutput = dialog->selectedFiles().value(0);
+            QMetaObject::invokeMethod(dialog, "accept");
         });
         QVERIFY(button("Export")); button("Export")->click(); QVERIFY(visited);
+        QCOMPARE(selectedOutput, output);
         if (done.isEmpty()) QVERIFY(done.wait(5000));
         QVERIFY(done.takeFirst()[0].toBool());
         QFile file(output); QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.size(),512);

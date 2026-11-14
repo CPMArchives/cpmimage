@@ -763,11 +763,12 @@ void Window::inspectImage(const QString &path, const QString &explicitFormat, co
         loadCatalogue(cataloguePath);
         return;
     }
-    begin({{"op", "inspect"}, {"image", requestedImage}, {"explicit_format", requestedFormat}});
+    begin({{"op", "inspect"}, {"image", requestedImage}, {"explicit_format", requestedFormat}, {"container", requestedContainer}});
 }
 void Window::openImage(const QString &path, const QString &fmt, const QString &type) {
     if (busy) return;
     requestedImage.clear();
+    requestedFormat.clear();
     retainSource = false;
     resetImage();
     image = QFileInfo(path).absoluteFilePath();
@@ -841,6 +842,12 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
         favorite->setEnabled(enabled);
     };
     connect(list, &QListWidget::currentItemChanged, &dialog, updateButtons);
+    const auto diagnostic = inspection["detection_warning"].toString();
+    if (!diagnostic.isEmpty()) {
+        auto *hint = new QLabel(diagnostic, &dialog);
+        hint->setWordWrap(true);
+        layout->insertWidget(0, hint);
+    }
     const auto candidates = inspection["candidates"].toArray();
     const QString favoritesKey = "formatFavorites";
     auto favorites = settings->value(favoritesKey).toStringList();
@@ -1617,7 +1624,7 @@ void Window::readReply() {
             cataloguePath = activeCatalogue;
             if (newImagePicker) { chooseFormat({}, false); return; }
             if (!requestedImage.isEmpty()) {
-                begin({{"op","inspect"}, {"image",requestedImage}, {"explicit_format",requestedFormat}});
+                begin({{"op","inspect"}, {"image",requestedImage}, {"explicit_format",requestedFormat}, {"container",requestedContainer}});
             } else {
                 setBusy(false);
                 status->setText(QString("Loaded %1 disk definitions.").arg(catalogueRows.size()));
@@ -1678,9 +1685,8 @@ void Window::readReply() {
         snapshotHash=result["source_sha256"].toString();
         imageGeometry = result["geometry"].toObject();
         imdComment = result["imd_comment"].toString();
-        retainSource = false;
         const auto definitionHash = result["definition_sha256"].toString();
-        if (!activeCatalogue.isEmpty() && hash.match(definitionHash).hasMatch()) {
+        if ((retainSource || requestedFormat.isEmpty()) && !activeCatalogue.isEmpty() && hash.match(definitionHash).hasMatch()) {
             settings->setValue(associationKey(image, activeCatalogue),
                                QStringList{snapshotHash, format, definitionHash, container});
         }

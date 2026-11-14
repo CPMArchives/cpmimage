@@ -97,8 +97,27 @@ class CatalogueCheck(unittest.TestCase):
         self.assertTrue(result['ok'], result)
         candidates = result['result']['candidates']
         self.assertIn('ibm-3740', [row['id'] for row in candidates])
-        ranking = [(row['evidence'] == 'Geometry and empty directory', row['id']) for row in candidates]
+        ranking = []
+        for row in candidates:
+            evidence = row['evidence']
+            shortened = evidence.startswith('Short RAW')
+            missing = int(evidence.split('(')[1].split()[0].replace(',', '')) if shortened else 0
+            ranking.append((shortened, 'empty directory' in evidence, missing, row['id']))
         self.assertEqual(ranking, sorted(ranking))
+
+    def test_short_raw_prefers_closer_populated_geometry(self):
+        catalogue = self.directory / 'short-raw-definitions'
+        catalogue.write_text(
+            CUSTOM.replace('custom-3740', 'aaa-larger').replace('tracks 77', 'tracks 80') + CUSTOM
+        )
+        self.assertTrue(self.request('catalogue', path=str(catalogue))['ok'])
+        with self.image.open('r+b') as stream:
+            stream.truncate(self.image.stat().st_size - 128)
+        inspected = self.request('inspect', image=str(self.image))
+        self.assertTrue(inspected['ok'], inspected)
+        rows = inspected['result']['candidates']
+        self.assertEqual([row['id'] for row in rows], ['custom-3740', 'aaa-larger'])
+        self.assertTrue(all('populated directory' in row['evidence'] for row in rows))
 
     def test_fdf_is_discovered_and_bound_to_content(self):
         path = self.image.with_suffix('.FDF')
