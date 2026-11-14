@@ -1,6 +1,6 @@
 # CP/M Image — Development Roadmap
 
-**Status:** Approved development sequence, reconciled with Engineering Specification 0.8  
+**Status:** Approved development sequence, reconciled with Engineering Specification 0.9  
 **Project:** CPMArchives/cpmimage  
 **Target release:** 1.0  
 **Date:** November 14, 2026
@@ -87,6 +87,8 @@ The current five-format restriction is an implementation limitation, **not** a p
 
 - Support tabbed image sessions within each window and multiple independent application instances, with per-tab format, user area, and unsaved state. Allow shared read-only access but enforce a single writable owner per source, with external-change checks before save.
 - Support copying/moving files between images and user areas.
+- Implement the required Show All virtual view across user areas, retaining source user identities in selections and prompting for destination user areas when importing or pasting.
+- Implement default flat multi-area export and native drag-out, consolidating byte-identical same-name files and checking existing destination contents; offer Overwrite, Skip (default), Rename, or Cancel for differing-content collisions. Cancel stops the remainder; completed exports remain; report skipped and deduplicated files.
 - Implement drag-and-drop, clipboard transfers, multiple selection, and conflict handling. Copy/Paste duplicates; Cut/Paste moves only after successful destination writing; drag-and-drop copies by default between user areas/images and requires an explicit action to move. Cross-instance transfers use native host clipboard/drag-and-drop without a custom interprocess protocol.
 - Preserve the narrow left CP/M user-area sidebar (approximately 90–120 pixels by default, resizable) and wide right file-list pane; do not add a permanent host filesystem browser.
 - Support native host file-manager drag-and-drop: drop images to open, host files onto user areas to import, CP/M files onto host folders to export, and files between open images to transfer. Distinguish opening an image from importing it as data by drop target.
@@ -103,6 +105,7 @@ The current five-format restriction is an implementation limitation, **not** a p
 - Build and package the pinned standalone cpmtools executables for each supported host platform. Preserve arguments, stdin/stdout/stderr, and exit codes, with explicit Windows console qualification.
 - Complete preferences, Image Information, relevant format-detection assistance, progress/error presentation, and general workflow integration.
 - Finalize the narrow-sidebar file list with default Filename, Records, Size (bytes), Attributes columns; optional User and supported timestamps; numeric sorting, column-header Choose Columns, reorder/resize, and persistent layout. Display logical bytes as records × 128, not exact original length.
+- Add All above numbered user areas, automatically show User in Show All and restore the normal column configuration when leaving it; implement View → Show All User Areas and Ctrl/Cmd+Shift+A as a per-tab toggle returning to the previously selected user area and clearing selections on view switches.
 - Provide the five-button labeled toolbar (Open, New, Save | Import, Export), visible by default and persistently hideable via View → Toolbar. Keep sorting and other contextual commands off the toolbar.
 - Implement target-specific context menus for files, user areas, empty file-list space, image tabs, and column headers, with selection-sensitive availability and consistent underlying actions. Double-click opens Properties in 1.0; F2 renames; Delete confirms; Properties edits RO/SYS/ARC and shows available metadata.
 - Implement approved function keys: F1 Help, F2 Rename, F4 Properties, F5 Refresh, F6 Move to User; reserve F3 for a future viewer, leave F7–F9/F11–F12 unassigned, and respect native F10 menu behavior.
@@ -122,6 +125,7 @@ The current five-format restriction is an implementation limitation, **not** a p
 - Publish online Help and complete documentation and release-readiness checks.
 - Validate offline Help without network access, search, contextual topics, online/offline content consistency, and Help links.
 - Qualify native UI appearance, sidebar sizing, column sorting/persistence, toolbar visibility, context menus, Properties, function-key and standard shortcuts (including macOS/Windows/Linux differences), tab/instance ownership, conflict behavior, safe rename/delete, filename review, and bidirectional drag-and-drop with host file managers on the release platforms.
+- Qualify Show All's cross-user-area listing, keyboard toggle, source identity preservation, destination prompts, flat export, checksum/byte-comparison deduplication, host-existing-file comparisons, Rename conflicts, Skip/Cancel semantics, and native drag-out behavior.
 
 **Acceptance:** Release targets have reproducible builds, qualified installers/packages, working bundled offline Help, published online documentation, verified native file-manager transfers, and documented evidence of the required workflows.
 
@@ -149,4 +153,4 @@ The existing cpmtools CLI executables, including `fsck.cpm` and `fsed.cpm`, rema
 - Keep source images safe until explicit publication.
 - Test and review each milestone independently. Do not interpret this roadmap as authorization to implement all milestones in a single Work assignment.
 - Resolve open implementation details in the milestone where they matter, without reopening approved product requirements.
-- Treat the approved 1.0 product/UI design as feature-frozen; optional All User Areas and future file viewer are not release blockers.
+- Treat the approved 1.0 product/UI design as feature-frozen; **Show All User Areas is required** for 1.0, while the future file viewer is not a release blocker.
