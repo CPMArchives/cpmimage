@@ -1,0 +1,523 @@
+--- a/cpmfs.c
++++ b/cpmfs.c
+@@ -265,7 +265,7 @@
+   for (block=0; block<d->dirblks; ++block)
+   {
+     offset = block/INTBITS;
+-    d->alv[offset] |= (1<<(block%INTBITS));
++    d->alv[offset] |= (1u<<(block%INTBITS));
+ #ifdef CPMFS_DEBUG
+     fprintf(stderr,"alvInit: allocate directory block %d\n",block);
+ #endif
+@@ -288,7 +288,7 @@
+           fprintf(stderr,"alvInit: allocate block %d\n",block);
+ #endif
+           offset=block/INTBITS;
+-          d->alv[offset]|=(1<<block%INTBITS);
++          d->alv[offset]|=(1u<<block%INTBITS);
+         }
+       }
+     }
+@@ -710,12 +710,43 @@
+ 
+ /* superblock management */
+ /* diskdefReadSuper   -- read super block from diskdefs file     */ /*{{{*/
+-static int diskdefReadSuper(struct cpmSuperBlock *d, char const *format)
++static int validateDiskGeometry(struct cpmSuperBlock *d, int skewCount)
++{
++  if (d->secLength<128 || d->secLength>16384 || d->secLength%128 ||
++      d->sectrk<1 || d->sectrk>65536 || d->tracks<1 ||
++      d->blksiz<128 || d->blksiz>16384 || d->blksiz%d->secLength ||
++      d->blksiz%128 || d->maxdir<1 || d->maxdir>65536 ||
++      d->dirblks<0 || d->extents<0 || d->extents>32 ||
++      d->skew<0 || d->skew>INT_MAX-d->sectrk || d->offset<0 ||
++      (d->bootsec<0 && d->boottrk<0)) return -1;
++  long long sectors=(long long)d->sectrk*d->tracks;
++  long long boot=d->bootsec>=0 ? d->bootsec : (long long)d->boottrk*d->sectrk;
++  if (sectors>INT_MAX/d->secLength || boot>=sectors) return -1;
++  d->size=(int)((sectors-boot)*d->secLength/d->blksiz);
++  int directory=(d->maxdir*32+d->blksiz-1)/d->blksiz;
++  if (!d->dirblks) d->dirblks=directory;
++  if ((long long)d->extents*16384>(long long)(d->size>256?8:16)*d->blksiz && d->extents>1) return -1;
++  if (d->dirblks<directory || d->dirblks>d->size || d->size>65536) return -1;
++  if (d->skewtab)
++  {
++    if (skewCount!=d->sectrk) return -1;
++    unsigned char seen[65536]={0};
++    for (int i=0;i<skewCount;++i)
++    {
++      int sector=d->skewtab[i];
++      if (sector<0 || sector>=d->sectrk || seen[sector]) return -1;
++      seen[sector]=1;
++    }
++  }
++  return 0;
++}
++int cpmImageReadDefinition(struct cpmSuperBlock *d, char const *format)
+ {
+   char line[256];
+   int ln;
+   FILE *fp;
+-  int insideDef=0,found=0;
++  int insideDef=0,found=0,skewCount=0;
++  int finish=0;
+ 
+   d->libdskGeometry[0] = '\0';
+   d->type=0;
+@@ -728,6 +759,9 @@
+   while (fgets(line,sizeof(line),fp)!=(char*)0)
+   {
+     int argc;
++    size_t length=strlen(line);
++    if (length==sizeof(line)-1 && line[length-1]!='\n') goto invalid;
++    while (length && isspace((unsigned char)line[length-1])) line[--length]=0;
+     char *argv[2];
+     char *s;
+ 
+@@ -737,20 +771,46 @@
+     s = strchr(line, ';');
+     if (s) strcpy(s, "\n");
+ 
++    length=strlen(line);
++    while (length && isspace((unsigned char)line[length-1])) line[--length]=0;
++
+     for (argc=0; argc<1 && (argv[argc]=strtok(argc ? (char*)0 : line," \t\n")); ++argc);
+     if ((argv[argc]=strtok((char*)0,"\n"))!=(char*)0) ++argc;
++    if (argc==2) while (isspace((unsigned char)*argv[1])) ++argv[1];
++    if (insideDef && argc==2 && !strcmp(argv[0],"diskdef"))
++    {
++      if (found)
++      {
++        if (validateDiskGeometry(d,skewCount)<0) goto invalid;
++        finish=1; break;
++      }
++      free(d->skewtab); d->skewtab=NULL; insideDef=0;
++    }
+     if (insideDef)
+     {
+       if (argc==1 && strcmp(argv[0],"end")==0)
+       {
+         insideDef=0;
+-        d->size=(d->sectrk*d->tracks-bootOffset(d)) * d->secLength / d->blksiz;
++        finish=1;
++        if (!found) { free(d->skewtab); d->skewtab=NULL; ++ln; continue; }
++        if (validateDiskGeometry(d,skewCount)<0) goto invalid;
+         if (d->extents==0) d->extents=((d->size>256 ? 8 : 16)*d->blksiz)/16384;
+         if (d->extents==0) d->extents=1;
+         if (found) break;
+       }
+-      else if (argc==2)
++      else if (argc==2 && strcmp(argv[0],"diskdef") && strcmp(argv[0],"end"))
+       {
++        if (!strcmp(argv[0],"seclen") || !strcmp(argv[0],"tracks") ||
++            !strcmp(argv[0],"sectrk") || !strcmp(argv[0],"blocksize") ||
++            !strcmp(argv[0],"maxdir") || !strcmp(argv[0],"dirblks") ||
++            !strcmp(argv[0],"skew") || !strcmp(argv[0],"boottrk") ||
++            !strcmp(argv[0],"bootsec") || !strcmp(argv[0],"logicalextents"))
++        {
++          char *end;
++          errno=0;
++          long value=strtol(argv[1],&end,0);
++          if (end==argv[1] || *end || errno || value<0 || value>INT_MAX) goto invalid;
++        }
+         if (strcmp(argv[0],"seclen")==0) d->secLength=strtol(argv[1],(char**)0,0);
+         else if (strcmp(argv[0],"tracks")==0) d->tracks=strtol(argv[1],(char**)0,0);
+         else if (strcmp(argv[0],"sectrk")==0) d->sectrk=strtol(argv[1],(char**)0,0);
+@@ -770,40 +830,45 @@
+         {
+           int pass,sectors;
+ 
++          free(d->skewtab); d->skewtab=NULL;
+           for (pass=0; pass<2; ++pass)
+           {
+             sectors=0;
+             for (s=argv[1]; *s; )
+             {
+-              int phys;
++              long phys;
+               char *end;
+ 
++              errno=0;
+               phys=strtol(s,&end,10);
+-              if (pass==1) d->skewtab[sectors]=phys;
++              if (errno || phys<0 || phys>INT_MAX || sectors>=1024) goto invalid;
+               if (end==s)
+               {
+                 fprintf(stderr,"%s: invalid skewtab `%s' at `%s' in line %d\n",cmd,argv[1],s,ln);
+                 exit(1);
+               }
++              if (pass==1) d->skewtab[sectors]=(int)phys;
+               s=end;
+               ++sectors;
+               if (*s==',') ++s;
+             }
+-            if (pass==0) d->skewtab=malloc(sizeof(int)*sectors);
++            if (!sectors) goto invalid;
++            if (pass==0 && !(d->skewtab=malloc(sizeof(int)*sectors))) goto invalid;
++            skewCount=sectors;
+           }
+         }
+         else if (strcmp(argv[0],"boottrk")==0) d->boottrk=strtol(argv[1],(char**)0,0);
+         else if (strcmp(argv[0],"bootsec")==0) d->bootsec=strtol(argv[1],(char**)0,0);
+         else if (strcmp(argv[0],"offset")==0)  
+         {
+-          off_t val;
+-          unsigned int multiplier;
++          long long val;
++          long long multiplier;
+           char *endptr;
+ 
+           errno=0;
+           multiplier=1;
+-          val = strtol(argv[1],&endptr,10);
+-          if ((errno==ERANGE && val==LONG_MAX)||(errno!=0 && val<=0))
++          val = strtoll(argv[1],&endptr,10);
++          if (errno || val<0 || val>INT_MAX)
+           {
+             fprintf(stderr,"%s: invalid offset value `%s' (%s) in line %d\n",cmd,argv[1],strerror(errno),ln);
+             exit(1);
+@@ -830,7 +895,7 @@
+                   fprintf(stderr,"%s: offset must be specified after sectrk, tracks and secLength in line %d\n",cmd,ln);
+                   exit(1);
+                 }
+-                multiplier=d->sectrk*d->secLength;
++                multiplier=(long long)d->sectrk*d->secLength;
+                 break;
+               case 'S':
+                 if (d->sectrk<0||d->tracks<0||d->secLength<0)
+@@ -845,7 +910,7 @@
+                 exit(1);
+             }
+           }
+-          if (val*multiplier>INT_MAX)
++          if (multiplier<=0 || val>INT_MAX/multiplier)
+           {
+             fprintf(stderr,"%s: effective offset is out of range in line %d\n",cmd,ln);
+             exit(1);
+@@ -853,7 +918,7 @@
+           d->offset=val*multiplier;
+         }
+         else if (strcmp(argv[0],"logicalextents")==0) d->extents=strtol(argv[1],(char**)0,0);
+-        else if (strcmp(argv[0],"os")==0)
++        else if (strcmp(argv[0],"os")==0 || strcmp(argv[0],"OS")==0)
+         {
+           if      (strcmp(argv[1],"2.2"  )==0) d->type|=CPMFS_DR22;
+           else if (strcmp(argv[1],"3"    )==0) d->type|=CPMFS_DR3;
+@@ -868,6 +933,7 @@
+         }
+ 	else if (strcmp(argv[0], "libdsk:format")==0)
+         {
++          if (strlen(argv[1])>=sizeof(d->libdskGeometry)) goto invalid;
+           strncpy(d->libdskGeometry, argv[1], sizeof(d->libdskGeometry) - 1);
+           d->libdskGeometry[sizeof(d->libdskGeometry) - 1] = 0;
+         }
+@@ -881,6 +947,7 @@
+     else if (argc==2 && strcmp(argv[0],"diskdef")==0)
+     {
+       insideDef=1;
++      finish=0; skewCount=0;
+       d->skew=1;
+       d->extents=0;
+       d->type=CPMFS_DR22;
+@@ -891,45 +958,23 @@
+       d->libdskGeometry[0] = 0;
+       if (strcmp(argv[1],format)==0) found=1;
+     }
++    else if (argc>0) goto invalid;
+     ++ln;
+   }
++  if (insideDef && found && !finish) goto invalid;
+   fclose(fp);
+   if (!found)
+   {
+     fprintf(stderr,"%s: unknown format %s\n",cmd,format);
+-    exit(1);
+-  }
+-  if (d->boottrk<0 && d->bootsec<0)
+-  {
+-    fprintf(stderr, "%s: boottrk / bootsec parameter invalid or missing from diskdef\n",cmd);
+-    exit(1);
+-  }
+-  if (d->secLength<0)
+-  {
+-    fprintf(stderr, "%s: secLength parameter invalid or missing from diskdef\n",cmd);
+-    exit(1);
+-  }
+-  if (d->sectrk<0)
+-  {
+-    fprintf(stderr, "%s: sectrk parameter invalid or missing from diskdef\n",cmd);
+     exit(1);
+   }
+-  if (d->tracks<0)
+-  {
+-    fprintf(stderr, "%s: tracks parameter invalid or missing from diskdef\n",cmd);
+-    exit(1);
+-  }
+-  if (d->blksiz<0)
+-  {
+-    fprintf(stderr, "%s: blocksize parameter invalid or missing from diskdef\n",cmd);
+-    exit(1);
+-  }
+-  if (d->maxdir<0)
+-  {
+-    fprintf(stderr, "%s: maxdir parameter invalid or missing from diskdef\n",cmd);
+-    exit(1);
+-  }
++  if (!finish) return -1;
+   return 0;
++
++invalid:
++  fprintf(stderr,"%s: invalid disk definition near line %d\n",cmd,ln);
++  fclose(fp);
++  exit(1);
+ }
+ /*}}}*/
+ /* amsReadSuper       -- read super block from amstrad disk      */ /*{{{*/
+@@ -941,8 +986,7 @@
+   Device_setGeometry(&d->dev,512,9,40,0,"pcw180");
+   if ((err=Device_readSector(&d->dev, 0, 0, (char *)boot_sector)))
+   {
+-    fprintf(stderr,"%s: Failed to read Amstrad superblock (%s)\n",cmd,err);
+-    exit(1);
++    boo=err; return -1;
+   }
+   boot_spec=(boot_sector[0] == 0 || boot_sector[0] == 3)?boot_sector:(unsigned char*)0;
+   /* Check for JCE's extension to allow Amstrad and MSDOS superblocks
+@@ -957,8 +1001,7 @@
+   ) boot_spec = boot_sector + 128;
+   if (boot_spec==(unsigned char*)0)
+   {
+-    fprintf(stderr,"%s: Amstrad superblock not present\n",cmd);
+-    exit(1);
++    boo="Amstrad superblock not present"; return -1;
+   }
+   /* boot_spec[0] = format number: 0 for SS SD, 3 for DS DD
+               [1] = single/double sided and density flags
+@@ -969,6 +1012,11 @@
+               [6] = Block shift
+               [7] = No. of directory blocks
+    */
++#ifdef CPMIMAGE_READ_ONLY_NAMES
++  if (boot_spec[4]>7 || boot_spec[6]>7)
++  { boo="Invalid Amstrad geometry"; return -1; }
++  d->bootsec=-1;
++#endif
+   d->type = 0;
+   d->type |= CPMFS_DR3;	/* Amstrads are CP/M 3 systems */
+   d->secLength = 128 << boot_spec[4];
+@@ -987,6 +1035,10 @@
+   d->libdskGeometry[0] = 0; /* LibDsk can recognise an Amstrad superblock 
+                              * and autodect */
+  
++#ifdef CPMIMAGE_READ_ONLY_NAMES
++  if (validateDiskGeometry(d,0)<0) { boo="Invalid Amstrad geometry"; return -1; }
++  if (!d->extents) d->extents=1;
++#endif
+   return 0;
+ }
+ /*}}}*/
+@@ -1036,6 +1088,52 @@
+   return 0;
+ }
+ /*}}}*/
++#ifdef CPMIMAGE_READ_ONLY_NAMES
++static int cpmImageCheckDirectory(const struct cpmSuperBlock *d)
++{
++  unsigned char *seen=calloc((size_t)d->size,1);
++  if (!seen) { boo="Out of memory"; return -1; }
++  for (int i=0;i<d->maxdir;++i)
++  {
++    const struct PhysDirectoryEntry *entry=&d->dir[i];
++    unsigned char status=(unsigned char)entry->status;
++    if (status==0xe5 || ((d->type&CPMFS_CPM3_OTHER) && status>=16 && status<=32) ||
++        ((d->type&CPMFS_CPM3_DATES) && status==33)) continue;
++    if (status>(d->type&CPMFS_HI_USER ? 31 : 15) || (unsigned char)entry->blkcnt>128 ||
++        !ISFILECHAR(0,entry->name[0]&127))
++    {
++      boo="Invalid directory entry"; free(seen); return -1;
++    }
++    for (int j=0;j<16;++j)
++    {
++      int block=(unsigned char)entry->pointers[j];
++      if (d->size>256) block|=(unsigned char)entry->pointers[++j]<<8;
++      if (!block) continue;
++      if (block<d->dirblks || block>=d->size || seen[block])
++      {
++        boo="Invalid or duplicated file allocation"; free(seen); return -1;
++      }
++      seen[block]=1;
++      if (d->dev.imageLimit>=0)
++      {
++        int first=block*(d->blksiz/d->secLength)+bootOffset(d);
++        for (int n=0;n<d->blksiz/d->secLength;++n)
++        {
++          int sector=first+n;
++          long long end=((long long)(sector/d->sectrk)*d->sectrk+
++            d->skewtab[sector%d->sectrk]+1)*d->secLength+d->offset;
++          if (end>d->dev.imageLimit)
++          {
++            boo="Missing allocated sectors"; free(seen); return -1;
++          }
++        }
++      }
++    }
++  }
++  free(seen);
++  return 0;
++}
++#endif
+ /* cpmReadSuper       -- get DPB and init in-core data for drive */ /*{{{*/
+ int cpmReadSuper(struct cpmSuperBlock *d, struct cpmInode *root, char const *format, int uppercase)
+ {
+@@ -1044,12 +1142,15 @@
+   while (s_ifreg && !S_ISREG(s_ifreg)) s_ifreg<<=1;
+   assert(s_ifreg);
+ 
+-  if (strcmp(format,"amstrad")==0) amsReadSuper(d,format);
+-  else diskdefReadSuper(d,format);
++  if (!strcmp(format,"amstrad")) { if (amsReadSuper(d,format)<0) return -1; }
++  else if (cpmImageReadDefinition(d,format)<0) { boo="Invalid disk definition"; return -1; }
+ 
++#ifdef CPMIMAGE_READ_ONLY_NAMES
++  if (d->type&CPMFS_CPM3_OTHER) d->type &= ~CPMFS_HI_USER;
++#endif
+   d->uppercase=uppercase;
+ 
+-  assert(d->boottrk>=0);
++  assert(d->boottrk>=0 || d->bootsec>=0);
+   assert(d->secLength>0);
+   assert(d->sectrk>0);
+   assert(d->tracks>0);
+@@ -1068,26 +1169,22 @@
+ 
+   if (d->skewtab==(int*)0) /* generate skew table */ /*{{{*/
+   {
+-    int	i,j,k;
++    int	i,j;
+ 
+     if (( d->skewtab = malloc(d->sectrk*sizeof(int))) == (int*)0) 
+     {
+       boo=strerror(errno);
+       return -1;
+     }
+-    memset(d->skewtab,0,d->sectrk*sizeof(int));
++    unsigned char *used=calloc((size_t)d->sectrk,1);
++    if (!used) { boo=strerror(errno); return -1; }
+     for (i=j=0; i<d->sectrk; ++i,j=(j+d->skew)%d->sectrk)
+     {
+-      while (1)
+-      {
+-        assert(i<d->sectrk);
+-        assert(j<d->sectrk);
+-        for (k=0; k<i && d->skewtab[k]!=j; ++k);
+-        if (k<i) j=(j+1)%d->sectrk;
+-        else break;
+-      }
++      while (used[j]) j=(j+1)%d->sectrk;
+       d->skewtab[i]=j;
++      used[j]=1;
+     }
++    free(used);
+   }
+   /*}}}*/
+   /* initialise allocation vector bitmap */ /*{{{*/
+@@ -1126,6 +1223,9 @@
+     }
+   }
+   /*}}}*/
++#ifdef CPMIMAGE_READ_ONLY_NAMES
++  if (d->dev.opened && cpmImageCheckDirectory(d)<0) return -1;
++#endif
+   alvInit(d);
+   if (d->type&CPMFS_CPM3_OTHER) /* read additional superblock information */ /*{{{*/
+   {
+--- a/device.h
++++ b/device.h
+@@ -25,6 +25,9 @@
+   HANDLE hdisk;
+ #endif
+   int fd;
++  /* The application selects the linear RAW working device explicitly. */
++  void *rawFile;
++  long long imageLimit;
+ };
+ 
+ const char *Device_open(struct Device *self, const char *filename, int mode, const char *deviceOpts);
+--- a/device_libdsk.c
++++ b/device_libdsk.c
+@@ -4,6 +4,7 @@
+ #include <assert.h>
+ #include <errno.h>
+ #include <stdlib.h>
++#include <stdio.h>
+ #include <string.h>
+ 
+ #include "device.h"
+@@ -34,6 +35,19 @@
+   const char *boo;
+   dsk_err_t e;
+ 
++  if (deviceOpts && !strcmp(deviceOpts,"cpmimage-raw"))
++  {
++    FILE *file=fopen(filename,"rb");
++    if (!file) return strerror(errno);
++    if (fseek(file,0,SEEK_END) || (this->imageLimit=ftell(file))<0)
++    { fclose(file); return "Cannot determine RAW image size"; }
++    this->rawFile=file;
++    this->opened=1;
++    return NULL;
++  }
++  this->rawFile=NULL;
++  this->imageLimit=-1;
++
+   /* Assume driver name & format name both fit in 80 characters, rather than
+    * malloccing the exact size */
+   if (deviceOpts == NULL) 
+@@ -76,6 +90,11 @@
+   this->secLength=secLength;
+   this->sectrk=sectrk;
+   this->tracks=tracks;
++  if (this->rawFile)
++  {
++    this->offset=offset;
++    return NULL;
++  }
+   /* Must be an even multiple of sector size */
+   assert(offset%secLength==0);
+   this->offset=offset;
+@@ -112,6 +131,12 @@
+ {
+   dsk_err_t e;
+   this->opened=0;
++  if (this->rawFile)
++  {
++    int result=fclose(this->rawFile);
++    this->rawFile=NULL;
++    return result ? strerror(errno) : NULL;
++  }
+   e = dsk_close(&this->dev);
+   return (e?dsk_strerror(e):(const char*)0);
+ }
+@@ -120,6 +145,14 @@
+ const char *Device_readSector(const struct Device *this, int track, int sector, char *buf)
+ {
+   dsk_err_t e;
++  if (this->rawFile)
++  {
++    long long start=((long long)track*this->sectrk+sector)*this->secLength+this->offset;
++    if (start<0 || start+this->secLength>this->imageLimit) return "Missing image sectors";
++    if (fseek(this->rawFile,(long)start,SEEK_SET) ||
++        fread(buf,1,this->secLength,this->rawFile)!=(size_t)this->secLength) return "Cannot read RAW sector";
++    return NULL;
++  }
+   e = dsk_lread(this->dev, &this->geom, buf, (track * this->sectrk) + sector + this->offset/this->secLength);
+   return (e?dsk_strerror(e):(const char*)0);
+ }
+@@ -128,6 +161,7 @@
+ const char *Device_writeSector(const struct Device *this, int track, int sector, const char *buf)
+ {
+   dsk_err_t e;
++  if (this->rawFile) return "Read-only RAW image";
+   e = dsk_lwrite(this->dev, &this->geom, buf, (track * this->sectrk) + sector + this->offset/this->secLength);
+   return (e?dsk_strerror(e):(const char*)0);
+ }

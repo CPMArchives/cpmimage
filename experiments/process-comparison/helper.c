@@ -17,8 +17,63 @@ static int fail(const char *code,const char *message) {
   printf("{\"v\":1,\"ok\":false,\"error\":");quoted(code);
   printf(",\"message\":");quoted(message?message:"backend error");puts("}");return 2;
 }
+#ifdef CPMIMAGE_READ_ONLY
+extern int cpmImageReadDefinition(struct cpmSuperBlock *, const char *);
+
+static int describe(const char *format)
+{
+  struct cpmSuperBlock sb={0};
+  if (!strcmp(format,"amstrad"))
+  {
+    puts("{\"v\":1,\"ok\":true,\"boot_geometry\":true}");
+    return 0;
+  }
+  if (cpmImageReadDefinition(&sb,format)<0) return fail("invalid_definition","Incomplete definition");
+  printf("{\"v\":1,\"ok\":true,\"sector_size\":%d,\"tracks\":%d,\"sectors_per_track\":%d,"
+      "\"offset\":%lld,\"block_size\":%d,\"directory_entries\":%d,\"directory_blocks\":%d,"
+      "\"boot_sectors\":%d,\"extent_factor\":%d,\"skew\":%d,\"os_flags\":%d,\"libdsk_format\":",
+      sb.secLength,sb.tracks,sb.sectrk,(long long)sb.offset,sb.blksiz,sb.maxdir,sb.dirblks,
+      sb.bootsec>=0?sb.bootsec:sb.boottrk*sb.sectrk,sb.extents,sb.skew,sb.type);
+  quoted(sb.libdskGeometry);
+  printf(",\"skew_table\":[");
+  if (sb.skewtab)
+    for (int i=0;i<sb.sectrk;++i) printf("%s%d",i?",":"",sb.skewtab[i]);
+  puts("]}");
+  free(sb.skewtab);
+  return 0;
+}
+
+/* Decode the already qualified standard, single-sided DSK sector map.
+ * The broker checks header order and flags before asking LibDsk to read it. */
+static int decode(const char *image, const char *destination)
+{
+  DSK_PDRIVER disk=NULL;
+  DSK_GEOMETRY geometry;
+  dsk_err_t error=dg_stdformat(&geometry,FMT_AMPRO200,NULL,NULL);
+  if (!error) error=dsk_open(&disk,image,"dsk",NULL);
+  if (error) return fail("unsupported_container",dsk_strerror(error));
+  FILE *output=fopen(destination,"wb");
+  if (!output) { dsk_close(&disk); return fail("open","Cannot stage RAW image"); }
+  unsigned char sector[512];
+  int failed=0;
+  for (unsigned n=0;n<400;++n)
+  {
+    error=dsk_lread(disk,&geometry,sector,n);
+    if (error || fwrite(sector,1,sizeof sector,output)!=sizeof sector) { failed=1; break; }
+  }
+  if (fclose(output)) failed=1;
+  dsk_close(&disk);
+  if (failed) return fail("image_incompatible",error?dsk_strerror(error):"Cannot stage RAW image");
+  puts("{\"v\":1,\"ok\":true}");
+  return 0;
+}
+#endif
 int main(int argc,char **argv) {
   struct cpmSuperBlock sb={0};struct cpmInode root,ino; const char *err;
+#ifdef CPMIMAGE_READ_ONLY
+  if (argc==3 && !strcmp(argv[1],"describe")) return describe(argv[2]);
+  if (argc==4 && !strcmp(argv[1],"decode")) return decode(argv[2],argv[3]);
+#endif
   if(argc<5) return fail("arguments","expected operation, image, format, container");
   const char *op=argv[1];int rename=!strcmp(op,"rename");
 #ifdef CPMIMAGE_READ_ONLY
@@ -26,14 +81,22 @@ int main(int argc,char **argv) {
 #endif
   if(strcmp(op,"list") && strcmp(op,"export") && !rename) return fail("operation","unsupported operation");
   if((!strcmp(op,"list") && argc!=5) || ((!strcmp(op,"export")||rename) && argc!=7)) return fail("arguments","wrong argument count");
-  if((err=Device_open(&sb.dev,argv[2],rename?O_RDWR:O_RDONLY,argv[4]))) return fail("open",err);
-  if(cpmReadSuper(&sb,&root,argv[3],0)<0) {Device_close(&sb.dev);return fail("filesystem",boo);}
+  const char *device=argv[4];
+#ifdef CPMIMAGE_READ_ONLY
+  if (!strcmp(device,"raw")) device="cpmimage-raw";
+#endif
+  if((err=Device_open(&sb.dev,argv[2],rename?O_RDWR:O_RDONLY,device))) return fail("open",err);
+  if(cpmReadSuper(&sb,&root,argv[3],0)<0)
+  {
+    Device_close(&sb.dev);
+    return fail(boo && !strncmp(boo,"Missing ",8) ? "image_truncated" : "image_incompatible",boo);
+  }
   if(!strcmp(op,"list")) {
     struct cpmFile dir;struct cpmDirent ent; struct cpmStatFS stats;
     struct {char name[16];long long size,atime,mtime,ctime;int attr;} entries[4096];int count=0,n;
     if(cpmOpendir(&root,&dir)<0) {cpmUmount(&sb);return fail("list",boo);}
     while((n=cpmReaddir(&dir,&ent))>0) {
-      if(ent.name[0]=='.')continue;
+      if(ent.name[0]=='.' || ent.name[0]=='[')continue;
       if(count==4096||cpmNamei(&root,ent.name,&ino)<0) {cpmUmount(&sb);return fail("list","entry or limit error");}
       snprintf(entries[count].name,sizeof entries[count].name,"%s",ent.name);
       entries[count].size=ino.size;entries[count].attr=ino.attr;entries[count].atime=ino.atime;entries[count].mtime=ino.mtime;entries[count].ctime=ino.ctime;count++;

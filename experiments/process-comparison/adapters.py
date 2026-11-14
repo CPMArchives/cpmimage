@@ -16,7 +16,7 @@ FORMATS={'ibm-3740':(128,77,26,1024,64,2,[0,6,12,18,24,4,10,16,22,2,8,14,20,1,7,
  'bettercpm-ampro-little-board':(512,40,10,2048,64,2,list(range(10)))}
 NAME=re.compile(r'^(0[0-9]|1[0-5])[a-z0-9!#$%&\x27()@^_`{}~-]{1,8}(?:\.[a-z0-9!#$%&\x27()@^_`{}~-]{1,3})?$')
 # CP/M '/' is an opaque image filename character, never a host path.
-READ_ONLY_NAME=re.compile('^(0[0-9]|1[0-5])[a-z0-9!#$%&\'()@^_`{}~+/:\\\\|"-]{1,8}(?:\\.[a-z0-9!#$%&\'()@^_`{}~+/:\\\\|"-]{1,3})?$',re.IGNORECASE)
+READ_ONLY_NAME=re.compile('^(0[0-9]|[12][0-9]|3[01])[a-z0-9!#$%&\'()@^_`{}~+/:\\\\|"-]{1,8}(?:\\.[a-z0-9!#$%&\'()@^_`{}~+/:\\\\|"-]{1,3})?$',re.IGNORECASE)
 class Failure(Exception):
  def __init__(self,code,message=''):self.code=code;self.message=message;super().__init__(code+': '+message)
 def digest(b):return hashlib.sha256(b).hexdigest()
@@ -119,15 +119,21 @@ class Adapter:
   if failure:raise Failure(failure)
   if p.returncode<0:raise Failure('backend_crash',str(p.returncode))
   return p.returncode,bytes(out['stdout']),bytes(out['stderr'])
+ def native(self,cwd,*args):
+  op_is_description=args[0]=='describe'
+  rc,out,err=self.child([HELPER,*args],cwd)
+  if op_is_description and rc and not out:
+   message=err.decode(errors="replace").strip()
+   raise Failure("unknown_format" if ": unknown format " in message else "invalid_definition",message)
+  try:r=json.loads(out)
+  except (ValueError,UnicodeError):raise Failure('backend_exit' if rc else 'protocol_invalid',err.decode(errors='replace'))
+  if not isinstance(r,dict) or r.get('v')!=1 or type(r.get('ok'))!=bool:raise Failure('protocol_invalid')
+  if not r['ok']:raise Failure(r.get('error','backend_error'),r.get('message',''))
+  if rc:raise Failure('protocol_invalid','success with nonzero status')
+  return r
  def invoke(self,op,image,fmt,container,cwd,*args):
   if self.kind=='helper':
-   rc,out,err=self.child([HELPER,op,image,fmt,container,*args],cwd)
-   try:r=json.loads(out)
-   except (ValueError,UnicodeError):raise Failure('backend_exit' if rc else 'protocol_invalid',err.decode(errors='replace'))
-   if not isinstance(r,dict) or r.get('v')!=1 or type(r.get('ok'))!=bool:raise Failure('protocol_invalid')
-   if not r['ok']:raise Failure(r.get('error','backend_error'),r.get('message',''))
-   if rc:raise Failure('protocol_invalid','success with nonzero status')
-   return r
+   return self.native(cwd,op,image,fmt,container,*args)
   def cli(tool,*a):
    argv=[TOOLS/tool,'-f',fmt,'-T',container,*a,image] if tool=='cpmls' else [TOOLS/tool,'-f',fmt,'-T',container,image,*a]
    rc,out,err=self.child(argv,cwd)
@@ -167,7 +173,7 @@ class Adapter:
   for e in r['entries']:
    if not isinstance(e,dict) or not isinstance(e.get('name'),str):raise Failure('protocol_invalid')
    n=filename(e['name'],self.read_only)
-   if n in entries or type(e.get('size'))!=int or not 0<=e['size']<=16777216 or type(e.get('attr'))!=int or not 0<=e['attr']<=16383:raise Failure('protocol_invalid')
+   if n in entries or type(e.get('size'))!=int or not 0<=e['size']<=(128 * 1024 * 1024 if self.read_only else 16777216) or type(e.get('attr'))!=int or not 0<=e['attr']<=16383:raise Failure('protocol_invalid')
    entries[n]={'name':n,'size':e['size'],'attr':e['attr']}
   return entries
  def export(self,image,fmt,container,cwd,name,path,entry):
@@ -192,9 +198,9 @@ class Adapter:
    if op not in ('list','export','rename'):raise Failure('unsupported_operation')
    if self.read_only and op=='rename':raise Failure('read_only')
    image=Path(request['image']).resolve()
-   if not image.is_file() or image.stat().st_size>16777216:raise Failure('input_limit')
+   if not image.is_file() or image.stat().st_size>(128 * 1024 * 1024 if self.read_only else 16777216):raise Failure('input_limit')
    original=image.read_bytes();original_hash=digest(original)
-   geometry=validate(original,fmt,container,self.read_only)
+   geometry=None if self.read_only else validate(original,fmt,container)
    if op=='rename':guard_rename_metadata(original,fmt,container)
    dest=None
    if op in ('export','rename'):
@@ -202,7 +208,7 @@ class Adapter:
     if dest.exists() or dest.is_symlink():raise Failure('destination_exists')
     if not dest.parent.is_dir():raise Failure('destination_parent')
    with tempfile.TemporaryDirectory(prefix='cpmimage-comparison-') as td:
-    cwd=Path(td);(cwd/'diskdefs').write_text(DEFS if defs_override is None else defs_override)
+    cwd=Path(td);(cwd/'diskdefs').write_text(DEFS if defs_override is None else defs_override, encoding='utf-8')
     stage=cwd/('image.'+container);stage.write_bytes(original)
     entries=self.listing(stage,fmt,container,cwd)
     if op=='list':result={'entries':sorted(entries.values(),key=lambda e:e['name'])}
