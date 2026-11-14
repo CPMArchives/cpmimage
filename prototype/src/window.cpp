@@ -205,8 +205,6 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     toolbar->addWidget(exportButton);
     layout->addWidget(toolbarWidget);
     toolbar->addStretch();
-    auto *readOnly = new QLabel("Private edits");
-    readOnly->setToolTip("Edits affect a private copy until you save.");
 
     auto *imageRow=new QHBoxLayout;
     imageRow->addWidget(new QLabel("Image layout:"));
@@ -214,7 +212,6 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     imageInfoButton=new QPushButton("Image information…");
     imageInfoButton->setObjectName("imageInformation");
     imageRow->addWidget(imageInfoButton);
-    imageRow->addWidget(readOnly);
     layout->addLayout(imageRow);
     source = new QLabel("No image open");
     source->setTextFormat(Qt::PlainText);
