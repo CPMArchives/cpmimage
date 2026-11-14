@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "window.h"
+#include "workspace.h"
 #include "runtime_paths.h"
 #include <QApplication>
 #include <QIcon>
+#include <QTabWidget>
+#include <QMenuBar>
+#include <QMenu>
+#include <QCloseEvent>
 #include <QCommandLineParser>
 #include <QDir>
 #include <QFileInfo>
@@ -64,8 +68,10 @@ int main(int argc, char **argv) {
             "Required application files are missing. Restore the complete application package and try again.");
         return 2;
     }
-    Window window(paths.root, paths.python, paths.helper, 30000, 2000, paths.notices);
-    window.show();
+    Workspace workspace(paths);
+    auto &window = workspace.addSession();
+    workspace.catalogue = parser.value("diskdefs");
+    workspace.show();
     QTimer::singleShot(0, &window, [&] {
         if (!parser.isSet("image")) {
             window.loadCatalogue(parser.value("diskdefs"));

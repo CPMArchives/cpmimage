@@ -16,13 +16,17 @@ class QListWidget;
 class QSettings;
 class QProgressBar;
 class QAction;
+class TransferFiles;
 
 class Window : public QMainWindow {
     Q_OBJECT
 public:
     Window(QString root, QString python, QString helper, int deadlineMs = 30000, int graceMs = 2000, QString noticesPath = {}, QString settingsFile = {});
     ~Window() override;
+    void openFromPicker();
+    void importFiles(const QStringList &paths);
     void openImage(const QString &path, const QString &format, const QString &container);
+    void setCataloguePath(const QString &path) { cataloguePath = path; }
     void loadCatalogue(const QString &path = {});
     void inspectImage(const QString &path, const QString &explicitFormat = {}, const QString &type = {});
     void exportFile(const QString &destination);
@@ -35,9 +39,13 @@ public:
     QString lastError() const { return error; }
 signals:
     void completed(bool success);
+    void sessionClosed();
+    void imageOpened(const QString &path);
+    void imagePicked(const QString &path);
     void exportProgress(int completed, int total);
 protected:
     void closeEvent(QCloseEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 private:
     void begin(QJsonObject request);
     void readReply();
@@ -53,7 +61,10 @@ private:
     void updateUserAreas();
     void chooseImage();
     void chooseSave(bool saveAs);
-    void chooseEdit(const QString &action);
+    void chooseEdit(const QString &action, QStringList paths = {}, const TransferFiles *transfer = nullptr);
+    void offerFiles(bool drag, bool cut = false);
+    quint64 imageRevision = 0;
+    void exportFlat(const QJsonArray &entries, const QString &directory);
     bool confirmWrite();
     bool dirty = false, writeConfirmed = false;
     bool resolveEdits(std::function<void()> next);

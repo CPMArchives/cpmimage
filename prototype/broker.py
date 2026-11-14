@@ -70,7 +70,7 @@ def main():
     import catalogue
     from container_mapping import MappingError, PhysicalMapping, inspect_imd, transfer_dmk, dmk_template, replace_imd_comment, verify_jv3, derive_mapping
     from publication import fingerprint as file_hash, publish, recovery_directory, require_recovery_clear
-    from source_ownership import Ownership, identity
+    from source_ownership import Ownership, OwnershipError, identity
     import adapters as backend
     backend.HELPER = args.helper.resolve()
     bundled_path = args.root / 'fixtures/diskdefs'
@@ -468,9 +468,9 @@ def main():
                 if not session['confirmed'] and request.get('confirmed') is not True:
                     raise backend.Failure('confirmation_required', 'Confirm the selected disk definition for writing.')
                 action = request['action']
-                if action not in ('rename', 'delete', 'attrs', 'import', 'move'):
+                if action not in ('rename', 'delete', 'delete_many', 'attrs', 'import', 'move'):
                     raise backend.Failure('invalid_edit', 'Unknown editing operation.')
-                name = '' if action == 'import' else backend.filename(request['name'], True)
+                name = '' if action in ('import', 'delete_many') else backend.filename(request['name'], True)
                 argument = '-'
                 if action in ('rename', 'move'):
                     argument = backend.filename(request['target'], True)
@@ -515,6 +515,13 @@ def main():
                             if item.get('replace') is True:
                                 adapter().native(edit_dir, 'edit_delete', candidate, session['format'], 'raw', target, '-')
                             adapter().native(edit_dir, 'edit_import', candidate, session['format'], 'raw', target, staged)
+                    elif action == 'delete_many':
+                        names = request['names']
+                        if not isinstance(names, list) or not 1 <= len(names) <= 256:
+                            raise backend.Failure('invalid_edit', 'Delete batch must contain 1 to 256 names.')
+                        for item in names:
+                            target = backend.filename(item, True)
+                            adapter().native(edit_dir, 'edit_delete', candidate, session['format'], 'raw', target, '-')
                     else:
                         adapter().native(edit_dir, 'edit_' + action, candidate, session['format'], 'raw', name, argument)
                     checked = adapter().request({
@@ -734,6 +741,8 @@ def main():
             respond(reply)
         except backend.Failure as error:
             respond(dict(v=1, id=rid, ok=False, error=error.code, message=error.message))
+        except OwnershipError as error:
+            respond(dict(v=1, id=rid, ok=False, error='ownership', message=str(error)))
         except (OSError, KeyError, TypeError, ValueError) as error:
             respond(dict(v=1, id=rid, ok=False, error='request_or_io', message=str(error)))
 

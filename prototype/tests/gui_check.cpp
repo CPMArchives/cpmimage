@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "window.h"
+#include "workspace.h"
 #include <QCryptographicHash>
 #include <QFile>
 #include <QSignalSpy>
@@ -85,6 +85,107 @@ private slots:
         QVERIFY(!information->isEnabled());QVERIFY(name->toolTip().isEmpty());
     }
 
+    void flatExportConsolidatesIdenticalHostFile() {
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                      qEnvironmentVariable("CPMIMAGE_HELPER"));
+        QSignalSpy done(&window, &Window::completed);
+        window.openImage(root + "/fixtures/ibm3740-independent.raw", "ibm-3740", "raw");
+        QVERIFY(done.wait(15000));
+        QVERIFY(done.takeFirst()[0].toBool());
+        auto *areas = window.findChild<QListWidget *>("userAreas");
+        auto *files = window.findChild<QTableWidget *>("fileList");
+        areas->setCurrentRow(0);
+        for (int row = 0; row < files->rowCount(); ++row)
+            if (files->item(row, 0)->data(Qt::UserRole).toString() == "00BINARY.BIN")
+                window.selectEntry(row);
+        QTemporaryDir output;
+        QVERIFY(output.isValid());
+        window.exportSelection(output.path());
+        QVERIFY(done.wait(15000));
+        QVERIFY(QFile::exists(output.filePath("BINARY.BIN")));
+        done.clear();
+        window.exportSelection(output.path());
+        QVERIFY(done.wait(15000));
+        QVERIFY(window.lastBatchReport().contains("Consolidated identical contents"));
+    }
+
+    void workspaceSwitchAndClose_data() {
+        QTest::addColumn<bool>("saveOnClose");
+        QTest::newRow("discard") << false;
+        QTest::newRow("save") << true;
+    }
+
+    void workspaceSwitchAndClose() {
+        QFETCH(bool, saveOnClose);
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}});
+        workspace.show();
+        auto &first = workspace.addSession();
+        QSignalSpy firstDone(&first, &Window::completed);
+        first.openImage(root + "/fixtures/ibm3740-independent.raw", "ibm-3740", "raw");
+        auto &second = workspace.addSession();
+        QSignalSpy secondDone(&second, &Window::completed);
+        second.openImage(root + "/fixtures/ibm3740-empty.raw", "ibm-3740", "raw");
+        QTRY_COMPARE(firstDone.size(), 1);
+        QTRY_COMPARE(secondDone.size(), 1);
+        QVERIFY(firstDone.first().first().toBool());
+        QVERIFY(secondDone.first().first().toBool());
+        auto *tabs = workspace.findChild<QTabWidget *>();
+        QCOMPARE(tabs->currentWidget(), &second);
+        QCOMPARE(first.entryCount(), 1);
+        QCOMPARE(second.entryCount(), 0);
+        tabs->setCurrentWidget(&first);
+        auto *areas = first.findChild<QListWidget *>("userAreas");
+        areas->setCurrentRow(0);
+        tabs->setCurrentWidget(&second);
+        QVERIFY(second.close());
+        QCOMPARE(tabs->count(), 1);
+        QCOMPARE(tabs->currentWidget(), &first);
+        QCOMPARE(areas->currentRow(), 0);
+        QCOMPARE(first.entryCount(), 3);
+        areas->setCurrentRow(1);
+        QAction *remove = nullptr;
+        for (auto *action : first.findChildren<QAction *>())
+            if (action->text() == "Delete…") remove = action;
+        QVERIFY(remove);
+        QTimer respond;
+        QMessageBox::StandardButton choice = QMessageBox::Yes;
+        connect(&respond, &QTimer::timeout, &workspace, [&] {
+            auto *dialog = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+            if (!dialog) return;
+            const auto answer = choice == QMessageBox::Save && dialog->button(QMessageBox::Yes) ? QMessageBox::Yes : choice;
+            if (auto *button = dialog->button(answer)) button->click();
+        });
+        // Edit a disposable image so ownership and export tests can run independently.
+        QTemporaryDir scratch;
+        const auto copy = scratch.filePath("dirty.raw");
+        QVERIFY(QFile::copy(root + "/fixtures/ibm3740-independent.raw", copy));
+        firstDone.clear();
+        first.openImage(copy, "ibm-3740", "raw");
+        QTRY_COMPARE(firstDone.size(), 1);
+        QVERIFY(firstDone.takeFirst().first().toBool());
+        respond.start(20);
+        remove->trigger();
+        QTRY_COMPARE(firstDone.size(), 1);
+        QVERIFY(firstDone.takeFirst().first().toBool());
+        QVERIFY(first.windowTitle().endsWith("*"));
+        choice = QMessageBox::Cancel;
+        QVERIFY(!first.close());
+        QCOMPARE(tabs->count(), 1);
+        QVERIFY(first.windowTitle().endsWith("*"));
+        choice = saveOnClose ? QMessageBox::Save : QMessageBox::Discard;
+        QVERIFY(!first.close());
+        QTRY_COMPARE(tabs->count(), 0);
+        QVERIFY(workspace.close());
+        QFile result(copy);
+        QFile original(root + "/fixtures/ibm3740-independent.raw");
+        QVERIFY(result.open(QIODevice::ReadOnly) && original.open(QIODevice::ReadOnly));
+        QCOMPARE(result.readAll() != original.readAll(), saveOnClose);
+        QCOMPARE(QFile::exists(copy + ".BAK"), saveOnClose);
+    }
+
     void saveWorkflow() {
         QTemporaryDir temp;
         QVERIFY(temp.isValid());
@@ -120,8 +221,10 @@ private slots:
         const auto destination = temp.filePath("copy.raw");
         connect(&confirm, &QTimer::timeout, &window, [&] {
             if (auto *chooser = fileDialog()) {
-                chooser->selectFile(destination);
-                QMetaObject::invokeMethod(chooser, "accept");
+                if (auto *filename = chooser->findChild<QLineEdit *>("fileNameEdit")) {
+                    filename->setText(destination);
+                    QMetaObject::invokeMethod(chooser, "accept");
+                }
             }
         });
         confirm.start(20);
@@ -183,7 +286,7 @@ private slots:
             QTest::keyClick(search, Qt::Key_Down);
             const auto firstRow = list->currentRow();
             QTest::keyClick(list, Qt::Key_Down);
-            const bool keyboardNavigation = list->hasFocus() && list->currentRow() == firstRow + 1;
+            const bool keyboardNavigation = dialog->focusWidget() == list && list->currentRow() == firstRow + 1;
             search->setText("ibm-3740");
             const auto exact = list->findItems("ibm-3740", Qt::MatchExactly);
             chose = keyboardNavigation && exact.size() == 1;
@@ -282,7 +385,7 @@ private slots:
         QVERIFY(QDir(areas.filePath("1")).exists());QVERIFY(QDir(areas.filePath("1")).isEmpty());
         QVERIFY(image.open(QIODevice::ReadOnly));QCOMPARE(image.readAll(),bytes);
         window.openImage(root+"/fixtures/ibm3740-independent.raw","ibm-3740","raw");QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
-        navigation->setCurrentRow(7);window.exportUserArea(areas.path());QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        navigation->setCurrentRow(8);window.exportUserArea(areas.path());QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
         QFile seven(areas.filePath("7/BINARY.BIN"));QVERIFY(seven.open(QIODevice::ReadOnly));
         QCOMPARE(QCryptographicHash::hash(seven.readAll(),QCryptographicHash::Sha256).toHex(),QByteArray("cd6816b77f68d70001fc3eaa4d42bdd67cb5973b3151cc5292ecc02a3daac6ab"));
     }
