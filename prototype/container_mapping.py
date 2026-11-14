@@ -22,6 +22,43 @@ class PhysicalMapping:
 
     tracks: tuple
 
+    @classmethod
+    def from_profile(cls, profile, geometry):
+        """Expand explicit RAW track order and optional per-track overrides."""
+        try:
+            order = profile['track_order']
+            defaults = profile['default']
+            overrides = profile.get('tracks', {})
+            if len(order) != geometry['tracks']:
+                raise MappingError('Profile does not cover every RAW track.')
+            tracks = []
+            used = set()
+            for cylinder, head in order:
+                key = f'{cylinder}/{head}'
+                fields = {**defaults, **overrides.get(key, {})}
+                used.add(key)
+                tracks.append(Track(cylinder, head, fields['mode'],
+                                    fields['size'], tuple(fields['sectors'])))
+            if set(overrides) - used:
+                raise MappingError('Profile contains an override for an unmapped track.')
+            mapping = cls(tuple(tracks))
+            mapping.verify(geometry)
+            return mapping
+        except (KeyError, TypeError, ValueError) as error:
+            if isinstance(error, MappingError):
+                raise
+            raise MappingError('Invalid physical mapping profile.') from error
+
+    def verify_inventory(self, inventory):
+        """Confirm a source has precisely the addresses and properties expected."""
+        if len(inventory) != len(self.tracks):
+            raise MappingError('Container track inventory differs from the mapping.')
+        for track in self.tracks:
+            observed = inventory.get((track.cylinder, track.head))
+            if (not observed or observed.size != track.size or observed.mode != track.mode
+                    or set(observed.sectors) != set(track.sectors)):
+                raise MappingError(f'Container sectors differ on track {track.cylinder}/{track.head}.')
+
     def verify(self, geometry):
         if len(self.tracks) != geometry['tracks'] or geometry['offset']:
             raise MappingError('Physical track count or RAW offset is unsupported.')
