@@ -4,12 +4,76 @@ from pathlib import Path
 import subprocess
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import unittest
 
 from catalogue_check import CatalogueCheck
+from source_ownership import Ownership
 
 
 class EditCheck(unittest.TestCase):
+    def test_competing_saves_to_shared_sidecar(self):
+        first, second = CatalogueCheck(), CatalogueCheck()
+        for broker in (first, second):
+            broker.setUp()
+            self.addCleanup(broker.doCleanups)
+            self.addCleanup(broker.tearDown)
+        paths = [first.directory / ('shared.' + ext) for ext in ('raw', 'img')]
+        plans = []
+        for broker, path in zip((first, second), paths):
+            path.write_bytes(broker.image.read_bytes())
+            opened = broker.request('open', image=str(path), format='ibm-3740', container='raw')
+            opts = dict(session=opened['result']['session'])
+            planned = broker.request('save_plan', **opts)
+            self.assertTrue(planned['ok'], planned)
+            plans.append(dict(plan=planned['result'], confirm_sidecar=True, **opts))
+        sidecar = paths[0].with_suffix('.FDF')
+        with Ownership(sidecar, Path.home() / '.cpmimage' / 'ownership'):
+            blocked = second.request('save', **plans[1])
+            self.assertFalse(blocked['ok'], blocked)
+            self.assertIn('ownership', blocked['message'])
+            self.assertFalse(sidecar.exists())
+        self.assertTrue(first.request('save', **plans[0])['ok'])
+        before = sidecar.read_bytes()
+        stale = second.request('save', **plans[1])
+        self.assertEqual(stale['error'], 'save_plan_changed')
+        self.assertEqual(sidecar.read_bytes(), before)
+        self.assertFalse(sidecar.with_suffix('.FDF.BAK').exists())
+
+    def test_timestamp_survives_save_and_reopen(self):
+        tools = os.environ.get('CPMIMAGE_UPSTREAM_TOOLS')
+        if not tools:
+            self.skipTest('Requires unmodified cpmtools')
+        broker = CatalogueCheck()
+        broker.setUp()
+        self.addCleanup(broker.doCleanups)
+        self.addCleanup(broker.tearDown)
+        root = Path(os.environ['CPMIMAGE_ROOT'])
+        (broker.directory / 'diskdefs').write_bytes((root / 'fixtures/diskdefs').read_bytes())
+        broker.image.write_bytes(b'\xe5' * (40 * 9 * 512))
+        subprocess.run([str(Path(tools) / 'mkfs.cpm'), '-f', 'pcw', '-t', str(broker.image)],
+                       cwd=broker.directory, check=True)
+        with broker.image.open('ab') as stream:
+            stream.write(b'\xe5' * (40 * 9 * 512 - broker.image.stat().st_size))
+        args = dict(image=str(broker.image), format='pcw', container='raw')
+        opened = broker.request('open', **args)
+        self.assertTrue(opened['ok'], opened)
+        options = dict(session=opened['result']['session'])
+        payload = broker.directory / 'dated.bin'
+        payload.write_bytes(b'timestamp test')
+        stamp = 1609459200
+        os.utime(payload, (stamp, stamp))
+        edited = broker.request('edit', action='import', name='00DATED.BIN', path=str(payload),
+                                confirmed=True, **options)
+        self.assertTrue(edited['ok'], edited)
+        plan = broker.request('save_plan', **options)
+        saved = broker.request('save', plan=plan['result'], confirm_sidecar=True, **options)
+        self.assertTrue(saved['ok'], saved)
+        reopened = broker.request('open', **args)
+        self.assertTrue(reopened['ok'], reopened)
+        row = next(e for e in reopened['result']['entries'] if e['name'] == '00DATED.BIN')
+        self.assertEqual(row['mtime'], stamp)
+
     def test_batch_text_and_dsk_roundtrip(self):
         broker = CatalogueCheck()
         broker.setUp()

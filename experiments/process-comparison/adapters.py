@@ -175,6 +175,8 @@ class Adapter:
    n=filename(e['name'],self.read_only)
    if n in entries or type(e.get('size'))!=int or not 0<=e['size']<=(128 * 1024 * 1024 if self.read_only else 16777216) or type(e.get('attr'))!=int or not 0<=e['attr']<=16383:raise Failure('protocol_invalid')
    entries[n]={'name':n,'size':e['size'],'attr':e['attr']}
+   if self.read_only:
+    entries[n].update({key:e[key] for key in ('atime','mtime','ctime') if type(e.get(key)) is int})
   return entries
  def export(self,image,fmt,container,cwd,name,path,entry):
   self.invoke('export',image,fmt,container,cwd,name,path)

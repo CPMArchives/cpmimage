@@ -13,6 +13,11 @@ Save stages and synchronizes output and recovery copies beside the destination. 
 - Debian ARM64 passed a fresh build, focused Qt format selection, both editing tests including batch text/DSK, and four recovery tests.
 - x86-64 and native desktop publication workflows remain unqualified.
 
-## Remaining acceptance work
+## Final targeted checks
 
-Unmodified cpmtools 2.23 linked with LibDsk opened the published DSK directly using the generated FDF and extracted the expected text records. The macOS Qt Save check confirmed a sidecar-only Save creates an FDF without rotating the image backup. Broader GUI Save As and dirty discard coverage, timestamp-preserving format checks, and failure testing for competing sidecar publications remain open.
+- macOS ARM64 passed the Qt Save, Save As, and dirty Discard workflow. The test verifies active image switching, restoration of a deleted entry, unchanged image bytes after Discard, and no rotation of the image backup on a sidecar-only Save.
+- A timestamp-enabled CP/M Plus PCW image initialized by unmodified cpmtools retained the imported modification timestamp after Save and reopen on macOS.
+- Two broker sessions targeting the same FDF through different image filenames were tested on macOS. A held sidecar lock blocked publication and a stale save plan could not replace the published sidecar.
+- Unmodified cpmtools 2.23 linked with LibDsk opened the published DSK directly with the generated FDF and extracted the expected text records.
+
+The final targeted checks above ran on macOS. Windows and Debian results cover the earlier milestone smoke runs listed above.
