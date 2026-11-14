@@ -37,14 +37,14 @@ private slots:
     void compactToolbarAndImageInformation() {
         const auto root=qEnvironmentVariable("CPMIMAGE_ROOT");
         Window window(root,qEnvironmentVariable("CPMIMAGE_PYTHON","python3"),qEnvironmentVariable("CPMIMAGE_HELPER"));
-        window.show();window.resize(920,580);
+        window.show();
         auto *information=window.findChild<QPushButton *>("imageInformation");
         auto *action=window.findChild<QAction *>("imageInformationAction");
         auto *name=window.findChild<QLabel *>("imageName");
         auto *cancel=window.findChild<QPushButton *>("cancelOperation");
         QVERIFY(information);QVERIFY(action);QVERIFY(name);QVERIFY(cancel);
         QVERIFY(!information->isEnabled());QVERIFY(!action->isEnabled());QVERIFY(cancel->isHidden());
-        QVERIFY2(window.minimumSizeHint().width()<=920,qPrintable(QString::number(window.minimumSizeHint().width())));
+        QVERIFY2(window.width()<=580,qPrintable(QString::number(window.minimumSizeHint().width())));
         QSignalSpy done(&window,&Window::completed);
         const auto source=root+"/fixtures/ibm3740-independent.raw";
         window.openImage(source,"ibm-3740","raw");

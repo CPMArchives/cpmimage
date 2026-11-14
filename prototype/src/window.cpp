@@ -94,7 +94,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
         box->addWidget(buttons); dialog.exec();
     });
-    resize(920, 580);
+    resize(580, 580);
     auto *central = new QWidget(this);
     auto *layout = new QVBoxLayout(central);
     auto *toolbar = new QHBoxLayout;
@@ -157,14 +157,15 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setSelectionMode(QAbstractItemView::ExtendedSelection);
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Interactive);
+    table->setColumnWidth(0, 170);
     table->verticalHeader()->hide();
     table->setAlternatingRowColors(true);
     table->setSortingEnabled(true);
     table->sortItems(0, Qt::AscendingOrder);
     splitter->addWidget(table);
     splitter->setStretchFactor(1, 1);
-    splitter->setSizes({160, 720});
+    splitter->setSizes({90, 470});
     layout->addWidget(splitter, 1);
     auto *selectAll = new QAction("Select all", table);
     selectAll->setShortcut(QKeySequence::SelectAll);
