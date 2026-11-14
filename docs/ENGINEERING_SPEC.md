@@ -646,6 +646,10 @@ Opening an image shall establish a working session containing:
 - Working-image state.
 - Modification status.
 
+### 8.1.1 Format confirmation for writing
+
+The selected disk definition and the user's confirmation of that definition **for writing** shall be separate per-session states. A successful read, remembered selection, or loaded `.FDF` shall not by itself count as confirmation for writing. Before the first filesystem modification under an unconfirmed definition, request explicit confirmation identifying that definition and explaining that an incorrect interpretation may damage the filesystem. Changing the selected definition invalidates the previous confirmation. Cancellation leaves the source and working image unmodified. Confirmation is not a claim that the format is verified. Where this confirmation and a first-save or changed-definition `.FDF` warning would otherwise be presented together, combine their information in one dialog without weakening either requirement. Suppression of routine `.FDF` warnings shall not suppress required write confirmation or detected integrity warnings.
+
 ### 8.2 Working-image modifications
 
 Filesystem changes shall be applied to a private working image.
@@ -662,13 +666,19 @@ The implementation shall protect against incomplete operations and detect releva
 
 The exact save-publication mechanism shall be designed during the safe-write milestone. It shall coordinate publication with the ownership mechanism, including replacement of locked files and failure recovery.
 
+### 8.3.1 Automatic previous-version backups
+
+Automatic single-version `.BAK` backups shall be enabled by default and disableable in Preferences. When Save replaces image bytes, preserve the previous destination image as `<image-filename>.BAK` (for example `SYSTEM.DSK.BAK`); replace that backup on a subsequent successful image-changing Save, not on a sidecar-only Save. When an existing `.FDF` is replaced, preserve its previous version as `<sidecar-filename>.BAK`; do not create an `.FDF` backup when no previous sidecar exists. Back up only destination files actually being replaced. Independently updated `.BAK` files shall not be represented as a guaranteed synchronized image/sidecar recovery pair.
+
+A required backup failure shall abort publication rather than silently proceed unprotected. An explicitly authorized retry without backup may be offered, but never selected automatically. Output shall first be prepared and validated, with source changes rechecked before publication. The image and sidecar are distinct files and their publication is not assumed to be jointly atomic; the implementation shall define ordering, synchronization, interrupted-operation recovery, and clear reporting of partial publication. Never report partial publication as a successful Save; preserve recoverable files and do not silently restore backups. Only mark the working image clean after successful publication of all required outputs. A sidecar-only Save shall not rotate the image backup.
+
 ### 8.4 Save As
 
 Save As shall permit saving the working image under a different filename.
 
 Where supported, users may select a different output container.
 
-Conversion limitations shall be reported before output publication.
+Conversion limitations shall be reported before output publication. Save As leaves the original image unchanged and, after successful publication, makes the new destination the active image in the same tab. A new destination needs no backup; replacement of an existing destination follows the same backup policy for files actually replaced. On failed Save As, retain the original active session and preserve recoverable output without silently changing its identity.
 
 ### 8.5 Unsaved changes
 
