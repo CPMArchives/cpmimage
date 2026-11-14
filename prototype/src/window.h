@@ -59,6 +59,8 @@ private:
     bool resolveEdits(std::function<void()> next);
     std::function<void()> afterSave;
     QJsonObject pendingSave;
+    QAction *showAllAction = nullptr;
+    int previousUserArea = 0;
     QJsonObject initializeOptions(const QJsonObject &geometry);
     bool newImagePicker = false;
     bool unpublished = false;
