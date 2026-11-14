@@ -2,6 +2,7 @@
 #include "window.h"
 #include <QCryptographicHash>
 #include <algorithm>
+#include <utility>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QFileDialog>
@@ -458,8 +459,21 @@ void Window::chooseSave(bool saveAs) {
                    {"sidecar",settings->value("saveSidecar",true).toBool()}};
     begin(pendingSave);
 }
+bool Window::resolveEdits(std::function<void()> next) {
+    if (!dirty) return true;
+    const auto answer = QMessageBox::warning(this, "Unsaved changes", "Save changes before continuing?",
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Cancel);
+    if (answer == QMessageBox::Save) {
+        afterSave = std::move(next);
+        chooseSave(false);
+    } else if (answer == QMessageBox::Discard) {
+        afterSave = std::move(next);
+        begin({{"op","discard"}, {"session",session}});
+    }
+    return false;
+}
 void Window::chooseImage() {
-    if (dirty) { status->setText("Save or discard your edits before opening another image."); return; }
+    if (!resolveEdits([this] { chooseImage(); })) return;
     const QString path = QFileDialog::getOpenFileName(this, "Open CP/M image", image.isEmpty() ? QDir::homePath() : image,
         "Disk images (*.raw *.img *.dsk);;All files (*)");
     if (path.isEmpty()) return;
@@ -515,7 +529,7 @@ void Window::openDefinition(const QJsonObject &definition, bool sidecar, bool sw
     begin(request);
 }
 void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
-    if (dirty) { status->setText("Save or discard your edits before switching formats."); return; }
+    if (!resolveEdits([this] { formats->click(); })) return;
     QDialog dialog(this);
     dialog.setWindowTitle("Choose disk format");
     dialog.resize(650, 480);
@@ -912,6 +926,7 @@ void Window::cancel() {
     status->setText("Cancelling…");
 }
 void Window::fail(const QString &message) {
+    afterSave = {};
     deadline.stop(); cancellationDeadline.stop(); error = message;
     if(batchActive) {
         if(batchInFlight && batchIndex<batch.items.size()) batch.items[batchIndex].outcome=
@@ -967,6 +982,7 @@ void Window::readReply() {
         setWindowTitle("cpmimage — " + QFileInfo(image).fileName() + (dirty ? " *" : ""));
         setBusy(false);
         status->setText(dirty ? "Unsaved changes." : operation == "discard" ? "Changes discarded." : "System tracks exported.");
+        if (operation == "discard" && afterSave) QTimer::singleShot(0, this, std::exchange(afterSave, {}));
         emit completed(true);
         return;
     }
@@ -977,10 +993,10 @@ void Window::readReply() {
         if (operation == "save_plan") {
             bool replace = !pendingSave["destination"].toString().isEmpty() && result["expected"].isString();
             if (replace && QMessageBox::question(this, "Replace image", "Replace the existing destination image?",
-                    QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) return;
+                    QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) { afterSave = {}; return; }
             if (result["sidecar_changed"].toBool() && QMessageBox::question(this, "Confirm Disk Definition",
                     QString("Record %1 in the image's FDF? This records your interpretation and does not verify or convert the filesystem.").arg(format),
-                    QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) return;
+                    QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) { afterSave = {}; return; }
             pendingSave["op"] = "save";
             pendingSave["plan"] = result;
             pendingSave["replace"] = replace;
@@ -994,6 +1010,7 @@ void Window::readReply() {
             source->setToolTip(image);
             setWindowTitle("cpmimage — " + QFileInfo(image).fileName());
             status->setText("Save completed.");
+            if (afterSave) QTimer::singleShot(0, this, std::exchange(afterSave, {}));
             emit completed(true);
         }
         return;
@@ -1100,11 +1117,6 @@ void Window::readReply() {
 }
 void Window::closeEvent(QCloseEvent *event) {
     if (busy) { closing = true; cancel(); event->ignore(); }
-    else if (dirty) {
-        const auto answer = QMessageBox::warning(this, "Unsaved changes", "Save changes before closing?",
-            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Cancel);
-        if (answer == QMessageBox::Save) chooseSave(false);
-        if (answer == QMessageBox::Discard) { process.closeWriteChannel(); event->accept(); }
-        else event->ignore();
-    } else { process.closeWriteChannel(); event->accept(); }
+    else if (!resolveEdits([this] { close(); })) event->ignore();
+    else { process.closeWriteChannel(); event->accept(); }
 }
