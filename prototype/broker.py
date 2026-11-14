@@ -468,9 +468,9 @@ def main():
                 if not session['confirmed'] and request.get('confirmed') is not True:
                     raise backend.Failure('confirmation_required', 'Confirm the selected disk definition for writing.')
                 action = request['action']
-                if action not in ('rename', 'delete', 'attrs', 'import', 'move'):
+                if action not in ('rename', 'delete', 'delete_many', 'attrs', 'import', 'move'):
                     raise backend.Failure('invalid_edit', 'Unknown editing operation.')
-                name = '' if action == 'import' else backend.filename(request['name'], True)
+                name = '' if action in ('import', 'delete_many') else backend.filename(request['name'], True)
                 argument = '-'
                 if action in ('rename', 'move'):
                     argument = backend.filename(request['target'], True)
@@ -515,6 +515,13 @@ def main():
                             if item.get('replace') is True:
                                 adapter().native(edit_dir, 'edit_delete', candidate, session['format'], 'raw', target, '-')
                             adapter().native(edit_dir, 'edit_import', candidate, session['format'], 'raw', target, staged)
+                    elif action == 'delete_many':
+                        names = request['names']
+                        if not isinstance(names, list) or not 1 <= len(names) <= 256:
+                            raise backend.Failure('invalid_edit', 'Delete batch must contain 1 to 256 names.')
+                        for item in names:
+                            target = backend.filename(item, True)
+                            adapter().native(edit_dir, 'edit_delete', candidate, session['format'], 'raw', target, '-')
                     else:
                         adapter().native(edit_dir, 'edit_' + action, candidate, session['format'], 'raw', name, argument)
                     checked = adapter().request({

@@ -138,8 +138,38 @@ private slots:
         QCOMPARE(tabs->currentWidget(), &first);
         QCOMPARE(areas->currentRow(), 0);
         QCOMPARE(first.entryCount(), 3);
+        areas->setCurrentRow(1);
+        QAction *remove = nullptr;
+        for (auto *action : first.findChildren<QAction *>())
+            if (action->text() == "Delete…") remove = action;
+        QVERIFY(remove);
+        QTimer respond;
+        QMessageBox::StandardButton choice = QMessageBox::Yes;
+        connect(&respond, &QTimer::timeout, &workspace, [&] {
+            auto *dialog = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+            if (dialog && dialog->button(choice)) dialog->button(choice)->click();
+        });
+        // Edit a disposable image so ownership and export tests can run independently.
+        QTemporaryDir scratch;
+        const auto copy = scratch.filePath("dirty.raw");
+        QVERIFY(QFile::copy(root + "/fixtures/ibm3740-independent.raw", copy));
+        firstDone.clear();
+        first.openImage(copy, "ibm-3740", "raw");
+        QTRY_COMPARE(firstDone.size(), 1);
+        QVERIFY(firstDone.takeFirst().first().toBool());
+        respond.start(20);
+        remove->trigger();
+        QTRY_COMPARE(firstDone.size(), 1);
+        QVERIFY(firstDone.takeFirst().first().toBool());
+        QVERIFY(first.windowTitle().endsWith("*"));
+        choice = QMessageBox::Cancel;
+        QVERIFY(!first.close());
+        QCOMPARE(tabs->count(), 1);
+        QVERIFY(first.windowTitle().endsWith("*"));
+        choice = QMessageBox::Discard;
+        QVERIFY(!first.close());
+        QTRY_COMPARE(tabs->count(), 0);
         QVERIFY(workspace.close());
-        QCOMPARE(tabs->count(), 0);
     }
 
     void saveWorkflow() {

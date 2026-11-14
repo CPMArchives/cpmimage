@@ -1,3 +1,5 @@
+#include <QPointer>
+#include <QDateTime>
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "window.h"
 #include <QCryptographicHash>
@@ -53,6 +55,16 @@
 #else
 #include <signal.h>
 #endif
+
+namespace {
+class CutFiles : public QMimeData {
+public:
+    QPointer<Window> origin;
+    quint64 revision = 0;
+    QString session;
+    QHash<QString, QString> names;
+};
+}
 
 Window::Window(QString root, QString python, QString helper, int deadlineMs, int graceMs, QString noticesPath, QString settingsFile)
     : root(root), python(python), helper(helper), deadlineMs(deadlineMs), graceMs(graceMs) {
@@ -284,6 +296,9 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     auto *copy = editMenu->addAction("Copy Files");
     copy->setShortcut(QKeySequence::Copy);
     connect(copy, &QAction::triggered, this, [this] { offerFiles(false); });
+    auto *cut = editMenu->addAction("Cut Files");
+    cut->setShortcut(QKeySequence::Cut);
+    connect(cut, &QAction::triggered, this, [this] { offerFiles(false, true); });
     auto *paste = editMenu->addAction("Paste Files");
     paste->setShortcut(QKeySequence::Paste);
     connect(paste, &QAction::triggered, this, [this] {
@@ -292,7 +307,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         QStringList paths;
         for (const auto &url : mime->urls())
             if (url.isLocalFile()) paths.append(url.toLocalFile());
-        importFiles(paths);
+        if (!paths.isEmpty()) chooseEdit("paste", paths);
     });
     table->viewport()->setAcceptDrops(true);
     userAreas->viewport()->setAcceptDrops(true);
@@ -475,8 +490,21 @@ void Window::chooseEdit(const QString &action, QStringList paths) {
         begin(request);
         return;
     }
+    QPointer<Window> cutOrigin;
+    quint64 cutRevision = 0;
+    QString cutSession;
+    QJsonArray removedNames;
     bool accepted = false;
-    if (action == "import") {
+    if (action == "import" || action == "paste") {
+        request["action"] = "import";
+        QHash<QString, QString> cutNames;
+        const auto *cut = action == "paste" ? dynamic_cast<const CutFiles *>(QApplication::clipboard()->mimeData()) : nullptr;
+        if (cut) {
+            cutOrigin = cut->origin;
+            cutRevision = cut->revision;
+            cutSession = cut->session;
+            cutNames = cut->names;
+        }
         if (paths.isEmpty()) paths = QFileDialog::getOpenFileNames(this, "Import files");
         if (paths.isEmpty() || !userAreas->currentItem()) return;
         const QRegularExpression valid(R"CPM(^[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,8}(\.[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,3})?$)CPM");
@@ -544,6 +572,9 @@ void Window::chooseEdit(const QString &action, QStringList paths) {
                 if (all->isChecked()) defaultConflict = choice;
             }
             if (conflict && choice == "skip") continue;
+            const auto oldName = cutNames.value(paths[row]);
+            if (cutOrigin == this && cutNames.values().contains(key)) continue;
+            if (!oldName.isEmpty()) removedNames.append(oldName);
             items.append(QJsonObject{{"name",key},{"path",paths[row]},{"replace",conflict},{"text",text.isChecked()}});
         }
         if (items.isEmpty()) return;
@@ -584,6 +615,23 @@ void Window::chooseEdit(const QString &action, QStringList paths) {
     }
     if (!confirmWrite()) return;
     request["confirmed"] = true;
+    if (cutOrigin && !removedNames.isEmpty()) {
+        connect(this, &Window::completed, this, [this, cutOrigin, cutRevision, cutSession, removedNames](bool ok) {
+            if (!ok) return;
+            const auto expected = cutRevision + (cutOrigin == this ? 1 : 0);
+            if (!cutOrigin || cutOrigin->busy || cutOrigin->session != cutSession ||
+                cutOrigin->imageRevision != expected || !cutOrigin->confirmWrite()) {
+                status->setText("Files copied. Source files were retained.");
+                return;
+            }
+            connect(cutOrigin, &Window::completed, this, [this](bool removed) {
+                status->setText(removed ? "Files moved in the working images." :
+                                          "Files copied. Source removal failed; duplicates remain.");
+            }, Qt::SingleShotConnection);
+            cutOrigin->begin({{"op","edit"},{"session",cutSession},{"action","delete_many"},
+                              {"names",removedNames},{"confirmed",true}});
+        }, Qt::SingleShotConnection);
+    }
     begin(request);
 }
 QJsonObject Window::initializeOptions(const QJsonObject &geometry) {
@@ -998,34 +1046,50 @@ void Window::importFiles(const QStringList &paths) {
     if (!paths.isEmpty()) chooseEdit("import", paths);
 }
 
-void Window::offerFiles(bool drag) {
+void Window::offerFiles(bool drag, bool cut) {
     if (busy || session.isEmpty()) return;
     const auto entries = exportEntries(false);
     if (entries.isEmpty()) return;
-    QTemporaryDir staging(QDir::temp().filePath("cpmimage-transfer-XXXXXX"));
-    if (!staging.isValid()) return;
-    auto plan = planExport(entries, staging.path(), -1, filenamePolicy);
+    const auto cache = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/file-transfers";
+    if (!QDir().mkpath(cache)) return;
+    const QDir transferCache(cache);
+    const auto cutoff = QDateTime::currentDateTime().addDays(-7);
+    for (const auto &old : transferCache.entryInfoList({"transfer-*"}, QDir::Dirs | QDir::NoSymLinks))
+        if (old.lastModified() < cutoff) QDir(old.absoluteFilePath()).removeRecursively();
+    auto staging = std::make_shared<QTemporaryDir>(transferCache.filePath("transfer-XXXXXX"));
+    if (!staging->isValid()) return;
+    auto plan = planExport(entries, staging->path(), -1, filenamePolicy);
     if (!plan.error.isEmpty()) {
         status->setText(plan.error);
         return;
     }
-    const auto directory = staging.path();
-    staging.setAutoRemove(false);
-    connect(this, &Window::completed, this, [this, drag, directory, plan](bool ok) {
-        if (!ok) {
-            QDir(directory).removeRecursively();
-            return;
-        }
+
+
+    const auto revision = imageRevision;
+    const auto originSession = session;
+    connect(this, &Window::completed, this, [this, drag, cut, staging, plan, revision, originSession](bool ok) {
+        if (!ok) return;
         QList<QUrl> urls;
         for (const auto &item : plan.items) urls.append(QUrl::fromLocalFile(item.destination));
-        auto *mime = new QMimeData;
+        auto *mime = new CutFiles;
         mime->setUrls(urls);
+        if (cut) {
+            mime->origin = this;
+            mime->revision = revision;
+            mime->session = originSession;
+            for (const auto &item : plan.items) mime->names.insert(item.destination, item.name);
+        }
         if (drag) {
             auto *gesture = new QDrag(table);
             gesture->setMimeData(mime);
-            gesture->exec(Qt::CopyAction);
+            if (gesture->exec(Qt::CopyAction) != Qt::IgnoreAction)
+                staging->setAutoRemove(false);
             gesture->deleteLater();
-        } else QApplication::clipboard()->setMimeData(mime);
+        } else {
+            // Clipboard consumers can resolve the URLs after this process exits.
+            staging->setAutoRemove(false);
+            QApplication::clipboard()->setMimeData(mime);
+        }
     }, Qt::SingleShotConnection);
     startBatch(plan, false);
 }
@@ -1404,6 +1468,7 @@ void Window::readReply() {
             writeConfirmed = true;
             imageGeometry = result["geometry"].toObject();
         } else if (result["closed"].toBool()) resetImage();
+        if (operation != "systems_export") ++imageRevision;
         dirty = result["dirty"].toBool();
         if (result["imd_comment"].isString()) imdComment = result["imd_comment"].toString();
         if (operation == "edit" || operation == "discard" || operation == "systems_import") writeConfirmed = dirty;
@@ -1550,7 +1615,10 @@ void Window::readReply() {
         QTimer::singleShot(0,this,&Window::nextBatchFile); return;
     }
     setBusy(false);
-    if (operation == "open") updateSelectionStatus();
+    if (operation == "open") {
+        updateSelectionStatus();
+        emit imageOpened(image);
+    }
     emit completed(true);
     if (closing) close();
 }

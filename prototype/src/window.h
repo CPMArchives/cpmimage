@@ -39,6 +39,7 @@ public:
 signals:
     void completed(bool success);
     void sessionClosed();
+    void imageOpened(const QString &path);
     void imagePicked(const QString &path);
     void exportProgress(int completed, int total);
 protected:
@@ -60,7 +61,8 @@ private:
     void chooseImage();
     void chooseSave(bool saveAs);
     void chooseEdit(const QString &action, QStringList paths = {});
-    void offerFiles(bool drag);
+    void offerFiles(bool drag, bool cut = false);
+    quint64 imageRevision = 0;
     void exportFlat(const QJsonArray &entries, const QString &directory);
     bool confirmWrite();
     bool dirty = false, writeConfirmed = false;
