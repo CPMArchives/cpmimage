@@ -14,6 +14,7 @@
 #include <QClipboard>
 #include <QMimeData>
 #include <QDrag>
+#include <QEventLoop>
 #include <QDragEnterEvent>
 #include <QTemporaryDir>
 #include <QSaveFile>
@@ -1090,60 +1091,86 @@ void Window::offerFiles(bool drag, bool cut) {
 
     const auto revision = imageRevision;
     const auto originSession = session;
-    connect(this, &Window::completed, this, [this, drag, cut, staging, plan, revision, originSession](bool ok) {
+    if (drag) {
+        // The native drag must start before returning from the view's mouse gesture.
+        // Service broker replies while staging, but defer further user input.
+        QEventLoop stagingLoop;
+        bool ready = false;
+        const auto completion = connect(this, &Window::completed, &stagingLoop, [&](bool ok) {
+            ready = ok;
+            stagingLoop.quit();
+        });
+        startBatch(plan, false);
+        if (batchActive) stagingLoop.exec(QEventLoop::ExcludeUserInputEvents);
+        disconnect(completion);
+        if (!ready || session != originSession || imageRevision != revision) return;
+
+        auto *mime = new TransferFiles;
+        QList<QUrl> urls;
+        for (const auto &item : plan.items) {
+            urls.append(QUrl::fromLocalFile(item.destination));
+            mime->names.insert(item.destination, item.name);
+        }
+        mime->setUrls(urls);
+        mime->origin = this;
+        mime->revision = revision;
+        mime->session = originSession;
+
+        // A native receiver can read these URLs after the gesture has ended.
+        staging->setAutoRemove(false);
+        auto *gesture = new QDrag(table);
+        gesture->setMimeData(mime);
+        gesture->exec(Qt::CopyAction);
+        gesture->deleteLater();
+        return;
+    }
+
+    connect(this, &Window::completed, this, [this, cut, staging, plan, revision, originSession](bool ok) {
         if (!ok) return;
         QList<QUrl> urls;
         for (const auto &item : plan.items) urls.append(QUrl::fromLocalFile(item.destination));
         auto *mime = new TransferFiles;
         mime->setUrls(urls);
-        if (cut || drag) {
+        if (cut) {
             mime->origin = this;
             mime->revision = revision;
             mime->session = originSession;
             for (const auto &item : plan.items) mime->names.insert(item.destination, item.name);
         }
-        if (drag) {
-            auto *gesture = new QDrag(table);
-            gesture->setMimeData(mime);
-            if (gesture->exec(Qt::CopyAction) != Qt::IgnoreAction)
-                staging->setAutoRemove(false);
-            gesture->deleteLater();
-        } else {
-            // Clipboard consumers can resolve the URLs after this process exits.
-            staging->setAutoRemove(false);
-            if (cut) {
-                const auto token = QUuid::createUuid().toString(QUuid::WithoutBraces);
-                mime->setData(cutMime, token.toLatin1());
-                auto *receiptListener = new QTimer(this);
-                receiptListener->setInterval(500);
-                connect(receiptListener, &QTimer::timeout, this,
-                    [this, receiptListener, token, plan, revision, originSession] {
-                    const auto *current = QApplication::clipboard()->mimeData();
-                    if (current && current->data(cutMime) == token.toLatin1()) return;
-                    receiptListener->stop();
-                    receiptListener->deleteLater();
-                    if (!current || busy || session != originSession || imageRevision != revision) return;
-                    const auto bytes = current->data(receiptMime);
-                    if (bytes.size() > 262144) return;
-                    const auto receipt = QJsonDocument::fromJson(bytes).object();
-                    if (receipt["token"].toString() != token || !receipt["files"].isArray()) return;
-                    const auto files = receipt["files"].toArray();
-                    QJsonArray names;
-                    for (const auto &item : plan.items)
-                        if (files.contains(item.destination)) names.append(item.name);
-                    if (names.isEmpty() || names.size() != files.size()) return;
-                    if (QMessageBox::question(this, "Complete file move",
-                        QString("The receiving instance confirmed importing %1 file(s). Remove those files from the source working image?")
-                            .arg(names.size()), QMessageBox::Yes | QMessageBox::Cancel,
-                            QMessageBox::Cancel) != QMessageBox::Yes) return;
-                    if (busy || session != originSession || imageRevision != revision || !confirmWrite()) return;
-                    begin({{"op","edit"},{"session",originSession},{"action","delete_many"},
-                           {"names",names},{"confirmed",true}});
-                });
-                receiptListener->start();
-            }
-            QApplication::clipboard()->setMimeData(mime);
+        // Clipboard consumers can resolve the URLs after this process exits.
+        staging->setAutoRemove(false);
+        if (cut) {
+            const auto token = QUuid::createUuid().toString(QUuid::WithoutBraces);
+            mime->setData(cutMime, token.toLatin1());
+            auto *receiptListener = new QTimer(this);
+            receiptListener->setInterval(500);
+            connect(receiptListener, &QTimer::timeout, this,
+                [this, receiptListener, token, plan, revision, originSession] {
+                const auto *current = QApplication::clipboard()->mimeData();
+                if (current && current->data(cutMime) == token.toLatin1()) return;
+                receiptListener->stop();
+                receiptListener->deleteLater();
+                if (!current || busy || session != originSession || imageRevision != revision) return;
+                const auto bytes = current->data(receiptMime);
+                if (bytes.size() > 262144) return;
+                const auto receipt = QJsonDocument::fromJson(bytes).object();
+                if (receipt["token"].toString() != token || !receipt["files"].isArray()) return;
+                const auto files = receipt["files"].toArray();
+                QJsonArray names;
+                for (const auto &item : plan.items)
+                    if (files.contains(item.destination)) names.append(item.name);
+                if (names.isEmpty() || names.size() != files.size()) return;
+                if (QMessageBox::question(this, "Complete file move",
+                    QString("The receiving instance confirmed importing %1 file(s). Remove those files from the source working image?")
+                        .arg(names.size()), QMessageBox::Yes | QMessageBox::Cancel,
+                        QMessageBox::Cancel) != QMessageBox::Yes) return;
+                if (busy || session != originSession || imageRevision != revision || !confirmWrite()) return;
+                begin({{"op","edit"},{"session",originSession},{"action","delete_many"},
+                       {"names",names},{"confirmed",true}});
+            });
+            receiptListener->start();
         }
+        QApplication::clipboard()->setMimeData(mime);
     }, Qt::SingleShotConnection);
     startBatch(plan, false);
 }
