@@ -70,6 +70,17 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     filenameSettings->setShortcut(QKeySequence::Preferences);
     addAction(filenameSettings);
     connect(filenameSettings, &QAction::triggered, this, &Window::editFilenameSettings);
+    for (const auto &option : QList<QPair<QString,QString>>{
+            {"Keep automatic save backups", "saveBackups"},
+            {"Save disk definitions beside images", "saveSidecar"},
+            {"Show routine disk-definition save warnings", "warnSaveSidecar"}}) {
+        auto *action = preferences->addAction(option.first);
+        action->setCheckable(true);
+        action->setChecked(settings->value(option.second, true).toBool());
+        connect(action, &QAction::toggled, this, [this, option](bool checked) {
+            settings->setValue(option.second, checked);
+        });
+    }
     auto *formatFavorites = preferences->addAction("Format favorites…");
     connect(formatFavorites, &QAction::triggered, this, [this] {
         QStringList entries = settings->value("formatFavorites").toStringList();
@@ -1043,7 +1054,7 @@ void Window::readReply() {
             bool replace = !pendingSave["destination"].toString().isEmpty() && result["expected"].isString();
             if (replace && QMessageBox::question(this, "Replace image", "Replace the existing destination image?",
                     QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) { afterSave = {}; return; }
-            if (result["sidecar_changed"].toBool() && QMessageBox::question(this, "Confirm Disk Definition",
+            if (result["sidecar_changed"].toBool() && settings->value("warnSaveSidecar", true).toBool() && QMessageBox::question(this, "Confirm Disk Definition",
                     QString("Record %1 in the image's FDF? This records your interpretation and does not verify or convert the filesystem.").arg(format),
                     QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) { afterSave = {}; return; }
             pendingSave["op"] = "save";

@@ -5,11 +5,21 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from contextlib import contextmanager
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from publication import fingerprint, publish, PublicationError, recovery_directory
 from source_ownership import Ownership, OwnershipError
+
+
+@contextmanager
+def replace_with(operation):
+    original = os.replace
+    os.replace = operation
+    try:
+        yield
+    finally:
+        os.replace = original
 
 
 class PublicationCheck(unittest.TestCase):
@@ -33,7 +43,7 @@ class PublicationCheck(unittest.TestCase):
             replace(source, target)
 
         with Ownership(self.image, self.root / 'locks') as owner:
-            with patch('publication.os.replace', side_effect=interrupt):
+            with replace_with(interrupt):
                 with self.assertRaisesRegex(PublicationError, 'Save interrupted'):
                     publish(owner, fingerprint(self.image), self.stage,
                             (self.sidecar, fingerprint(self.sidecar), self.stage))
