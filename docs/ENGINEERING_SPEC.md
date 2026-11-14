@@ -1,6 +1,6 @@
 # CP/M Image — Engineering Specification
 
-**Version:** 0.8  
+**Version:** 0.9  
 **Status:** Approved engineering baseline  
 **Project:** CPMArchives/cpmimage  
 **Target release:** 1.0  
@@ -42,6 +42,7 @@ Version 1.0 shall provide:
 - Creating and formatting disk images.
 - Saving modified images and saving copies under different names.
 - Multiple simultaneously open images.
+- Show All User Areas with flat multi-area export and duplicate-content handling.
 - Narrow CP/M user-area navigation and a spacious file-list pane.
 - Bidirectional drag-and-drop with native host file managers.
 - Bundled searchable offline Help and companion online documentation.
@@ -776,7 +777,7 @@ The primary window shall use a narrow left sidebar for CP/M user areas and a lar
 
 The sidebar shall show numbered user-area folders (0–15, or 0–31 where supported), including empty areas, with a visual distinction between populated and empty folders. Its default width should be approximately 90–120 pixels, adjustable by a splitter. The right pane is the main workspace, with sortable filename, size, attribute, and available timestamp columns.
 
-An All User Areas view is optional rather than a 1.0 requirement. Host filesystem browsing shall use native file-open dialogs and the operating system's file manager.
+**Show All User Areas is required for 1.0.** The sidebar shall provide an **All** entry above the numbered areas. Selecting it displays a virtual combined listing of all user areas, without creating a CP/M directory. Host filesystem browsing shall use native file-open dialogs and the operating system's file manager.
 
 ### 10.3 Native file-manager drag-and-drop
 
@@ -798,11 +799,27 @@ Copy/Paste duplicates files without modifying their sources. Cut/Paste moves fil
 
 ### 10.5 File-list columns and interaction
 
-The default columns, in order, shall be **Filename**, **Records**, **Size (bytes)**, and **Attributes**. User area and supported timestamp columns are optional; an eventual All User Areas view shall include the User column. Column headers sort ascending/descending, with filename ascending by default and numeric sorting for record and byte counts. Columns shall be resizable, reorderable, and configurable through a column-header Choose Columns context menu. Visibility, order, and widths shall persist.
+The default columns, in order, shall be **Filename**, **Records**, **Size (bytes)**, and **Attributes**. User area and supported timestamp columns are optional in an individual user-area view; **Show All shall automatically display the User column** so duplicate filenames from different areas remain distinguishable. Returning to an individual area restores its ordinary column configuration, including any explicitly enabled User column. Column headers sort ascending/descending, with filename ascending by default and numeric sorting for record and byte counts. Columns shall be resizable, reorderable, and configurable through a column-header Choose Columns context menu. Visibility, order, and widths shall persist.
 
 Single-click selects a file; double-click opens Properties in 1.0. A future viewer may replace double-click behavior, with Properties remaining in the context menu. F2 renames and Delete invokes confirmed deletion. Multiselection shall follow native platform conventions.
 
 Properties shall display filename, user area, logical size, available timestamps, and optional directory extent/allocation details. RO, SYS, and ARC are editable; renaming and moving user areas are separate operations. Unsupported timestamps shall not be fabricated.
+
+### 10.5.1 Show All navigation and selection
+
+View → Show All User Areas shall be a checked toggle, with **Ctrl/Cmd+Shift+A** as its keyboard shortcut. Enabling Show All displays every user area's files and their User numbers; disabling it returns to the previously selected user area, remembered independently per image tab. Switching views clears file selections to prevent actions on hidden selections.
+
+All selected files shall retain their source user-area identities, including during sorting, multiselection, Properties, copying, moving, deletion, and export. Operations requiring a destination user area (including Import and Paste) shall prompt for one while Show All is active, rather than silently choosing User 0.
+
+### 10.5.2 Flat multi-area export and deduplication
+
+When files from multiple user areas are exported or dragged to a host folder from Show All, the default shall be a **flat export** into that destination folder, not automatic USERnn subdirectories. Group source files by their translated host destination names. Compare files with the same destination name by logical CP/M content, including final-record padding: compare lengths first, use checksums as an optimization, and verify byte equality before treating files as identical.
+
+Identical copies shall be exported once and subsequent copies skipped with an explicit report. If the destination host folder already contains an identical file, skip the redundant export. Different-content collisions, whether among selected source files or against existing destination files, shall invoke export conflict resolution.
+
+The export conflict actions shall be **Overwrite**, **Skip** (preselected), **Rename** (choose a distinct valid host filename), and **Cancel**. Apply to All shall be offered for Overwrite and Skip, not Rename or Cancel. Skip omits only the current file and continues; Cancel stops the current and all remaining files, without rolling back completed exports. Report skipped files and consolidated duplicates.
+
+Flat export with deduplication is a convenience operation; it does not promise archival preservation of user-area organization or all CP/M metadata. The approved general import/copy collision policy remains unchanged outside this export-specific Rename option.
 
 ### 10.6 Toolbar and context menus
 
@@ -846,6 +863,7 @@ Standard application shortcuts shall be:
 | Ctrl/Cmd+X | Cut |
 | Ctrl/Cmd+V | Paste |
 | Ctrl/Cmd+A | Select all files in the active list |
+| Ctrl/Cmd+Shift+A | Toggle Show All User Areas |
 | Delete | Delete selected files, with confirmation |
 
 Use Command on macOS and Control on Windows/Linux as appropriate. Do not override operating-system function-key or hardware-control behavior. Keyboard shortcuts, menus, context menus, and toolbar controls shall invoke the same underlying commands, with availability governed by current selection and image state. F3 is reserved rather than implemented as a viewer in 1.0.
@@ -1023,7 +1041,7 @@ Tests shall verify generated `.FDF` files using independent cpmtools, image/side
 
 ### 13.10 Interface and Help qualification
 
-Verify the narrow user-area sidebar, populated/empty indicators, default and optional columns, numeric sorting, column persistence, hideable five-action toolbar, context-menu selection rules, file Properties, independent instances and writable ownership, and native appearance on each supported platform. Exercise image-opening drops, host-to-image imports, image-to-host exports, and cross-image transfers.
+Verify the narrow user-area sidebar, populated/empty indicators, Show All toggle and per-tab return state, automatic User column, multi-area selection identity, flat export deduplication, export conflict choices and batch cancellation, default and optional columns, numeric sorting, column persistence, hideable five-action toolbar, context-menu selection rules, file Properties, independent instances and writable ownership, and native appearance on each supported platform. Exercise image-opening drops, host-to-image imports, image-to-host exports, and cross-image transfers.
 
 Verify bundled offline Help without network access, search, contextual links, and consistency with the published online documentation.
 
