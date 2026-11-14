@@ -32,6 +32,7 @@ class ContainerSaveCheck(unittest.TestCase):
                 self.assertTrue(plan['ok'], plan)
                 saved = broker.request('save', plan=plan['result'], confirm_sidecar=True, **args)
                 self.assertTrue(saved['ok'], saved)
+                dst.with_name(dst.name + '.mapping.json').unlink()
                 reopened = broker.request('open', image=str(dst), format=fmt, container=container)
                 self.assertTrue(reopened['ok'], reopened)
                 token = reopened['result']['session']
@@ -61,7 +62,8 @@ class ContainerSaveCheck(unittest.TestCase):
                     for diagnostic, data in variants.items():
                         bad = dst.with_name(diagnostic + '.jv3')
                         bad.write_bytes(data)
-                        bad.with_name(bad.name + '.mapping.json').write_text(json.dumps(profile))
+                        if diagnostic == 'differs':
+                            bad.with_name(bad.name + '.mapping.json').write_text(json.dumps(profile))
                         invalid = broker.request('open', image=str(bad), format=fmt, container=container)
                         self.assertEqual(invalid.get('error'), 'physical_mapping', invalid)
                         self.assertIn(diagnostic, invalid['message'].lower())

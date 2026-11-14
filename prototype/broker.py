@@ -68,7 +68,7 @@ def main():
     sys.path.insert(0, str(args.root / 'experiments/process-comparison'))
     sys.path.insert(0, str(args.root / 'prototype'))
     import catalogue
-    from container_mapping import MappingError, PhysicalMapping, inspect_imd, transfer_dmk, dmk_template, replace_imd_comment, verify_jv3
+    from container_mapping import MappingError, PhysicalMapping, inspect_imd, transfer_dmk, dmk_template, replace_imd_comment, verify_jv3, derive_mapping
     from publication import fingerprint as file_hash, publish, recovery_directory, require_recovery_clear
     from source_ownership import Ownership, identity
     import adapters as backend
@@ -171,7 +171,10 @@ def main():
     def mapped_image(container, source, data, geometry, directory, raw, writing=False):
         profile = source.with_name(source.name + '.mapping.json')
         try:
-            mapping = PhysicalMapping.from_profile(json.loads(catalogue.read_text(profile)), geometry)
+            try:
+                mapping = PhysicalMapping.from_profile(json.loads(catalogue.read_text(profile)), geometry)
+            except FileNotFoundError:
+                mapping = derive_mapping(container, data, geometry)
             if container == 'dmk':
                 if writing:
                     raise MappingError('Use a verified DMK template; RAW-to-DMK creation is unavailable.')
@@ -579,8 +582,11 @@ def main():
                                 folder = Path(temp)
                                 try:
                                     profile = destination.with_name(destination.name + '.mapping.json')
-                                    mapping = PhysicalMapping.from_profile(
-                                        json.loads(catalogue.read_text(profile)), session['geometry'])
+                                    if same and session['mapping'] is not None:
+                                        mapping = session['mapping']
+                                    else:
+                                        mapping = PhysicalMapping.from_profile(
+                                            json.loads(catalogue.read_text(profile)), session['geometry'])
                                     if session['mapping'] is not None and mapping != session['mapping']:
                                         raise MappingError('Destination profile differs from the source RAW slot mapping.')
                                     if output_container == 'dmk':
@@ -619,6 +625,8 @@ def main():
                     if session['owner'] and session['owner'] is not owner:
                         session['owner'].close()
                     session.update(owner=owner, source=owner.path, identity=owner.current, sha=file_hash(owner.path), dirty=False, original_container=output_container)
+                    if output is not None and output_container in structured:
+                        session['mapping'] = mapping
                     session.pop('saved_comment', None)
                     plan['source_sha256'] = session['sha']
                 reply = dict(v=1, id=rid, ok=True, result=plan)

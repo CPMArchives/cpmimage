@@ -4,7 +4,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from container_mapping import MappingError, PhysicalMapping, Track, inspect_imd
+from container_mapping import MappingError, PhysicalMapping, Track, inspect_imd, derive_mapping
 
 
 class ContainerMappingCheck(unittest.TestCase):
@@ -35,6 +35,12 @@ class ContainerMappingCheck(unittest.TestCase):
         del inventory[0, 1]
         with self.assertRaisesRegex(MappingError, 'inventory'):
             mapping.verify_inventory(inventory)
+
+    def test_noncanonical_order_requires_profile(self):
+        geometry = dict(tracks=1, offset=0, sector_size=128, sectors_per_track=2)
+        data = b'IMD header\x1a' + bytes((5, 0, 0, 2, 0, 2, 1, 2, 65, 2, 66))
+        with self.assertRaisesRegex(MappingError, 'explicit profile'):
+            derive_mapping('imd', data, geometry)
 
     def test_mapping_checks_geometry_without_applying_skew(self):
         geometry = dict(tracks=2, offset=0, sector_size=128, sectors_per_track=2, skew=2)

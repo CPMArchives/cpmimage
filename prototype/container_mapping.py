@@ -225,13 +225,11 @@ def replace_imd_comment(data, comment):
     return header + b'\r\n' + comment + data[end:]
 
 
-def verify_jv3(data, mapping):
+def inspect_jv3(data):
     """Check the complete JV3 descriptor inventory before LibDsk reads it."""
     header_size = 8704
     sizes = (256, 128, 1024, 512)
-    expected = {(t.cylinder, t.head, sector): (t.size, t.mode >= 3)
-                for t in mapping.tracks for sector in t.sectors}
-    observed = set()
+    observed = {}
     position = 0
     while position < len(data):
         header = data[position:position + header_size]
@@ -261,9 +259,60 @@ def verify_jv3(data, mapping):
             size = sizes[flags & 3]
             if unused_tail or position + size > len(data):
                 raise MappingError(f'Truncated JV3 sector {address}.')
-            if expected.get(address) != (size, bool(flags & 128)):
-                raise MappingError(f'JV3 sector {address} differs from the physical mapping.')
-            observed.add(address)
+            observed[address] = size, bool(flags & 128)
             position += size
-    if observed != expected.keys():
+    return observed
+
+
+def verify_jv3(data, mapping):
+    observed = inspect_jv3(data)
+    expected = {(t.cylinder, t.head, sector): (t.size, t.mode >= 3)
+                for t in mapping.tracks for sector in t.sectors}
+    for address, properties in observed.items():
+        if expected.get(address) != properties:
+            raise MappingError(f'JV3 sector {address} differs from the physical mapping.')
+    if observed.keys() != expected.keys():
         raise MappingError('JV3 inventory is missing mapped sectors.')
+
+
+def derive_mapping(container, data, geometry):
+    """Only derive canonical single-sided, sequential sector layouts."""
+    if container == 'imd':
+        tracks = list(inspect_imd(data)[0].values())
+    elif container == 'jv3':
+        grouped = {}
+        for (cylinder, head, sector), (size, mfm) in inspect_jv3(data).items():
+            # JV3 stores density but not a data rate. LibDsk JV3 uses the
+            # FM/MFM distinction for sector lookup.
+            grouped.setdefault((cylinder, head, size, mfm), []).append(sector)
+        tracks = [Track(c, h, 5 if mfm else 2, size, tuple(ids))
+                  for (c, h, size, mfm), ids in grouped.items()]
+    else:
+        if len(data) < 16 or data[4] != 16:
+            raise MappingError('An explicit profile is required for this DMK geometry.')
+        length = int.from_bytes(data[2:4], 'little')
+        if length <= 128 or len(data) != 16 + data[1] * length:
+            raise MappingError('Invalid DMK track length.')
+        tracks = []
+        for cylinder in range(data[1]):
+            base = 16 + cylinder * length
+            ids = []
+            for index in range(base, base + 128, 2):
+                pointer = int.from_bytes(data[index:index + 2], 'little')
+                if not pointer:
+                    break
+                offset = pointer & 0x3fff
+                if pointer & 0xc000 != 0x8000 or not 128 <= offset <= length - 7:
+                    raise MappingError('Unsupported DMK density or ID pointer.')
+                ids.append(data[base + offset + 3])
+            tracks.append(Track(cylinder, 0, 5, geometry['sector_size'], tuple(ids)))
+    tracks.sort(key=lambda track: track.cylinder)
+    count = geometry['sectors_per_track']
+    canonical = (tuple(range(count)), tuple(range(1, count + 1)))
+    if (not tracks or [t.cylinder for t in tracks] != list(range(len(tracks)))
+            or any(t.head or t.sectors != tracks[0].sectors or t.mode != tracks[0].mode for t in tracks)
+            or tracks[0].sectors not in canonical):
+        raise MappingError('An explicit profile is required for noncanonical track or sector order.')
+    mapping = PhysicalMapping(tuple(tracks))
+    mapping.verify(geometry)
+    return mapping
