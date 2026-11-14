@@ -28,3 +28,18 @@ The committed fixtures are independently generated test data. SIG/M images, Bett
 ## License
 
 New project code is **GPL-3.0-or-later**, as approved by the owner. See [LICENSE](LICENSE). Third-party code and documentation retain their own licenses; see [licenses/third-party](licenses/third-party).
+
+### Headless cpmtools
+
+Use the package executable with a utility selector such as
+`cpmimage /cpmls -f ibm-3740 image.raw`. On macOS, run
+`CPMImage.app/Contents/MacOS/cpmimage-review` from Terminal. Selectors include
+`/cpmls`, `/cpmrm`, `/cpmcp`, `/cpmchmod`, `/cpmchattr`, `/mkfs.cpm`,
+`/fsck.cpm`, and `/fsed.cpm`. One selector may appear anywhere in the
+argument list. Use `/diskdefs=PATH` to override the bundled catalogue.
+
+For packaging, apply `packaging/scripts/configure-utility-catalogue.py` to a
+pinned cpmtools 2.23 source tree before compiling the standalone utilities.
+Build the complete suite with a curses implementation for `fsed.cpm` and
+set `CPMIMAGE_CPMTOOLS_BIN` to the native build output when assembling the
+package. Include any Windows utility runtime DLLs in that directory.

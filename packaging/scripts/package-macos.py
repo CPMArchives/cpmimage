@@ -2,6 +2,7 @@
 from pathlib import Path
 import os,shutil,subprocess,plistlib,re
 from notices import BASE,ROOT,create
+from utility_bundle import install_utilities
 app=BASE/'dist/CPMImage-macOS-arm64/CPMImage.app'
 if app.exists():shutil.rmtree(app)
 shutil.copytree(BASE/'app-macos/cpmimage-review.app',app,symlinks=True)
@@ -35,6 +36,7 @@ subprocess.run([str(BASE/'qt-macos/install/bin/macdeployqt'),str(app),'-no-strip
 platforms=app/'Contents/PlugIns/platforms'
 shutil.copy2(BASE/'qt-macos/install/plugins/platforms/libqoffscreen.dylib',platforms/'libqoffscreen.dylib')
 subprocess.run(['install_name_tool','-add_rpath','@loader_path/../../Frameworks',str(platforms/'libqoffscreen.dylib')],check=True)
+install_utilities(app/'Contents/MacOS/cpmtools', 'macos')
 create(resources/'notices','macos')
 # Remove stale build-prefix fallback search paths, even when the relocated app
 # already works via its bundle-relative primary search path.
