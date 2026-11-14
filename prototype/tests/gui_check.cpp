@@ -110,7 +110,14 @@ private slots:
         QVERIFY(window.lastBatchReport().contains("Consolidated identical contents"));
     }
 
+    void workspaceSwitchAndClose_data() {
+        QTest::addColumn<bool>("saveOnClose");
+        QTest::newRow("discard") << false;
+        QTest::newRow("save") << true;
+    }
+
     void workspaceSwitchAndClose() {
+        QFETCH(bool, saveOnClose);
         const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
         Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
                              qEnvironmentVariable("CPMIMAGE_HELPER"), {}});
@@ -147,7 +154,9 @@ private slots:
         QMessageBox::StandardButton choice = QMessageBox::Yes;
         connect(&respond, &QTimer::timeout, &workspace, [&] {
             auto *dialog = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
-            if (dialog && dialog->button(choice)) dialog->button(choice)->click();
+            if (!dialog) return;
+            const auto answer = choice == QMessageBox::Save && dialog->button(QMessageBox::Yes) ? QMessageBox::Yes : choice;
+            if (auto *button = dialog->button(answer)) button->click();
         });
         // Edit a disposable image so ownership and export tests can run independently.
         QTemporaryDir scratch;
@@ -166,10 +175,15 @@ private slots:
         QVERIFY(!first.close());
         QCOMPARE(tabs->count(), 1);
         QVERIFY(first.windowTitle().endsWith("*"));
-        choice = QMessageBox::Discard;
+        choice = saveOnClose ? QMessageBox::Save : QMessageBox::Discard;
         QVERIFY(!first.close());
         QTRY_COMPARE(tabs->count(), 0);
         QVERIFY(workspace.close());
+        QFile result(copy);
+        QFile original(root + "/fixtures/ibm3740-independent.raw");
+        QVERIFY(result.open(QIODevice::ReadOnly) && original.open(QIODevice::ReadOnly));
+        QCOMPARE(result.readAll() != original.readAll(), saveOnClose);
+        QCOMPARE(QFile::exists(copy + ".BAK"), saveOnClose);
     }
 
     void saveWorkflow() {
@@ -272,7 +286,7 @@ private slots:
             QTest::keyClick(search, Qt::Key_Down);
             const auto firstRow = list->currentRow();
             QTest::keyClick(list, Qt::Key_Down);
-            const bool keyboardNavigation = list->hasFocus() && list->currentRow() == firstRow + 1;
+            const bool keyboardNavigation = dialog->focusWidget() == list && list->currentRow() == firstRow + 1;
             search->setText("ibm-3740");
             const auto exact = list->findItems("ibm-3740", Qt::MatchExactly);
             chose = keyboardNavigation && exact.size() == 1;

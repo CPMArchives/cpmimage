@@ -12,6 +12,37 @@ from source_ownership import Ownership
 
 
 class EditCheck(unittest.TestCase):
+    def test_failed_transfer_batch_leaves_both_working_directories_unchanged(self):
+        source, destination = CatalogueCheck(), CatalogueCheck()
+        for broker in (source, destination):
+            broker.setUp()
+            self.addCleanup(broker.doCleanups)
+            self.addCleanup(broker.tearDown)
+        destination.image.write_bytes((Path(os.environ['CPMIMAGE_ROOT']) /
+                                       'fixtures/ibm3740-empty.raw').read_bytes())
+        def open_image(broker):
+            result = broker.request('open', image=str(broker.image), format='ibm-3740', container='raw')
+            self.assertTrue(result['ok'], result)
+            return result['result']['session']
+        src, dst = open_image(source), open_image(destination)
+        payload = source.directory / 'staged.bin'
+        self.assertTrue(source.request('export', session=src, name='00BINARY.BIN',
+                                       destination=str(payload))['ok'])
+        too_large = source.directory / 'large.bin'
+        too_large.write_bytes(bytes(512 * 1024))
+        failed = destination.request('edit', session=dst, action='import', confirmed=True, items=[
+            {'name': '00FIRST.BIN', 'path': str(payload)},
+            {'name': '00LARGE.BIN', 'path': str(too_large)},
+        ])
+        self.assertFalse(failed['ok'], failed)
+        absent = destination.request('export', session=dst, name='00FIRST.BIN',
+                                     destination=str(destination.directory / 'unexpected.bin'))
+        self.assertEqual(absent.get('error'), 'not_found', absent)
+        retained = source.directory / 'retained.bin'
+        self.assertTrue(source.request('export', session=src, name='00BINARY.BIN',
+                                       destination=str(retained))['ok'])
+        self.assertEqual(payload.read_bytes(), retained.read_bytes())
+
     def test_two_sessions_share_read_access_and_exclude_alias_writes(self):
         first, second = CatalogueCheck(), CatalogueCheck()
         for broker in (first, second):
