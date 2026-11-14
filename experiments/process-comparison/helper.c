@@ -102,6 +102,72 @@ static int encode(const char *image, const char *destination)
   return 0;
 }
 
+/* The broker supplies one physical address for each consecutive RAW slot.
+ * This routine only transfers bytes. cpmtools applies filesystem skew. */
+static int mapped_transfer(const char *driver, const char *map_path,
+                           const char *raw_path, const char *image_path, int writing)
+{
+  FILE *map=fopen(map_path,"r");
+  FILE *raw=fopen(raw_path,writing?"rb":"wb");
+  DSK_PDRIVER disk=NULL;
+  dsk_err_t error=DSK_ERR_OK;
+  int bad=!map || !raw;
+  if (!bad)
+    error=writing ? dsk_creat(&disk,image_path,driver,NULL) : dsk_open(&disk,image_path,driver,NULL);
+  unsigned cylinder, head, mode, size, count;
+  unsigned char bytes[8192];
+  int fields=EOF;
+  unsigned tracks=0;
+  while (!bad && !error && (fields=fscanf(map,"%u %u %u %u %u",
+                                          &cylinder,&head,&mode,&size,&count))==5)
+  {
+    DSK_FORMAT sectors[255];
+    DSK_GEOMETRY geometry={0};
+    if (cylinder>255 || head>1 || mode>5 || size<128 || size>sizeof bytes ||
+        !count || count>255 || ++tracks>512) { bad=1; break; }
+    geometry.dg_cylinders=256;
+    geometry.dg_heads=2;
+    geometry.dg_sectors=count;
+    geometry.dg_secsize=size;
+    geometry.dg_datarate=mode%3==0?RATE_HD : mode%3==1?RATE_DD : RATE_SD;
+    geometry.dg_fm=mode<3?RECMODE_FM:RECMODE_MFM;
+    for (unsigned i=0;i<count;++i)
+    {
+      unsigned id;
+      if (fscanf(map,"%u",&id)!=1 || id>255) { bad=1; break; }
+      sectors[i]=(DSK_FORMAT){cylinder,head,id,size};
+    }
+    if (bad) break;
+    if (writing) error=dsk_pformat(disk,&geometry,cylinder,head,sectors,0xe5);
+    for (unsigned i=0;i<count && !error;++i)
+    {
+      if (writing)
+      {
+        if (fread(bytes,1,size,raw)!=size) { bad=1; break; }
+        error=dsk_pwrite(disk,&geometry,bytes,cylinder,head,sectors[i].fmt_sector);
+      }
+      else
+      {
+        int deleted=0;
+        error=dsk_xread(disk,&geometry,bytes,cylinder,head,cylinder,head,
+                        sectors[i].fmt_sector,size,&deleted);
+        if (!error && (deleted || fwrite(bytes,1,size,raw)!=size)) { bad=1; break; }
+      }
+    }
+  }
+  if (!error && (!tracks || fields!=EOF || (writing && fgetc(raw)!=EOF))) bad=1;
+  if (map) fclose(map);
+  if (raw && fclose(raw)) bad=1;
+  if (disk)
+  {
+    dsk_err_t closed=dsk_close(&disk);
+    if (!error) error=closed;
+  }
+  if (bad || error) return fail("image_incompatible",error?dsk_strerror(error):"Invalid mapped sector transfer");
+  puts("{\"v\":1,\"ok\":true}");
+  return 0;
+}
+
 #endif
 static int edit(struct cpmSuperBlock *sb, struct cpmInode *root, const char *op,
                 const char *name, const char *argument)
@@ -153,6 +219,9 @@ static int edit(struct cpmSuperBlock *sb, struct cpmInode *root, const char *op,
 int main(int argc,char **argv) {
   struct cpmSuperBlock sb={0};struct cpmInode root,ino; const char *err;
 #ifdef CPMIMAGE_READ_ONLY
+  if (argc==6 && (!strcmp(argv[1],"mapped-read") || !strcmp(argv[1],"mapped-write")) &&
+      (!strcmp(argv[2],"imd") || !strcmp(argv[2],"jv3")))
+    return mapped_transfer(argv[2],argv[3],argv[4],argv[5],!strcmp(argv[1],"mapped-write"));
   if (argc==3 && !strcmp(argv[1],"describe")) return describe(argv[2]);
   if (argc>=3 && !strcmp(argv[1],"describe-catalogue"))
   {

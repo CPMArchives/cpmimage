@@ -511,13 +511,20 @@ void Window::chooseSave(bool saveAs) {
     QString destination, selectedFilter;
     if (saveAs) {
         destination = QFileDialog::getSaveFileName(this, "Save CP/M image as", image,
-            "RAW disk images (*.raw *.img);;Standard CPCEMU DSK (*.dsk)", &selectedFilter, QFileDialog::DontConfirmOverwrite);
+            "RAW disk images (*.raw *.img);;Standard CPCEMU DSK (*.dsk);;ImageDisk (*.imd);;JV3 (*.jv3);;DMK (*.dmk)", &selectedFilter, QFileDialog::DontConfirmOverwrite);
         if (destination.isEmpty()) return;
     }
     pendingSave = {{"op","save_plan"}, {"session",session}, {"destination",destination},
                    {"backups",settings->value("saveBackups",true).toBool()},
                    {"sidecar",settings->value("saveSidecar",true).toBool()}};
-    if (saveAs) pendingSave["container"] = selectedFilter.startsWith("Standard") ? "dsk" : "raw";
+    if (saveAs) {
+        QString type = "raw";
+        if (selectedFilter.startsWith("Standard")) type = "dsk";
+        else if (selectedFilter.startsWith("ImageDisk")) type = "imd";
+        else if (selectedFilter.startsWith("JV3")) type = "jv3";
+        else if (selectedFilter.startsWith("DMK")) type = "dmk";
+        pendingSave["container"] = type;
+    }
     begin(pendingSave);
 }
 bool Window::resolveEdits(std::function<void()> next) {
@@ -536,7 +543,7 @@ bool Window::resolveEdits(std::function<void()> next) {
 void Window::chooseImage() {
     if (!resolveEdits([this] { chooseImage(); })) return;
     const QString path = QFileDialog::getOpenFileName(this, "Open CP/M image", image.isEmpty() ? QDir::homePath() : image,
-        "Disk images (*.raw *.img *.dsk);;All files (*)");
+        "Disk images (*.raw *.img *.dsk *.imd *.jv3 *.dmk);;All files (*)");
     if (path.isEmpty()) return;
     inspectImage(path);
 }
@@ -941,8 +948,23 @@ void Window::showImageInformation() {
     auto *layout=new QVBoxLayout(&dialog);
     auto *text=new QTextEdit;text->setObjectName("imageInformationText");text->setReadOnly(true);
     text->setPlainText(details+(exportDiagnostics.isEmpty()?QString():"\n\n"+exportDiagnostics));layout->addWidget(text);
-    auto *buttons=new QDialogButtonBox(QDialogButtonBox::Close);layout->addWidget(buttons);
-    connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);dialog.exec();
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close);
+    layout->addWidget(buttons);
+    if (container == "imd") {
+        auto *comment = new QTextEdit;
+        comment->setPlainText(imdComment);
+        layout->insertWidget(1, new QLabel("IMD comment"));
+        layout->insertWidget(2, comment);
+        auto *apply = buttons->addButton("Apply comment", QDialogButtonBox::AcceptRole);
+        connect(apply, &QPushButton::clicked, &dialog, [&] {
+            if (comment->toPlainText() == imdComment) return;
+            const auto value = comment->toPlainText();
+            dialog.accept();
+            begin({{"op","imd_comment"},{"session",session},{"comment",value}});
+        });
+    }
+    connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
+    dialog.exec();
 }
 
 void Window::showExportReport() {
@@ -1031,11 +1053,12 @@ void Window::readReply() {
     const QRegularExpression hash("^[0-9a-f]{64}$");
     auto invalid = [this] { stopReader(); resetImage(); fail("Invalid response schema from the image reader."); };
     if (!reply["result"].isObject()) { invalid(); return; }
-    if (operation == "edit" || operation == "discard" || operation.startsWith("systems_")) {
+    if (operation == "edit" || operation == "imd_comment" || operation == "discard" || operation.startsWith("systems_")) {
         deadline.stop();
         cancellationDeadline.stop();
         dirty = result["dirty"].toBool();
-        if (operation != "systems_export") writeConfirmed = dirty;
+        if (result["imd_comment"].isString()) imdComment = result["imd_comment"].toString();
+        if (operation == "edit" || operation == "discard" || operation == "systems_import") writeConfirmed = dirty;
         if (result["entries"].isArray()) {
             directoryEntries = result["entries"].toArray();
             updateUserAreas();
@@ -1146,6 +1169,7 @@ void Window::readReply() {
         if (!tail.isUndefined() && !tail.isBool()) { invalid(); return; }
         imageNote = tail.toBool() ? "Unused image tail filled with E5 in the temporary snapshot; original unchanged." : "None.";
         snapshotHash=result["source_sha256"].toString();
+        imdComment = result["imd_comment"].toString();
         retainSource = false;
         const auto definitionHash = result["definition_sha256"].toString();
         if (!activeCatalogue.isEmpty() && hash.match(definitionHash).hasMatch()) {

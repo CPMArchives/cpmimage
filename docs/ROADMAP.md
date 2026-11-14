@@ -68,13 +68,14 @@ The current five-format restriction is an implementation limitation, **not** a p
 
 ## v0.5 — Container interoperability
 
-- Implement read/create/modify/save workflows for IMD, DMK, and JV3 alongside RAW.
-- Evaluate the pinned LibDsk drivers first for formats they already support; investigate DMK separately.
+- Support opening, editing, and saving qualified IMD, DMK, and JV3 layouts alongside RAW. Save As can create container output from an existing working image.
+- Use pinned LibDsk for IMD and JV3 sector I/O and a dedicated adapter for ordinary MFM DMK.
 - Decode containers to the **RAW layout expected by unmodified cpmtools** using the selected disk definition, not merely numeric sector-ID order. Apply sector translation/skew exactly once.
 - Implement reverse mapping for container encoding and qualify emulator-compatible output.
 - Provide IMD comment viewing, editing, and preservation in Image Information.
 - Report missing/ambiguous sectors and conversion limitations; never silently invent or discard essential data.
-- Expose known image geometry where useful.
+- Derive mappings for canonical single-sided layouts and reuse the verified mapping for Save. Require explicit profiles for multi-sided or noncanonical layouts and Save As to IMD, JV3, or DMK.
+- Defer broader container-derived mapping. Keep standalone Amstrad FDF generation and batch text-export conversion as deferred file-management work.
 
 **Acceptance:** Independent unmodified cpmtools can read generated RAW images with the corresponding `diskdefs` entry and extract correct file contents; IMD/DMK/JV3 conversions pass suitable round-trip and emulator checks; comments survive save/reopen.
 

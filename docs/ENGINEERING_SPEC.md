@@ -328,6 +328,10 @@ Where sector mapping cannot be determined reliably, the application shall report
 
 The reverse mapping shall be used when encoding RAW data into the destination container.
 
+An optional container-mapping profile may supply physical information unavailable from the container or disk definition. A profile can describe physical track order, sector IDs and sizes, density, and track-specific exceptions. Multiple physical profiles may describe the same disk definition. cpmtools remains authoritative for filesystem parameters and translation. Profiles do not extend diskdefs syntax or accompany standalone FDF files as a requirement for RAW access. RAW-to-container conversion requires a verified physical mapping; ambiguous or incomplete mappings shall produce an explicit error.
+
+**v0.5 implementation boundary.** Profile-free Open is qualified for canonical single-sided IMD, JV3, and DMK layouts with contiguous track numbers, uniform recording mode, and ordered contiguous sector IDs. The selected disk definition must match the verified inventory. Save to the current image reuses that mapping. Multi-sided and noncanonical layouts require explicit profiles, as does Save As with IMD, JV3, or DMK output. Broader container-derived mapping is deferred. RAW and standard CPCEMU DSK output require no destination profile.
+
 ### 5.5 Container adapters
 
 Container-specific decoding and encoding shall be encapsulated behind a common application-level interface.

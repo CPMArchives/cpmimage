@@ -11,7 +11,7 @@ metadata.update(CFBundleIdentifier='org.cpmarchives.cpmimage.packagereview',CFBu
 with info.open('wb') as stream: plistlib.dump(metadata,stream)
 resources=app/'Contents/Resources';resources.mkdir(exist_ok=True)
 backend=resources/'cpmimage'
-for rel in ['prototype/broker.py','prototype/catalogue.py','prototype/publication.py','prototype/source_ownership.py','prototype/helper_guard.py','experiments/process-comparison/adapters.py','experiments/process-comparison/windows_supervisor.py','fixtures/diskdefs','fixtures/diskdefs-metadata.json']:
+for rel in ['prototype/broker.py','prototype/catalogue.py','prototype/container_mapping.py','prototype/publication.py','prototype/source_ownership.py','prototype/helper_guard.py','experiments/process-comparison/adapters.py','experiments/process-comparison/windows_supervisor.py','fixtures/diskdefs','fixtures/diskdefs-metadata.json']:
  dst=backend/rel;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(ROOT/rel,dst)
 helper=app/'Contents/Helpers/cpmimage-helper';helper.parent.mkdir(exist_ok=True)
 shutil.copy2(BASE/'cpmimage-helper-macos',helper)
