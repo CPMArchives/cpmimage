@@ -59,6 +59,10 @@ private:
     bool resolveEdits(std::function<void()> next);
     std::function<void()> afterSave;
     QJsonObject pendingSave;
+    QJsonObject initializeOptions(const QJsonObject &geometry);
+    bool newImagePicker = false;
+    bool unpublished = false;
+    QJsonObject newDefinition, imageGeometry;
     void chooseExport();
     void editFilenameSettings();
     void chooseBatch(bool wholeArea);
