@@ -86,6 +86,10 @@ class Ownership:
         self.next_lock.enter_context(self._lock('file', candidate))
         self.next = candidate
 
+    def cancel_replacement(self):
+        self.next_lock.close()
+        self.next = None
+
     def adopt_replacement(self):
         if self.next is None or self._read_identity() != self.next:
             raise OwnershipError('The published image does not have the reserved identity.')
