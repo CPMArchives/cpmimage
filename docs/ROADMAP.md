@@ -52,6 +52,7 @@ The current five-format restriction is an implementation limitation, **not** a p
 
 - Introduce private mutable working images, dirty-state tracking, Discard, Save, and Save As.
 - Implement safe output publication and appropriate conflict, interruption, and concurrent-change handling.
+- Design source identity and single-writer ownership using native file identity and locking, including symlink/hard-link aliases, source replacement during publication, crash recovery, and external-change revalidation; avoid indefinite stale lockouts.
 - Implement file import/export, rename, confirmed deferred deletion, supported RO/SYS/ARC Properties editing, optional text conversion, timestamp handling where supported, and filename collision safeguards.
 - Import valid CP/M filenames automatically; review names requiring 8.3 shortening/translation in one editable batch dialog, detecting within-batch and destination collisions. Use Replace/Skip/Cancel with Skip preselected and Apply to All for batch conflicts.
 - Implement single-file F2/context-menu Rename as a metadata-only update across extents; reject rename collisions without Replace. Deletion requires confirmation, changes only the working image, and is reversible through Discard of all unsaved changes (not per-operation Undo).
@@ -87,6 +88,7 @@ The current five-format restriction is an implementation limitation, **not** a p
 ## v0.7 — Multiple images and desktop transfers
 
 - Support tabbed image sessions within each window and multiple independent application instances, with per-tab format, user area, and unsaved state. Allow shared read-only access but enforce a single writable owner per source, with external-change checks before save.
+- Integrate cross-instance ownership: subsequent opens of an already writable-owned source use read-only access; Save As transfers writable ownership to the new destination only after safe publication, with old ownership released afterward. Test aliases, failed acquisition, and crash recovery.
 - Support copying/moving files between images and user areas.
 - Implement the required Show All virtual view across user areas, retaining source user identities in selections and prompting for destination user areas when importing or pasting.
 - Implement default flat multi-area export and native drag-out, consolidating byte-identical same-name files and checking existing destination contents; offer Overwrite, Skip (default), Rename, or Cancel for differing-content collisions. Cancel stops the remainder; completed exports remain; report skipped and deduplicated files.
@@ -126,6 +128,7 @@ The current five-format restriction is an implementation limitation, **not** a p
 - Publish online Help and complete documentation and release-readiness checks.
 - Validate offline Help without network access, search, contextual topics, online/offline content consistency, and Help links.
 - Qualify native UI appearance, sidebar sizing, column sorting/persistence, toolbar visibility, context menus, Properties, function-key and standard shortcuts (including macOS/Windows/Linux differences), tab/instance ownership, conflict behavior, safe rename/delete, filename review, and bidirectional drag-and-drop with host file managers on the release platforms.
+- Qualify platform-specific locking and file-identity behavior across aliases, independent processes, safe replacement, Save As ownership transition, stale locks, and noncooperating external modifications.
 - Qualify Show All's cross-user-area listing, keyboard toggle, source identity preservation, destination prompts, flat export, checksum/byte-comparison deduplication, host-existing-file comparisons, Rename conflicts, Skip/Cancel semantics, and native drag-out behavior.
 
 **Acceptance:** Release targets have reproducible builds, qualified installers/packages, working bundled offline Help, published online documentation, verified native file-manager transfers, and documented evidence of the required workflows.
