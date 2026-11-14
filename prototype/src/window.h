@@ -51,6 +51,8 @@ private:
     void updateSelectionStatus();
     void updateUserAreas();
     void chooseImage();
+    void chooseSave(bool saveAs);
+    QJsonObject pendingSave;
     void chooseExport();
     void editFilenameSettings();
     void chooseBatch(bool wholeArea);

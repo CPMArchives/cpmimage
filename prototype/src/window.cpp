@@ -210,6 +210,16 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     menuBar()->insertMenu(preferences->menuAction(),fileMenu);
     auto *openAction=fileMenu->addAction("Open image…");
     connect(openAction,&QAction::triggered,openButton,&QPushButton::click);
+    auto *saveAction = fileMenu->addAction("Save");
+    saveAction->setShortcut(QKeySequence::Save);
+    auto *saveAsAction = fileMenu->addAction("Save As…");
+    saveAsAction->setShortcut(QKeySequence::SaveAs);
+    connect(saveAction, &QAction::triggered, this, [this] { chooseSave(false); });
+    connect(saveAsAction, &QAction::triggered, this, [this] { chooseSave(true); });
+    connect(fileMenu, &QMenu::aboutToShow, this, [this, saveAction, saveAsAction] {
+        saveAction->setEnabled(!busy && !session.isEmpty());
+        saveAsAction->setEnabled(!busy && !session.isEmpty());
+    });
     auto *exportAction=fileMenu->addAction("Export selected…");
     connect(exportAction,&QAction::triggered,exportButton,&QPushButton::click);
     auto *areaAction=fileMenu->addAction("Export user area…");
@@ -335,6 +345,19 @@ void Window::setBusy(bool value) {
     imageInfoButton->setEnabled(!busy && !session.isEmpty());
     imageInfoAction->setEnabled(!busy && !session.isEmpty());
     progress->setVisible(busy && batchActive);
+}
+void Window::chooseSave(bool saveAs) {
+    if (busy || session.isEmpty()) return;
+    QString destination;
+    if (saveAs) {
+        destination = QFileDialog::getSaveFileName(this, "Save CP/M image as", image,
+            "RAW disk images (*.raw *.img *.dsk);;All files (*)", nullptr, QFileDialog::DontConfirmOverwrite);
+        if (destination.isEmpty()) return;
+    }
+    pendingSave = {{"op","save_plan"}, {"session",session}, {"destination",destination},
+                   {"backups",settings->value("saveBackups",true).toBool()},
+                   {"sidecar",settings->value("saveSidecar",true).toBool()}};
+    begin(pendingSave);
 }
 void Window::chooseImage() {
     const QString path = QFileDialog::getOpenFileName(this, "Open CP/M image", image.isEmpty() ? QDir::homePath() : image,
@@ -763,7 +786,8 @@ void Window::begin(QJsonObject request) {
     }
     setBusy(true);
     status->setText(operation == "open" ? "Reading image…" : operation == "catalogue" ? "Loading disk definitions…" :
-        operation == "inspect" ? "Checking image format…" : batchActive ?
+        operation == "inspect" ? "Checking image format…" :
+        operation == "save_plan" ? "Preparing save…" : operation == "save" ? "Publishing save…" : batchActive ?
         QString("Exporting %1 of %2: %3").arg(batchIndex+1).arg(batch.items.size()).arg(batch.items[batchIndex].name.mid(2)) : "Exporting selected file…");
     deadline.start(deadlineMs);
     pending = QJsonDocument(request).toJson(QJsonDocument::Compact) + '\n';
@@ -829,6 +853,33 @@ void Window::readReply() {
     const QRegularExpression hash("^[0-9a-f]{64}$");
     auto invalid = [this] { stopReader(); resetImage(); fail("Invalid response schema from the image reader."); };
     if (!reply["result"].isObject()) { invalid(); return; }
+    if (operation == "save_plan" || operation == "save") {
+        deadline.stop();
+        cancellationDeadline.stop();
+        setBusy(false);
+        if (operation == "save_plan") {
+            bool replace = !pendingSave["destination"].toString().isEmpty() && result["expected"].isString();
+            if (replace && QMessageBox::question(this, "Replace image", "Replace the existing destination image?",
+                    QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) return;
+            if (result["sidecar_changed"].toBool() && QMessageBox::question(this, "Confirm Disk Definition",
+                    QString("Record %1 in the image's FDF? This records your interpretation and does not verify or convert the filesystem.").arg(format),
+                    QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) return;
+            pendingSave["op"] = "save";
+            pendingSave["plan"] = result;
+            pendingSave["replace"] = replace;
+            pendingSave["confirm_sidecar"] = true;
+            begin(pendingSave);
+        } else {
+            image = result["destination"].toString();
+            snapshotHash = result["source_sha256"].toString();
+            source->setText(QFileInfo(image).fileName());
+            source->setToolTip(image);
+            setWindowTitle("cpmimage — " + QFileInfo(image).fileName());
+            status->setText("Save completed.");
+            emit completed(true);
+        }
+        return;
+    }
     if (operation == "catalogue" || operation == "inspect") {
         deadline.stop(); cancellationDeadline.stop();
         setBusy(false);
