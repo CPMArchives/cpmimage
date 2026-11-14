@@ -29,11 +29,13 @@ public:
             if (auto *page = tabs->currentWidget()) page->close();
         });
         workspaceMenu = workspace;
-        auto *recent = workspace->addMenu("Recent Images");
-        auto *pinned = workspace->addMenu("Pinned Images");
+        auto *recent = new QMenu("Recent Images", this);
+        auto *pinned = new QMenu("Pinned Images", this);
+        recentImages = recent;
+        pinnedImages = pinned;
         connect(recent, &QMenu::aboutToShow, this, [this, recent] { populateImages(recent, "recentImages"); });
         connect(pinned, &QMenu::aboutToShow, this, [this, pinned] { populateImages(pinned, "pinnedImages"); });
-        pinAction = workspace->addAction("Pin Current Image");
+        pinAction = new QAction("Pin Current Image", this);
         connect(pinAction, &QAction::triggered, this, [this] {
             const auto path = tabs->currentWidget()->property("imagePath").toString();
             auto paths = settings.value("pinnedImages").toStringList();
@@ -127,14 +129,33 @@ private:
 
     void updateMenus() {
         for (auto *action : menuBar()->actions()) menuBar()->removeAction(action);
-        if (auto *page = qobject_cast<Window *>(tabs->currentWidget()))
-            for (auto *action : page->menuBar()->actions()) menuBar()->addAction(action);
-        menuBar()->addMenu(workspaceMenu);
+        if (auto *page = qobject_cast<Window *>(tabs->currentWidget())) {
+            const auto actions = page->menuBar()->actions();
+            for (const auto &title : {"File", "Edit", "View", "Tabs", "Settings", "Help"}) {
+                if (QLatin1String(title) == "Tabs") {
+                    menuBar()->addMenu(workspaceMenu);
+                    continue;
+                }
+                for (auto *action : actions) {
+                    auto *menu = action->menu();
+                    if (!menu || menu->title() != QLatin1String(title)) continue;
+                    if (QLatin1String(title) == "File" && !menu->actions().contains(pinAction)) {
+                        menu->addMenu(recentImages);
+                        menu->addMenu(pinnedImages);
+                        menu->addAction(pinAction);
+                    }
+                    menuBar()->addAction(action);
+                    break;
+                }
+            }
+        }
         updatePin();
     }
     RuntimePaths runtime;
     QTabWidget *tabs = new QTabWidget;
     QMenu *workspaceMenu = nullptr;
+    QMenu *recentImages = nullptr;
+    QMenu *pinnedImages = nullptr;
     QAction *pinAction = nullptr;
     QSettings settings{"CPMArchives", "cpmimage"};
 };
