@@ -1,6 +1,7 @@
 <RCC>
   <qresource prefix="/icons">
     <file>cpmimage.png</file>
+    <file>cpmimage-macos.png</file>
     <file>toolbar/open.png</file>
     <file>toolbar/new.png</file>
     <file>toolbar/save.png</file>
