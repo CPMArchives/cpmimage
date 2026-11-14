@@ -9,7 +9,8 @@ import unittest
 
 class MkfsAddressingCheck(unittest.TestCase):
     def test_reserved_sectors_offset_and_skewed_metadata(self):
-        formatter = Path(os.environ['CPMIMAGE_MKFS']).resolve()
+        dispatcher = os.environ.get('CPMIMAGE_DISPATCH_APP')
+        formatter = None if dispatcher else Path(os.environ['CPMIMAGE_MKFS']).resolve()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             for reservation, offset, skew, plus in (
@@ -30,7 +31,8 @@ class MkfsAddressingCheck(unittest.TestCase):
                     image.write_bytes(original)
                     (root / 'boot').write_bytes(b'B' * 128)
                     options = ['-L', 'PROOF', '-t'] if plus else []
-                    subprocess.run([formatter, '-f', 'test', '-b', 'boot', *options, image],
+                    command = [dispatcher, '/mkfs.cpm', '/diskdefs=' + str(root / 'diskdefs')] if dispatcher else [formatter]
+                    subprocess.run([*command, '-f', 'test', '-b', 'boot', *options, image],
                                    cwd=root, check=True)
                     reserved = 11 if 'bootsec' in reservation else 8
                     expected = bytearray(original)

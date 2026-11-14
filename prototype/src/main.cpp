@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "workspace.h"
+#include "dispatch.h"
 #include "runtime_paths.h"
 #include <QApplication>
 #include <QIcon>
@@ -17,6 +18,7 @@
 #include <functional>
 
 int main(int argc, char **argv) {
+    if (const auto status = dispatchUtility(argc, argv)) return *status;
     QApplication app(argc, argv);
     QApplication::setWindowIcon(QIcon(":/icons/cpmimage.png"));
     QApplication::setApplicationName("cpmimage Review");

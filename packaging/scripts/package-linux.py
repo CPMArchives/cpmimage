@@ -2,6 +2,7 @@
 from pathlib import Path
 import os,shutil,subprocess
 from notices import BASE,ROOT,create
+from utility_bundle import install_utilities
 out=BASE/'dist/CPMImage-linux-arm64'
 if out.exists():shutil.rmtree(out)
 for sub in ['bin','lib','libexec','share/cpmimage','plugins']: (out/sub).mkdir(parents=True,exist_ok=True)
@@ -28,6 +29,7 @@ for f in (py/'lib').glob('libpython*.so*'):
 shutil.copytree(py/'lib/python3.13',runtime/'lib/python3.13',symlinks=True,ignore=shutil.ignore_patterns('__pycache__','test','config-*'))
 for rel in ['prototype/broker.py','prototype/catalogue.py','prototype/container_mapping.py','prototype/publication.py','prototype/source_ownership.py','prototype/helper_guard.py','experiments/process-comparison/adapters.py','experiments/process-comparison/windows_supervisor.py','fixtures/diskdefs','fixtures/diskdefs-metadata.json']:
  dst=out/'share/cpmimage'/rel;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(ROOT/rel,dst)
+install_utilities(out/'bin/cpmtools', 'linux')
 (out/'bin/qt.conf').write_text('[Paths]\nPrefix=..\nLibraries=lib\nPlugins=plugins\n')
 launcher=out/'CPMImage';launcher.write_text('''#!/bin/sh
 HERE=$(CDPATH= cd -- "${0%/*}" && pwd)
@@ -41,6 +43,7 @@ for f in out.rglob('*'):
  with f.open('rb') as stream:magic=stream.read(4)
  if magic!=b'\x7fELF':continue
  if f==out/'bin/cpmimage' or f==out/'libexec/cpmimage-helper':rpath='$ORIGIN/../lib'
+ elif out/'bin/cpmtools' in f.parents:rpath='$ORIGIN/../../lib'
  elif f==runtime/'bin/python3.13':rpath='$ORIGIN/../lib'
  elif out/'plugins' in f.parents:rpath='$ORIGIN/../../lib'
  else:rpath='$ORIGIN'
