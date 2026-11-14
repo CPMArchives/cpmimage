@@ -17,39 +17,46 @@ import threading
 import uuid
 
 
-def prepare_read_only_image(data, fmt, container, backend):
-    """Accept a trimmed IBM3740 tail only when every allocated sector is present.
 
-    Never use this normalization for mutation. The source/hash stay unchanged;
-    only the retained read-only snapshot receives empty, unallocated sectors.
-    """
-    if fmt != 'ibm-3740' or container != 'raw' or len(data) == 256256:
-        backend.validate(data, fmt, container, read_only=True)
-        return data, False
-    if not data or len(data) > 256256 or len(data) % 128:
-        raise backend.Failure('image_size',
-            'IBM 3740 raw images must contain whole 128-byte sectors and be no larger than 256,256 bytes.')
-    sec, tracks, spt, block, maxdir, boot, skew = backend.FORMATS[fmt]
-    def physical_end(logical_sector):
-        track, sector = divmod(logical_sector, spt)
-        return (boot * spt + track * spt + skew[sector] + 1) * sec
-    directory_sectors = (maxdir * 32 + sec - 1) // sec
-    if any(physical_end(n) > len(data) for n in range(directory_sectors)):
-        raise backend.Failure('image_truncated', 'The image is missing directory sectors; it cannot be opened safely.')
-    padded = data + b'\xe5' * (sec * tracks * spt - len(data))
-    backend.validate(padded, fmt, container, read_only=True)
-    directory = b''.join(padded[physical_end(n)-sec:physical_end(n)]
-                         for n in range(directory_sectors))
-    for offset in range(0, maxdir * 32, 32):
-        entry = directory[offset:offset+32]
-        if entry[0] == 0xe5:
-            continue
-        for allocated in entry[16:32]:
-            if allocated and any(physical_end(allocated * (block // sec) + n) > len(data)
-                                 for n in range(block // sec)):
-                raise backend.Failure('image_truncated',
-                    'The image is missing allocated file sectors; no missing file data will be invented.')
-    return padded, True
+MAX_IMAGE_BYTES = 128 * 1024 * 1024
+DSK_MAGIC = b'MV - CPCEMU Disk-File\r\nDisk-Info\r\n'
+
+
+def check_standard_dsk(data, geometry, backend):
+    # The existing container scope is the qualified uniform, single-sided
+    # 40-track map. Match properties of the definition, not its identifier.
+    if (geometry.get('sector_size'), geometry.get('tracks'),
+            geometry.get('sectors_per_track'), geometry.get('offset')) != (512, 40, 10, 0):
+        raise backend.Failure('unsupported_container', 'Standard DSK support requires a 40-track, single-sided 512 × 10 sector map.')
+    if geometry['libdsk_format'] not in ('', 'ampro200', 'pcw200'):
+        raise backend.Failure('unsupported_container', 'The LibDsk geometry does not match the supported standard DSK map.')
+    track_size = 256 + 512 * 10
+    if (len(data) != 256 + 40 * track_size or data[48:50] != bytes([40, 1])
+            or int.from_bytes(data[50:52], 'little') != track_size):
+        raise backend.Failure('image_incompatible', 'Standard DSK geometry or track size differs from the selected definition.')
+    for track in range(40):
+        start = 256 + track * track_size
+        header = data[start:start + 256]
+        if (header[:12] != b'Track-Info\r\n' or header[16:18] != bytes([track, 0])
+                or header[20:22] != bytes([2, 10])):
+            raise backend.Failure('image_incompatible', 'Invalid standard DSK track header.')
+        for index in range(10):
+            sector = 24 + index * 8
+            if header[sector:sector + 6] != bytes([track, 0, index + 1, 2, 0, 0]):
+                raise backend.Failure('unsupported_container', 'The DSK contains a different sector order or sector error flags.')
+
+
+def raw_extent(data, geometry, backend):
+    if geometry.get('boot_geometry'):
+        return len(data)
+    sector = geometry['sector_size']
+    offset = geometry['offset']
+    end = offset + sector * geometry['tracks'] * geometry['sectors_per_track']
+    if end > MAX_IMAGE_BYTES:
+        raise backend.Failure('unsupported_backend', 'The definition exceeds the 128 MiB working image limit.')
+    if len(data) <= offset or (len(data) - offset) % sector or (not offset and len(data) > end):
+        raise backend.Failure('image_size', 'The RAW image size is incompatible with the selected geometry.')
+    return end
 
 
 def main():
@@ -58,8 +65,15 @@ def main():
     parser.add_argument('--helper', type=Path, required=True)
     args = parser.parse_args()
     sys.path.insert(0, str(args.root / 'experiments/process-comparison'))
+    sys.path.insert(0, str(args.root / 'prototype'))
+    import catalogue
     import adapters as backend
     backend.HELPER = args.helper.resolve()
+    bundled_path = args.root / 'fixtures/diskdefs'
+    definitions = catalogue.definitions(catalogue.read_text(bundled_path), bundled=True)
+    definitions['amstrad'] = ''
+    metadata = json.loads((args.root / 'fixtures/diskdefs-metadata.json').read_text(encoding='utf-8'))
+    descriptions = {}
     # Only internal command construction can select this guard; never a request.
     def guard(argv):
         if os.name == 'nt':
@@ -90,45 +104,204 @@ def main():
         fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0))
         with os.fdopen(fd, 'rb') as stream:
             info = os.fstat(stream.fileno())
-            if not stat.S_ISREG(info.st_mode) or info.st_size > 16777216:
-                raise backend.Failure('input_limit', 'Choose a regular disk-image file no larger than 16 MiB.')
-            data = stream.read(16777217)
-        if len(data) > 16777216:
-            raise backend.Failure('input_limit', 'Image exceeds the 16 MiB prototype limit.')
+            if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_IMAGE_BYTES:
+                raise backend.Failure('input_limit', 'Choose a regular disk-image file no larger than 128 MiB.')
+            data = stream.read(MAX_IMAGE_BYTES + 1)
+        if len(data) > MAX_IMAGE_BYTES:
+            raise backend.Failure('input_limit', 'Image exceeds the 128 MiB working image limit.')
         return data
 
+    def describe(fmt, definition, directory):
+        key = (fmt, catalogue.digest(definition))
+        if key not in descriptions:
+            (directory / 'diskdefs').write_text(definition, encoding='utf-8')
+            descriptions[key] = adapter().native(directory, 'describe', fmt)
+        return descriptions[key]
+
+    def validate_catalogue(blocks):
+        rows = []
+        with tempfile.TemporaryDirectory(prefix='cpmimage-catalogue-') as temp:
+            directory = Path(temp)
+            (directory / 'diskdefs').write_text(''.join(blocks.values()), encoding='utf-8')
+            identifiers = list(blocks)
+            for start in range(0, len(identifiers), 32):
+                chunk = identifiers[start:start + 32]
+                parsed = adapter().native(directory, 'describe-catalogue', *chunk)['definitions']
+                if not isinstance(parsed, list) or len(parsed) != len(chunk):
+                    raise backend.Failure("protocol_invalid", "Incomplete disk definition response.")
+                for fmt, geometry in zip(chunk, parsed):
+                    digest = catalogue.digest(blocks[fmt])
+                    descriptions[fmt, digest] = geometry
+                    manufacturer, model, family = metadata.get(fmt, ('', '', ''))
+                    rows.append(dict(id=fmt, manufacturer=manufacturer, model=model, family=family,
+                                     definition_sha256=digest, geometry=geometry))
+        return sorted(rows, key=lambda row: (row['id'].casefold(), row['id']))
+
+    def resolve_sidecar(source, directory):
+        path = None
+        try:
+            path = catalogue.sidecar(source)
+            if path is None:
+                return None
+            blocks = catalogue.definitions(catalogue.read_text(path))
+            if len(blocks) != 1:
+                raise catalogue.CatalogueError('An FDF must contain exactly one standalone definition.')
+            fmt, definition = next(iter(blocks.items()))
+            geometry = describe(fmt, definition, directory)
+        except (OSError, catalogue.CatalogueError, backend.Failure) as error:
+            if isinstance(error, backend.Failure) and error.code == 'cancelled':
+                raise
+            raise backend.Failure('invalid_sidecar', f'{path.name if path else source.name}: {error}') from error
+        return fmt, definition, geometry
+
     def perform(request):
-        nonlocal snapshot, session
+        nonlocal snapshot, session, definitions
         rid = request['id']
         try:
             op = request.get('op')
-            if op not in ('open', 'export'):
-                raise backend.Failure('read_only', 'Only listing and export are available.')
-            if op == 'open':
+            if op == 'catalogue':
+                try:
+                    path = Path(request['path']).resolve(strict=True) if request.get('path') else bundled_path
+                    blocks = catalogue.definitions(catalogue.read_text(path), bundled=path == bundled_path)
+                except (OSError, catalogue.CatalogueError) as error:
+                    raise backend.Failure('invalid_catalogue', str(error)) from error
+                if path == bundled_path:
+                    blocks['amstrad'] = ''
+                rows = validate_catalogue(blocks)
+                definitions = blocks
+                reply = dict(v=1, id=rid, ok=True, result=dict(formats=rows, catalogue=str(path)))
+            elif op == 'inspect':
+                source = Path(request['image']).absolute()
+                data = read_image(source)
+                container = 'dsk' if data.startswith(DSK_MAGIC) else 'raw'
+                if data.startswith(b'EXTENDED CPC DSK File'):
+                    raise backend.Failure('unsupported_container', 'Extended CPCEMU DSK is outside the supported container scope.')
+                fingerprint = hashlib.sha256(data).hexdigest()
+                selected = None
+                warning = ''
+                if not request.get('explicit_format') and not all((key, catalogue.digest(value)) in descriptions
+                    for key, value in definitions.items()):
+                    validate_catalogue(definitions)
+                with tempfile.TemporaryDirectory(prefix='cpmimage-inspect-') as temp:
+                    directory = Path(temp)
+                    if not request.get('explicit_format'):
+                        try:
+                            selected = resolve_sidecar(source, directory)
+                        except backend.Failure as error:
+                            if error.code != 'invalid_sidecar':
+                                raise
+                            warning = error.message
+                    candidates = []
+                    raw = directory / 'candidate.raw'
+                    ranked = []
+                    choices = () if selected or request.get('explicit_format') else sorted(definitions.items())
+                    for fmt, definition in choices:
+                        if stop.is_set():
+                            raise backend.Failure('cancelled')
+                        geometry = describe(fmt, definition, directory)
+                        if geometry.get('boot_geometry'):
+                            continue
+                        if container == 'dsk':
+                            try:
+                                check_standard_dsk(data, geometry, backend)
+                            except backend.Failure:
+                                continue
+                        else:
+                            try:
+                                if raw_extent(data, geometry, backend) != len(data):
+                                    continue
+                            except backend.Failure:
+                                continue
+                        if not raw.exists():
+                            if container == 'dsk':
+                                encoded = directory / 'source.dsk'
+                                encoded.write_bytes(data)
+                                adapter().native(directory, 'decode', encoded, raw)
+                            else:
+                                raw.write_bytes(data)
+                        probe = adapter().request({
+                            'v': 1, 'id': rid, 'op': 'list', 'image': str(raw),
+                            'format': fmt, 'container': 'raw'}, defs_override=definition)
+                        if probe['ok']:
+                            populated = bool(probe['result']['entries'])
+                            label = 'Geometry and nonempty directory' if populated else 'Geometry and empty directory'
+                            maker, model, family = metadata.get(fmt, ('', '', ''))
+                            ranked.append((not populated, fmt, dict(id=fmt, manufacturer=maker, model=model, family=family,
+                                evidence=label, definition_sha256=catalogue.digest(definition))))
+                    candidates = [row for _, _, row in sorted(ranked)]
+                result = dict(container=container, source_sha256=fingerprint, candidates=candidates,
+                              sidecar_warning=warning)
+                if selected:
+                    fmt, definition, _ = selected
+                    result['sidecar'] = dict(id=fmt, definition_sha256=catalogue.digest(definition))
+                reply = dict(v=1, id=rid, ok=True, result=result)
+            elif op == 'open':
                 session = None
                 if snapshot:
                     snapshot.cleanup()
                     snapshot = None
-                source = Path(request['image']).resolve(strict=True)
+                source = Path(request['image']).absolute()
                 data = read_image(source)
-                prepared, trimmed = prepare_read_only_image(data, request['format'], request['container'], backend)
+                fingerprint = hashlib.sha256(data).hexdigest()
+                if request.get('source_sha256', fingerprint) != fingerprint:
+                    raise backend.Failure('source_changed', 'The image changed after format selection. Open it again.')
+                fmt, container = request['format'], request['container']
+                if not isinstance(fmt, str) or not fmt or len(fmt) > 200 or '\0' in fmt:
+                    raise backend.Failure('unknown_format', 'Invalid disk-definition identifier.')
                 snapshot = tempfile.TemporaryDirectory(prefix='cpmimage-open-')
-                image = Path(snapshot.name) / ('image.' + request['container'])
-                image.write_bytes(prepared)
+                directory = Path(snapshot.name)
+                sidecar_selection = resolve_sidecar(source, directory) if request.get('sidecar') else None
+                if sidecar_selection:
+                    selected, definition, geometry = sidecar_selection
+                    if selected != fmt:
+                        raise backend.Failure('invalid_sidecar', 'The matching FDF identifier changed.')
+                else:
+                    if fmt not in definitions:
+                        raise backend.Failure('unknown_format', f'{fmt} is absent from the selected catalogue.')
+                    definition = definitions[fmt]
+                    geometry = describe(fmt, definition, directory)
+                if request.get('definition_sha256', catalogue.digest(definition)) != catalogue.digest(definition):
+                    raise backend.Failure('definition_changed', 'The disk definition changed. Select it again.')
+                if container not in ('raw', 'dsk'):
+                    raise backend.Failure('unsupported_container', 'Select RAW or standard CPCEMU DSK.')
+                if data.startswith(b'EXTENDED CPC DSK File'):
+                    raise backend.Failure('unsupported_container', 'Extended CPCEMU DSK is outside the supported container scope.')
+                if data.startswith(DSK_MAGIC) != (container == 'dsk'):
+                    raise backend.Failure('container_mismatch', 'The image header does not match the selected container.')
+                image = directory / 'image.raw'
+                if container == 'dsk':
+                    check_standard_dsk(data, geometry, backend)
+                    encoded = directory / 'source.dsk'
+                    encoded.write_bytes(data)
+                    adapter().native(directory, 'decode', encoded, image)
+                    end = image.stat().st_size
+                else:
+                    end = raw_extent(data, geometry, backend)
+                    image.write_bytes(data)
+                trimmed = image.stat().st_size < end
                 reply = adapter().request({
                     'v': 1, 'id': rid, 'op': 'list', 'image': str(image),
-                    'format': request['format'], 'container': request['container']})
+                    'format': fmt, 'container': 'raw'}, defs_override=definition)
                 if not reply['ok']:
                     respond(reply)
                     return
                 if stop.is_set():
                     raise backend.Failure('cancelled')
+                if trimmed:
+                    # The native reader has checked every directory and allocated
+                    # sector in the original short image before padding its tail.
+                    with image.open('ab') as stream:
+                        remaining = end - image.stat().st_size
+                        while remaining:
+                            chunk = min(remaining, 65536)
+                            stream.write(b'\xe5' * chunk)
+                            remaining -= chunk
                 token = str(uuid.uuid4())
-                fingerprint = hashlib.sha256(data).hexdigest()
                 session = dict(token=token, source=source, image=image, sha=fingerprint,
-                               format=request['format'], container=request['container'])
-                reply['result'].update(session=token, source_sha256=fingerprint, unused_tail_filled=trimmed)
-            else:
+                               format=fmt, container='raw', definitions=definition)
+                reply['result'].update(session=token, source_sha256=fingerprint, unused_tail_filled=trimmed,
+                                       definition_sha256=catalogue.digest(definition))
+            elif op == 'export':
                 if not session or request.get('session') != session['token']:
                     raise backend.Failure('stale_session', 'Open the image again.')
                 if hashlib.sha256(read_image(session['source'])).hexdigest() != session['sha']:
@@ -136,7 +309,9 @@ def main():
                 reply = adapter().request({
                     'v': 1, 'id': rid, 'op': 'export', 'image': str(session['image']),
                     'format': session['format'], 'container': session['container'],
-                    'name': request['name'], 'destination': request['destination']})
+                    'name': request['name'], 'destination': request['destination']}, defs_override=session['definitions'])
+            else:
+                raise backend.Failure('read_only', 'Only read-only operations are available.')
             respond(reply)
         except backend.Failure as error:
             respond(dict(v=1, id=rid, ok=False, error=error.code, message=error.message))

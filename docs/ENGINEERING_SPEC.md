@@ -260,9 +260,11 @@ Sidecar discovery and loading belong to v0.3; sidecar generation and updating be
 
 ### 4.10 Automatic format detection
 
-Assisted detection shall offer candidate formats based on available container metadata, geometry, and filesystem plausibility, while retaining access to the full catalogue. Geometric compatibility or plausible directory contents alone do not establish a uniquely correct format.
+Assisted detection shall use available container metadata, geometry, and filesystem plausibility to rank plausible disk definitions. The selection dialog shall show all candidates in ranked order, preselect the highest-ranked candidate, give tied candidates the same evidence description, and break ties deterministically. Users shall retain access to the full catalogue. Numerical confidence percentages require a defensible statistical basis.
 
-For unfamiliar images without an explicit `/f`, valid matching `.FDF`, or validated remembered association, users shall confirm the selected format before writable operations. Detection is read-only and shall not silently override a selected format. Candidate-ranking algorithms remain an implementation detail.
+A matching geometry or plausible directory is evidence for an interpretation of the image. Selecting a definition never converts the source filesystem. An explicit user selection shall take precedence over detection. For unfamiliar images, users shall confirm the selected format before writable operations.
+
+v0.3 implements the candidate picker and read-only checks supported by the current backend. Broader detection heuristics and evidence thresholds are targeted for v0.8.
 
 ---
 
@@ -792,6 +794,8 @@ The sidebar shall show numbered user-area folders (0–15, or 0–31 where suppo
 CP/M Image shall interoperate with Finder, Windows Explorer, and supported Linux file managers. Dropping an image onto the appropriate application-level target shall open it; dropping host files onto a CP/M user area shall import them; dragging CP/M files to a host file manager shall export them; and dragging between open CP/M images shall transfer files.
 
 Drop targets shall distinguish opening an image from importing the same file as ordinary CP/M data. Ambiguous actions shall be resolved explicitly. Existing filename translation, conflict handling, cancellation, and save-safety requirements apply.
+
+Native drag-out exports shall keep temporary files available for asynchronous consumption by destination applications. Ending the drag gesture alone does not establish that the destination has finished reading. Cleanup shall follow native platform behavior and account for cancellation and failures without removing data still in use. Exports shall never modify source images. Use native facilities where practical and avoid a dedicated interprocess protocol. Implementation is targeted for v0.7 and native cross-platform qualification for v0.9.
 
 ### 10.4 Multiple images and independent instances
 

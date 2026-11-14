@@ -15,3 +15,6 @@ else:
 # Only dedicated read-only cpmfs objects define this opt-in name policy.
 if 'CPMIMAGE_READ_ONLY_NAMES' not in (source/'cpmdir.h').read_text():
  subprocess.run(['patch','-p1','-i',str(patch.parent/'cpmtools-2.23-readonly-names.patch')],cwd=source,check=True)
+
+if 'cpmImageReadDefinition' not in (source/'cpmfs.c').read_text():
+ subprocess.run(['patch','-p1','-i',str(patch.parent/'cpmtools-2.23-diskdefs.patch')],cwd=source,check=True)

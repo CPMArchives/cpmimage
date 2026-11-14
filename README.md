@@ -4,10 +4,11 @@ A cross-platform CP/M disk-image GUI for macOS, Windows and Linux.
 
 ## Current status
 
-This repository contains the **validated read-only prototype**, not a public binary release. It lists files and attributes and exports selected files from explicitly supported image layouts. It does not import, rename, delete, create, or save modified images.
+The current development milestone is v0.3. The read-only application browses and exports files from CP/M images using bundled, external, and image-specific disk definitions. Published packages are available on the [releases page](https://github.com/CPMArchives/cpmimage/releases).
 
-The prototype uses Qt 6 Widgets/C++17, a separate Python broker, and a read-only C helper built from pinned cpmtools 2.23 and libdsk 1.4.2 sources. This is the evaluated implementation for this milestone; the broader product architecture remains open for review.
+The application uses Qt 6 Widgets/C++17, a separate Python broker, and a read-only C helper built from pinned cpmtools 2.23 and libdsk 1.4.2 sources.
 
+- [v0.3 implementation and validation](docs/V0_3_DISKDEFS_REVIEW.md)
 - [Build and run](docs/BUILDING.md)
 - [Prototype behavior and limits](docs/READ_ONLY_PROTOTYPE.md)
 - [Batch and user-area export review](docs/V0_2_BATCH_EXPORT_REVIEW.md)
