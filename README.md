@@ -43,3 +43,11 @@ pinned cpmtools 2.23 source tree before compiling the standalone utilities.
 Build the complete suite with a curses implementation for `fsed.cpm` and
 set `CPMIMAGE_CPMTOOLS_BIN` to the native build output when assembling the
 package. Include any Windows utility runtime DLLs in that directory.
+
+For the Windows ARM64 RAW utility build, extract cpmtools 2.23 and PDCurses 3.9
+into sibling directories under a scratch directory. From an ARM64 MSVC
+developer shell, run `python packaging/scripts/build-utilities-msvc.py SCRATCH`
+and set `CPMIMAGE_CPMTOOLS_BIN` to `SCRATCH/bin`. The Windows console editor
+links PDCurses statically and the utilities share the package's MSVC runtime.
+This recipe uses the upstream RAW file backend. It has no LibDsk container
+options. Upstream cpmtools 2.23 opens images read-only in `fsed.cpm`.
