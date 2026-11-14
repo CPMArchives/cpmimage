@@ -67,6 +67,8 @@ def main():
     sys.path.insert(0, str(args.root / 'experiments/process-comparison'))
     sys.path.insert(0, str(args.root / 'prototype'))
     import catalogue
+    from publication import fingerprint as file_hash, publish, recovery_directory
+    from source_ownership import Ownership, identity
     import adapters as backend
     backend.HELPER = args.helper.resolve()
     bundled_path = args.root / 'fixtures/diskdefs'
@@ -236,11 +238,14 @@ def main():
                     result['sidecar'] = dict(id=fmt, definition_sha256=catalogue.digest(definition))
                 reply = dict(v=1, id=rid, ok=True, result=result)
             elif op == 'open':
+                if session and session['owner']:
+                    session['owner'].close()
                 session = None
                 if snapshot:
                     snapshot.cleanup()
                     snapshot = None
                 source = Path(request['image']).absolute()
+                source_identity = identity(source.stat())
                 data = read_image(source)
                 fingerprint = hashlib.sha256(data).hexdigest()
                 if request.get('source_sha256', fingerprint) != fingerprint:
@@ -298,9 +303,75 @@ def main():
                             remaining -= chunk
                 token = str(uuid.uuid4())
                 session = dict(token=token, source=source, image=image, sha=fingerprint,
-                               format=fmt, container='raw', definitions=definition)
+                               format=fmt, container='raw', definitions=definition,
+                               original_container=container, owner=None, identity=source_identity)
                 reply['result'].update(session=token, source_sha256=fingerprint, unused_tail_filled=trimmed,
                                        definition_sha256=catalogue.digest(definition))
+            elif op in ('save_plan', 'save'):
+                if not session or request.get('session') != session['token']:
+                    raise backend.Failure('stale_session', 'Open the image again.')
+                source = session['source']
+                destination = Path(request.get('destination') or source).absolute().resolve()
+                same = source.resolve() == destination
+                if not same and destination.exists() and os.path.samefile(source, destination):
+                    raise backend.Failure('invalid_destination', 'Save As requires a separate file, not an alias of the source.')
+                expected = file_hash(destination)
+                recovery = recovery_directory(destination)
+                if recovery.exists():
+                    raise backend.Failure('recovery_required', f'Review the interrupted save in {recovery}.')
+                if same and (identity(destination.stat()) != session['identity'] or expected != session['sha']):
+                    raise backend.Failure('source_changed', 'The source changed. Open it again or use Save As.')
+                if not same and session['original_container'] != 'raw':
+                    raise backend.Failure('unsupported_container', 'Save As currently requires a RAW source.')
+                sidecar = None
+                if request.get('sidecar', True):
+                    definition = session['definitions']
+                    if not definition:
+                        raise backend.Failure('unsupported_backend', 'This format has no standalone definition.')
+                    target = catalogue.sidecar(destination) or destination.with_suffix('.FDF')
+                    if target == destination:
+                        raise backend.Failure('invalid_destination', 'Choose an image filename distinct from its FDF.')
+                    previous = file_hash(target)
+                    digest = hashlib.sha256(definition.encode('utf-8')).hexdigest()
+                    if digest != previous:
+                        sidecar = (target, previous)
+                plan = dict(destination=str(destination), expected=expected,
+                            sidecar_changed=sidecar is not None,
+                            sidecar_path=str(sidecar[0]) if sidecar else None,
+                            sidecar_expected=sidecar[1] if sidecar else None,
+                            backups=request.get('backups', True))
+                if op == 'save':
+                    if request.get('plan') != plan:
+                        raise backend.Failure('save_plan_changed', 'Review the save again before publishing.')
+                    if not same and expected is not None and request.get('replace') is not True:
+                        raise backend.Failure('destination_exists', 'Confirm replacement of the existing image.')
+                    if sidecar and request.get('confirm_sidecar') is not True:
+                        raise backend.Failure('confirmation_required', 'Confirm publication of the selected definition.')
+                    owner = session['owner'] if same else None
+                    acquired = owner is None
+                    if acquired:
+                        owner = Ownership(source if same else destination, Path.home() / '.cpmimage' / 'ownership')
+                    try:
+                        if same and owner.current != session['identity']:
+                            raise backend.Failure('source_changed', 'The source identity changed.')
+                        with tempfile.TemporaryDirectory(prefix='cpmimage-save-') as temp:
+                            staged = None
+                            if sidecar:
+                                staged = Path(temp) / 'definition'
+                                staged.write_bytes(definition.encode('utf-8'))
+                            if stop.is_set():
+                                raise backend.Failure('cancelled')
+                            publish(owner, expected, None if same else session['image'],
+                                    (*sidecar, staged) if sidecar else None, request.get('backups', True))
+                    except BaseException:
+                        if acquired:
+                            owner.close()
+                        raise
+                    if session['owner'] and session['owner'] is not owner:
+                        session['owner'].close()
+                    session.update(owner=owner, source=owner.path, identity=owner.current, sha=file_hash(owner.path))
+                    plan['source_sha256'] = session['sha']
+                reply = dict(v=1, id=rid, ok=True, result=plan)
             elif op == 'export':
                 if not session or request.get('session') != session['token']:
                     raise backend.Failure('stale_session', 'Open the image again.')
@@ -359,6 +430,8 @@ def main():
         stop.set()
         if worker:
             worker.join()
+        if session and session['owner']:
+            session['owner'].close()
         if snapshot:
             snapshot.cleanup()
 
