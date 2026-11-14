@@ -16,6 +16,7 @@ class QListWidget;
 class QSettings;
 class QProgressBar;
 class QAction;
+class TransferFiles;
 
 class Window : public QMainWindow {
     Q_OBJECT
@@ -60,7 +61,7 @@ private:
     void updateUserAreas();
     void chooseImage();
     void chooseSave(bool saveAs);
-    void chooseEdit(const QString &action, QStringList paths = {});
+    void chooseEdit(const QString &action, QStringList paths = {}, const TransferFiles *transfer = nullptr);
     void offerFiles(bool drag, bool cut = false);
     quint64 imageRevision = 0;
     void exportFlat(const QJsonArray &entries, const QString &directory);

@@ -9,3 +9,9 @@ Successful drag and clipboard staging remains available in the application cache
 The macOS ARM64 dirty-tab check covers Save, Discard, and Cancel. A two-broker failure test verifies that a disk-full import leaves both source content and the destination directory intact.
 
 Remaining acceptance work includes verified cross-instance moves, native delayed drag reads, explicit drag move handling, and coverage of the transfer conflict and cancellation paths.
+
+## Follow-up
+
+Shift-drop within the same process requests a move through the guarded destination-import path. Ordinary drops copy. The full macOS ARM64 Qt suite passed after this change, including dirty-tab Save, Discard, and Cancel. The focused disk-full broker test also passed. The suite does not drive the native Finder or assert the Shift-drop gesture end to end.
+
+Cross-instance Cut/Paste still needs a verified receipt. Native file URLs alone do not communicate which files a destination skipped or successfully imported. A possible extension is to exchange a single-use transfer token and per-file receipt through the native clipboard. This is a proposed application-level protocol and requires approval under the current transfer design.

@@ -56,15 +56,13 @@
 #include <signal.h>
 #endif
 
-namespace {
-class CutFiles : public QMimeData {
+class TransferFiles : public QMimeData {
 public:
     QPointer<Window> origin;
     quint64 revision = 0;
     QString session;
     QHash<QString, QString> names;
 };
-}
 
 Window::Window(QString root, QString python, QString helper, int deadlineMs, int graceMs, QString noticesPath, QString settingsFile)
     : root(root), python(python), helper(helper), deadlineMs(deadlineMs), graceMs(graceMs) {
@@ -470,7 +468,7 @@ bool Window::confirmWrite() {
         QString("Edit the private working image using %1? Confirm that this is the intended interpretation.").arg(format),
         QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) == QMessageBox::Yes;
 }
-void Window::chooseEdit(const QString &action, QStringList paths) {
+void Window::chooseEdit(const QString &action, QStringList paths, const TransferFiles *transfer) {
     if (busy || session.isEmpty()) return;
     QJsonObject request{{"op","edit"},{"session",session},{"action",action}};
     if (action.startsWith("systems_")) {
@@ -498,7 +496,9 @@ void Window::chooseEdit(const QString &action, QStringList paths) {
     if (action == "import" || action == "paste") {
         request["action"] = "import";
         QHash<QString, QString> cutNames;
-        const auto *cut = action == "paste" ? dynamic_cast<const CutFiles *>(QApplication::clipboard()->mimeData()) : nullptr;
+        const auto *cut = transfer;
+        if (!cut && action == "paste")
+            cut = dynamic_cast<const TransferFiles *>(QApplication::clipboard()->mimeData());
         if (cut) {
             cutOrigin = cut->origin;
             cutRevision = cut->revision;
@@ -1071,9 +1071,9 @@ void Window::offerFiles(bool drag, bool cut) {
         if (!ok) return;
         QList<QUrl> urls;
         for (const auto &item : plan.items) urls.append(QUrl::fromLocalFile(item.destination));
-        auto *mime = new CutFiles;
+        auto *mime = new TransferFiles;
         mime->setUrls(urls);
-        if (cut) {
+        if (cut || drag) {
             mime->origin = this;
             mime->revision = revision;
             mime->session = originSession;
@@ -1116,7 +1116,17 @@ bool Window::eventFilter(QObject *watched, QEvent *event) {
                 }
                 drop->setDropAction(Qt::CopyAction);
                 drop->accept();
-                QTimer::singleShot(0, this, [this, paths] { importFiles(paths); });
+                const auto *local = dynamic_cast<const TransferFiles *>(drop->mimeData());
+                auto transfer = std::make_shared<TransferFiles>();
+                if (local && drop->modifiers().testFlag(Qt::ShiftModifier)) {
+                    transfer->origin = local->origin;
+                    transfer->revision = local->revision;
+                    transfer->session = local->session;
+                    transfer->names = local->names;
+                }
+                QTimer::singleShot(0, this, [this, paths, transfer] {
+                    chooseEdit("import", paths, transfer.get());
+                });
                 return true;
             }
         }
