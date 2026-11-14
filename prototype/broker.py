@@ -68,7 +68,7 @@ def main():
     sys.path.insert(0, str(args.root / 'experiments/process-comparison'))
     sys.path.insert(0, str(args.root / 'prototype'))
     import catalogue
-    from publication import fingerprint as file_hash, publish, recovery_directory
+    from publication import fingerprint as file_hash, publish, recovery_directory, require_recovery_clear
     from source_ownership import Ownership, identity
     import adapters as backend
     backend.HELPER = args.helper.resolve()
@@ -466,6 +466,7 @@ def main():
                     target = catalogue.sidecar(destination) or destination.with_suffix('.FDF')
                     if target == destination:
                         raise backend.Failure('invalid_destination', 'Choose an image filename distinct from its FDF.')
+                    require_recovery_clear(destination, [target])
                     previous = file_hash(target)
                     digest = hashlib.sha256(definition.encode('utf-8')).hexdigest()
                     if digest != previous:

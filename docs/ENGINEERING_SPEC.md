@@ -672,6 +672,8 @@ Automatic single-version `.BAK` backups shall be enabled by default and disablea
 
 A required backup failure shall abort publication rather than silently proceed unprotected. An explicitly authorized retry without backup may be offered, but never selected automatically. Output shall first be prepared and validated, with source changes rechecked before publication. The image and sidecar are distinct files and their publication is not assumed to be jointly atomic; the implementation shall define ordering, synchronization, interrupted-operation recovery, and clear reporting of partial publication. Never report partial publication as a successful Save; preserve recoverable files and do not silently restore backups. Only mark the working image clean after successful publication of all required outputs. A sidecar-only Save shall not rotate the image backup.
 
+A Save commits when a final journal record is durable after all required image, sidecar, and backup replacements have been published and synchronized. Before replacing any live pathname, retain and synchronize the prior backup bytes and their hashes in the journal. A failed or interrupted Save shall preserve those bytes for explicit recovery. Separate live pathnames may temporarily reflect different versions. Block further publication to affected paths until the retained journal has been reviewed and explicitly resolved. Never silently restore live files. A committed Save remains successful if journal cleanup fails.
+
 ### 8.4 Save As
 
 Save As shall permit saving the working image under a different filename.
