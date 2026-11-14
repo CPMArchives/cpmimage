@@ -56,6 +56,9 @@
 #include <signal.h>
 #endif
 
+static constexpr auto cutMime = "application/x-cpmimage-cut";
+static constexpr auto receiptMime = "application/x-cpmimage-receipt";
+
 class TransferFiles : public QMimeData {
 public:
     QPointer<Window> origin;
@@ -491,7 +494,8 @@ void Window::chooseEdit(const QString &action, QStringList paths, const Transfer
     QPointer<Window> cutOrigin;
     quint64 cutRevision = 0;
     QString cutSession;
-    QJsonArray removedNames;
+    QJsonArray removedNames, importedPaths;
+    QByteArray transferToken;
     bool accepted = false;
     if (action == "import" || action == "paste") {
         request["action"] = "import";
@@ -499,6 +503,10 @@ void Window::chooseEdit(const QString &action, QStringList paths, const Transfer
         const auto *cut = transfer;
         if (!cut && action == "paste")
             cut = dynamic_cast<const TransferFiles *>(QApplication::clipboard()->mimeData());
+        if (action == "paste" && !cut) {
+            const auto *clipboard = QApplication::clipboard()->mimeData();
+            if (clipboard) transferToken = clipboard->data(cutMime);
+        }
         if (cut) {
             cutOrigin = cut->origin;
             cutRevision = cut->revision;
@@ -575,6 +583,7 @@ void Window::chooseEdit(const QString &action, QStringList paths, const Transfer
             const auto oldName = cutNames.value(paths[row]);
             if (cutOrigin == this && cutNames.values().contains(key)) continue;
             if (!oldName.isEmpty()) removedNames.append(oldName);
+            importedPaths.append(paths[row]);
             items.append(QJsonObject{{"name",key},{"path",paths[row]},{"replace",conflict},{"text",text.isChecked()}});
         }
         if (items.isEmpty()) return;
@@ -615,6 +624,20 @@ void Window::chooseEdit(const QString &action, QStringList paths, const Transfer
     }
     if (!confirmWrite()) return;
     request["confirmed"] = true;
+    if (transferToken.size() == 36) {
+        connect(this, &Window::completed, this, [transferToken, importedPaths](bool ok) {
+            if (!ok) return;
+            auto *clipboard = QApplication::clipboard();
+            const auto *offer = clipboard->mimeData();
+            if (!offer || offer->data(cutMime) != transferToken) return;
+            auto *receipt = new QMimeData;
+            receipt->setUrls(offer->urls());
+            receipt->setData(receiptMime, QJsonDocument(QJsonObject{
+                {"token", QString::fromLatin1(transferToken)}, {"files", importedPaths}
+            }).toJson(QJsonDocument::Compact));
+            clipboard->setMimeData(receipt);
+        }, Qt::SingleShotConnection);
+    }
     if (cutOrigin && !removedNames.isEmpty()) {
         connect(this, &Window::completed, this, [this, cutOrigin, cutRevision, cutSession, removedNames](bool ok) {
             if (!ok) return;
@@ -1088,6 +1111,37 @@ void Window::offerFiles(bool drag, bool cut) {
         } else {
             // Clipboard consumers can resolve the URLs after this process exits.
             staging->setAutoRemove(false);
+            if (cut) {
+                const auto token = QUuid::createUuid().toString(QUuid::WithoutBraces);
+                mime->setData(cutMime, token.toLatin1());
+                auto *receiptListener = new QTimer(this);
+                receiptListener->setInterval(500);
+                connect(receiptListener, &QTimer::timeout, this,
+                    [this, receiptListener, token, plan, revision, originSession] {
+                    const auto *current = QApplication::clipboard()->mimeData();
+                    if (current && current->data(cutMime) == token.toLatin1()) return;
+                    receiptListener->stop();
+                    receiptListener->deleteLater();
+                    if (!current || busy || session != originSession || imageRevision != revision) return;
+                    const auto bytes = current->data(receiptMime);
+                    if (bytes.size() > 262144) return;
+                    const auto receipt = QJsonDocument::fromJson(bytes).object();
+                    if (receipt["token"].toString() != token || !receipt["files"].isArray()) return;
+                    const auto files = receipt["files"].toArray();
+                    QJsonArray names;
+                    for (const auto &item : plan.items)
+                        if (files.contains(item.destination)) names.append(item.name);
+                    if (names.isEmpty() || names.size() != files.size()) return;
+                    if (QMessageBox::question(this, "Complete file move",
+                        QString("The receiving instance confirmed importing %1 file(s). Remove those files from the source working image?")
+                            .arg(names.size()), QMessageBox::Yes | QMessageBox::Cancel,
+                            QMessageBox::Cancel) != QMessageBox::Yes) return;
+                    if (busy || session != originSession || imageRevision != revision || !confirmWrite()) return;
+                    begin({{"op","edit"},{"session",originSession},{"action","delete_many"},
+                           {"names",names},{"confirmed",true}});
+                });
+                receiptListener->start();
+            }
             QApplication::clipboard()->setMimeData(mime);
         }
     }, Qt::SingleShotConnection);
