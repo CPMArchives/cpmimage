@@ -51,6 +51,26 @@ class InitializeCheck(CatalogueCheck):
                 saved = self.request('save', session=token, plan=plan['result'], confirm_sidecar=True)
                 self.assertTrue(saved['ok'], saved)
 
+    def test_failed_initialization_and_destination_conflict(self):
+        opened = self.request('open', image=str(self.image), format='ibm-3740', container='raw')
+        self.assertTrue(opened['ok'], opened)
+        token = opened['result']['session']
+        original = self.image.read_bytes()
+        refused = self.request('format_image', session=token)
+        self.assertEqual(refused['error'], 'confirmation_required')
+        refused = self.request('format_image', session=token, confirmed=True, label='BAD')
+        self.assertEqual(refused['error'], 'unsupported_backend')
+        self.assertEqual(self.image.read_bytes(), original)
+        created = self.request('new_image', format='ibm-3740', confirmed=True)
+        self.assertTrue(created['ok'], created)
+        options = dict(session=created['result']['session'], destination=str(self.image))
+        plan = self.request('save_plan', **options)
+        self.assertTrue(plan['ok'], plan)
+        refused = self.request('save', plan=plan['result'], confirm_sidecar=True, **options)
+        self.assertEqual(refused['error'], 'destination_exists')
+        self.assertEqual(self.image.read_bytes(), original)
+        self.assertTrue(self.request('discard', session=options['session'])['result']['closed'])
+
     def test_create_save_reformat_and_discard(self):
         original = self.image.read_bytes()
         created = self.request('new_image', format='ibm-3740', confirmed=True)

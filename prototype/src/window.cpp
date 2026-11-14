@@ -571,7 +571,7 @@ void Window::chooseSave(bool saveAs) {
     if (saveAs) {
         destination = QFileDialog::getSaveFileName(this, "Save CP/M image as", image,
             "RAW disk images (*.raw *.img);;Standard CPCEMU DSK (*.dsk);;ImageDisk (*.imd);;JV3 (*.jv3);;DMK (*.dmk)", &selectedFilter, QFileDialog::DontConfirmOverwrite);
-        if (destination.isEmpty()) return;
+        if (destination.isEmpty()) { afterSave = {}; return; }
     }
     pendingSave = {{"op","save_plan"}, {"session",session}, {"destination",destination},
                    {"backups",settings->value("saveBackups",true).toBool()},
@@ -1115,7 +1115,10 @@ void Window::readReply() {
         QString message;
         if (code == "destination_exists") message = "That destination already exists. Choose a new filename; nothing was overwritten.";
         else if (code == "cancelled") message = "Operation cancelled.";
-        else if (code == "source_changed") { session.clear(); message = "The source image changed. Open it again before exporting."; }
+        else if (code == "source_changed") {
+            if (operation == "export") session.clear();
+            message = reply["message"].toString();
+        }
         else message = "Cannot complete the operation (" + code + "). " + reply["message"].toString();
         fail(message); return;
     }
