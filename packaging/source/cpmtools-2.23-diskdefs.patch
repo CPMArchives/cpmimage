@@ -459,7 +459,7 @@
  
 +  if (deviceOpts && !strcmp(deviceOpts,"cpmimage-raw"))
 +  {
-+    FILE *file=fopen(filename,(mode & O_RDWR) ? "r+b" : "rb");
++    FILE *file=fopen(filename,"rb");
 +    if (!file) return strerror(errno);
 +    if (fseek(file,0,SEEK_END) || (this->imageLimit=ftell(file))<0)
 +    { fclose(file); return "Cannot determine RAW image size"; }
@@ -513,18 +513,11 @@
    e = dsk_lread(this->dev, &this->geom, buf, (track * this->sectrk) + sector + this->offset/this->secLength);
    return (e?dsk_strerror(e):(const char*)0);
  }
-@@ -128,6 +161,14 @@
+@@ -128,6 +161,7 @@
  const char *Device_writeSector(const struct Device *this, int track, int sector, const char *buf)
  {
    dsk_err_t e;
-+  if (this->rawFile)
-+  {
-+    long long start=((long long)track*this->sectrk+sector)*this->secLength+this->offset;
-+    if (start<0 || start+this->secLength>this->imageLimit) return "Missing image sectors";
-+    if (fseek(this->rawFile,(long)start,SEEK_SET) ||
-+        fwrite(buf,1,this->secLength,this->rawFile)!=(size_t)this->secLength) return "Cannot write RAW sector";
-+    return NULL;
-+  }
++  if (this->rawFile) return "Read-only RAW image";
    e = dsk_lwrite(this->dev, &this->geom, buf, (track * this->sectrk) + sector + this->offset/this->secLength);
    return (e?dsk_strerror(e):(const char*)0);
  }
