@@ -1,0 +1,13 @@
+--- a/cpmfs.c
++++ b/cpmfs.c
+@@ -1164,6 +1164,10 @@
+     d->dirblks=(d->maxdir*32+(d->blksiz-1))/d->blksiz;
+   }
+ 
++#ifdef CPMIMAGE_READ_ONLY_NAMES
++  /* The formatter opens the byte-offset RAW device after preparing the directory. */
++  if (d->dev.opened)
++#endif
+   boo = Device_setGeometry(&d->dev,d->secLength,d->sectrk,d->tracks,d->offset,d->libdskGeometry);
+   if (boo) return -1;
+ 

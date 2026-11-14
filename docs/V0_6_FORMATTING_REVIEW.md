@@ -12,3 +12,7 @@ The native helper reuses the pinned mkfs initializer. The standalone cpmtools pa
 - trs80gp on macOS ARM64 booted stock Montezuma Micro CP/M 2.31 and read the expected proof text from a newly initialized 40-cylinder, single-sided DMK in drive B.
 - Windows 11 ARM64 and Debian 13 ARM64 passed focused Qt startup and format selection and broker creation/reformat smoke across the five containers. These guest builds preceded the final narrow error-handling change.
 - x86-64 and manual native GUI walkthroughs were not tested.
+
+## Partial-reservation review follow-up
+
+Both formatter entry points call and check cpmReadSuper before the partial-reservation check. It generates the skew table when the definition omits one, retaining the configured skew factor and using identity for the default factor of one. The regression combines bootsec 11, no explicit skew table, a 17-byte offset, sequential boot data, and CP/M Plus metadata. It exposed an early LibDsk geometry setup on the helper's unopened device. The helper now defers that setup until mkfs opens its byte-offset RAW device. Clean standalone formatter checks, nine initialization/catalogue checks, and seven journaled Save checks passed on macOS ARM64.

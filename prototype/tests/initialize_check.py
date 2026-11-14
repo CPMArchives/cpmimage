@@ -10,6 +10,32 @@ from catalogue_check import CatalogueCheck
 
 
 class InitializeCheck(CatalogueCheck):
+    def test_partial_boot_reservation_without_explicit_skew(self):
+        catalogue = self.directory / 'custom.diskdefs'
+        catalogue.write_text(
+            'diskdef partial-boot\n seclen 128\n tracks 40\n sectrk 8\n'
+            ' blocksize 1024\n maxdir 32\n bootsec 11\n offset 17\n os 3\nend\n')
+        loaded = self.request('catalogue', path=str(catalogue))
+        self.assertTrue(loaded['ok'], loaded)
+        boot = self.directory / 'boot.bin'
+        boot.write_bytes(b'B' * 128)
+        created = self.request('new_image', format='partial-boot', confirmed=True,
+                               label='PROOF', timestamps=True, boot_path=str(boot), pad=True)
+        self.assertTrue(created['ok'], created)
+        target = self.directory / 'partial.raw'
+        options = dict(session=created['result']['session'], destination=str(target))
+        plan = self.request('save_plan', **options)
+        self.assertTrue(plan['ok'], plan)
+        saved = self.request('save', plan=plan['result'], confirm_sidecar=True, **options)
+        self.assertTrue(saved['ok'], saved)
+        data = target.read_bytes()
+        start = 17 + 11 * 128
+        self.assertEqual(len(data), 17 + 40 * 8 * 128)
+        self.assertEqual(data[:start], b'\xe5' * 17 + b'B' * 128 + b'\xe5' * (10 * 128))
+        self.assertEqual(data[start:start+13], b'\x20PROOF      \x11')
+        self.assertEqual(data[start+96:start+1024:128], bytes([0x21]) * 8)
+        self.assertEqual(data[start+1024:], b'\xe5' * (len(data) - start - 1024))
+
     def test_plus_and_structured_creation(self):
         import json
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
