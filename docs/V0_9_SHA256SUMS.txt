@@ -1,0 +1,4 @@
+8e1185908f86acd31c25da68d4d2cb9b325cb68ec71acf4f66654bfbdc3dc74e  cpmimage-linux-arm64
+e2df81e8a6f5cfe1cf9c472a3bfc779e81447fddd46fbac60e0a31c0429f12e4  cpmimage-linux-x86-64-bundled-python
+7c891373f20ec9c7966bf78fe516fd0bdddd0d3055e423b107510004297d8f08  cpmimage-windows-arm64.exe
+b0069394d23afaa1c1465e522f67930b62c759d189a42763f1591116d4142695  cpmimage-windows-x86-64.exe

@@ -7,6 +7,7 @@
     <file>toolbar/save.png</file>
     <file>toolbar/import.png</file>
     <file>toolbar/export.png</file>
+    <file>toolbar/export-area.png</file>
   </qresource>
   <qresource prefix="/help">
     <file alias="guide.md">../../docs/HELP.md</file>

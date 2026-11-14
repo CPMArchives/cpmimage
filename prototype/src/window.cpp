@@ -188,7 +188,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     for (const auto &[button, icon] : {
              std::pair{openButton, "open"}, std::pair{newButton, "new"},
              std::pair{saveButton, "save"}, std::pair{importButton, "import"},
-             std::pair{exportButton, "export"}}) {
+             std::pair{exportButton, "export"}, std::pair{areaExportButton, "export-area"}}) {
         button->setAccessibleName(button->text());
         if (button->toolTip().isEmpty()) button->setToolTip(button->text());
         button->setIcon(QIcon(QString(":/icons/toolbar/%1.png").arg(icon)));
@@ -203,14 +203,36 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     toolbar->addWidget(saveButton);
     toolbar->addWidget(importButton);
     toolbar->addWidget(exportButton);
+    toolbar->addWidget(areaExportButton);
     layout->addWidget(toolbarWidget);
     toolbar->addStretch();
 
     auto *imageRow=new QHBoxLayout;
     imageRow->addWidget(new QLabel("Image layout:"));
     imageRow->addWidget(formats,1);
-    imageInfoButton=new QPushButton("Image information…");
+    imageInfoButton=new QPushButton;
     imageInfoButton->setObjectName("imageInformation");
+    imageInfoButton->setAccessibleName("Image information");
+    imageInfoButton->setToolTip("Image information");
+    QPixmap informationIcon(64, 64);
+    informationIcon.setDevicePixelRatio(2);
+    informationIcon.fill(Qt::transparent);
+    {
+        QPainter painter(&informationIcon);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(QPen(QColor("#81929d"), 3.5));
+        painter.drawEllipse(QRectF(3, 3, 26, 26));
+        painter.setPen(QPen(QColor("#dce6ec"), 2));
+        painter.drawEllipse(QRectF(3, 3, 26, 26));
+        painter.setPen(QPen(QColor("#00cbe8"), 3.5, Qt::SolidLine, Qt::RoundCap));
+        painter.drawPoint(QPointF(16, 10));
+        painter.drawLine(QPointF(16, 15), QPointF(16, 22));
+    }
+    imageInfoButton->setIcon(QIcon(informationIcon));
+    imageInfoButton->setIconSize(QSize(32, 32));
+    imageInfoButton->setFlat(true);
+    imageInfoButton->setStyleSheet("QPushButton { border: none; background: transparent; padding: 4px; }"
+                                  "QPushButton:focus { background: palette(mid); }");
     imageRow->addWidget(imageInfoButton);
     layout->addLayout(imageRow);
     source = new QLabel("No image open");
@@ -304,7 +326,6 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     status->setTextInteractionFlags(Qt::TextSelectableByMouse);
     auto *statusRow=new QHBoxLayout;
     statusRow->addWidget(status,1);
-    statusRow->addWidget(areaExportButton);
     statusRow->addWidget(cancelButton);
     progress=new QProgressBar; progress->setObjectName("exportProgress"); progress->hide();
     layout->addWidget(progress);

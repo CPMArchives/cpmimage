@@ -37,23 +37,27 @@ public:
             "QTabBar::tab:selected { background: palette(highlight); color: palette(highlighted-text); }");
 #endif
 
-        auto *workspace = new QMenu("Tabs", this);
-        auto *create = workspace->addAction("New Tab");
+        newTabAction = new QAction("New Tab", this);
+        auto *create = newTabAction;
         create->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
         connect(create, &QAction::triggered, this, [this] { addSession(); });
         auto *newTab = new QToolButton(tabs);
         newTab->setText("+");
+        auto newTabFont = newTab->font();
+        newTabFont.setPixelSize(22);
+        newTab->setFont(newTabFont);
+        newTab->setMinimumSize(30, 26);
         newTab->setToolTip("New Tab");
         newTab->setAccessibleName("New Tab");
         newTab->setAutoRaise(true);
         tabs->setCornerWidget(newTab, Qt::TopRightCorner);
         connect(newTab, &QToolButton::clicked, create, &QAction::trigger);
-        auto *closeTab = workspace->addAction("Close Tab");
+        closeTabAction = new QAction("Close Tab", this);
+        auto *closeTab = closeTabAction;
         closeTab->setShortcut(QKeySequence::Close);
         connect(closeTab, &QAction::triggered, this, [this] {
             if (auto *page = tabs->currentWidget()) page->close();
         });
-        workspaceMenu = workspace;
         auto *recent = new QMenu("Recent Images", this);
         auto *pinned = new QMenu("Pinned Images", this);
         recentImages = recent;
@@ -157,11 +161,7 @@ private:
         for (auto *action : menuBar()->actions()) menuBar()->removeAction(action);
         if (auto *page = qobject_cast<Window *>(tabs->currentWidget())) {
             const auto actions = page->menuBar()->actions();
-            for (const auto &title : {"File", "Edit", "View", "Tabs", "Settings", "Help"}) {
-                if (QLatin1String(title) == "Tabs") {
-                    menuBar()->addMenu(workspaceMenu);
-                    continue;
-                }
+            for (const auto &title : {"File", "Edit", "View", "Settings", "Help"}) {
                 for (auto *action : actions) {
                     auto *menu = action->menu();
                     if (!menu || menu->title() != QLatin1String(title)) continue;
@@ -169,6 +169,11 @@ private:
                         menu->addMenu(recentImages);
                         menu->addMenu(pinnedImages);
                         menu->addAction(pinAction);
+                    }
+                    if (QLatin1String(title) == "View" && !menu->actions().contains(newTabAction)) {
+                        if (!menu->actions().isEmpty()) menu->addSeparator();
+                        menu->addAction(newTabAction);
+                        menu->addAction(closeTabAction);
                     }
                     menuBar()->addAction(action);
                     break;
@@ -179,7 +184,8 @@ private:
     }
     RuntimePaths runtime;
     QTabWidget *tabs = new QTabWidget;
-    QMenu *workspaceMenu = nullptr;
+    QAction *newTabAction = nullptr;
+    QAction *closeTabAction = nullptr;
     QMenu *recentImages = nullptr;
     QMenu *pinnedImages = nullptr;
     QAction *pinAction = nullptr;
