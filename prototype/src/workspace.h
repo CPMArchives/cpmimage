@@ -88,6 +88,7 @@ public:
         auto *page = new Window(runtime.root, runtime.python, runtime.helper, 30000, 2000, runtime.notices);
         page->menuBar()->setNativeMenuBar(false);
         page->menuBar()->hide();
+        page->findChild<QWidget *>("imageName")->hide();
         tabs->setCurrentIndex(tabs->addTab(page, "Untitled"));
         connect(page, &QWidget::windowTitleChanged, this, [this, page](const QString &title) {
             tabs->setTabText(tabs->indexOf(page), title.section(" — ", 1));
