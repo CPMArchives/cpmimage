@@ -68,7 +68,7 @@ def main():
     sys.path.insert(0, str(args.root / 'experiments/process-comparison'))
     sys.path.insert(0, str(args.root / 'prototype'))
     import catalogue
-    from container_mapping import MappingError, PhysicalMapping, inspect_imd, transfer_dmk, dmk_template, replace_imd_comment
+    from container_mapping import MappingError, PhysicalMapping, inspect_imd, transfer_dmk, dmk_template, replace_imd_comment, verify_jv3
     from publication import fingerprint as file_hash, publish, recovery_directory, require_recovery_clear
     from source_ownership import Ownership, identity
     import adapters as backend
@@ -180,6 +180,8 @@ def main():
             if not writing and container == 'imd':
                 inventory, _ = inspect_imd(data)
                 mapping.verify_inventory(inventory)
+            if not writing and container == 'jv3':
+                verify_jv3(data, mapping)
             transfer(container, mapping, directory, raw, data, writing)
             return mapping
         except (MappingError, OSError, ValueError) as error:
@@ -598,6 +600,8 @@ def main():
                                         encoded_bytes = replace_imd_comment(encoded_bytes, session['comment'])
                                         encoded.write_bytes(encoded_bytes)
                                         mapping.verify_inventory(inspect_imd(encoded_bytes)[0])
+                                    if output_container == 'jv3':
+                                        verify_jv3(encoded_bytes, mapping)
                                     transfer(output_container, mapping, folder, verified, encoded_bytes, False)
                                 if file_hash(verified) != file_hash(output):
                                     raise backend.Failure('image_incompatible', 'Container failed its RAW round trip.')

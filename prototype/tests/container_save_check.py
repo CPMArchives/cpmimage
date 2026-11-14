@@ -49,6 +49,25 @@ class ContainerSaveCheck(unittest.TestCase):
                 self.assertTrue(saved['ok'], saved)
                 reopened = broker.request('open', image=str(dst), format=fmt, container=container)
                 self.assertTrue(reopened['ok'], reopened)
+                if container == 'jv3':
+                    original = dst.read_bytes()
+                    variants = {
+                        'damaged': original[:2] + bytes((original[2] | 8,)) + original[3:],
+                        'deleted': original[:2] + bytes((original[2] | 32,)) + original[3:],
+                        'duplicate': original[:3] + original[:3] + original[6:],
+                        'truncated': original[:-1],
+                        'differs': original[:2] + bytes((original[2] ^ 128,)) + original[3:],
+                    }
+                    for diagnostic, data in variants.items():
+                        bad = dst.with_name(diagnostic + '.jv3')
+                        bad.write_bytes(data)
+                        bad.with_name(bad.name + '.mapping.json').write_text(json.dumps(profile))
+                        invalid = broker.request('open', image=str(bad), format=fmt, container=container)
+                        self.assertEqual(invalid.get('error'), 'physical_mapping', invalid)
+                        self.assertIn(diagnostic, invalid['message'].lower())
+                        self.assertEqual(bad.read_bytes(), data)
+                    reopened = broker.request('open', image=str(dst), format=fmt, container=container)
+                    self.assertTrue(reopened['ok'], reopened)
                 if container == 'imd':
                     self.assertEqual(reopened['result']['imd_comment'], 'Interoperability check')
                 exported = broker.directory / 'broker.bin'

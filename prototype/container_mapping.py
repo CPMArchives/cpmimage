@@ -223,3 +223,47 @@ def replace_imd_comment(data, comment):
     end = data.index(b'\x1a')
     header = data[:end].split(b'\n', 1)[0].rstrip(b'\r')
     return header + b'\r\n' + comment + data[end:]
+
+
+def verify_jv3(data, mapping):
+    """Check the complete JV3 descriptor inventory before LibDsk reads it."""
+    header_size = 8704
+    sizes = (256, 128, 1024, 512)
+    expected = {(t.cylinder, t.head, sector): (t.size, t.mode >= 3)
+                for t in mapping.tracks for sector in t.sectors}
+    observed = set()
+    position = 0
+    while position < len(data):
+        header = data[position:position + header_size]
+        if len(header) != header_size:
+            raise MappingError('Truncated JV3 descriptor block.')
+        if header[-1] != 255:
+            raise MappingError('Unsupported JV3 write protection or header flag.')
+        position += header_size
+        unused_tail = False
+        for index in range(0, header_size - 1, 3):
+            cylinder, sector, flags = header[index:index + 3]
+            if cylinder == sector == 255:
+                if flags & 0xfc != 0xfc:
+                    raise MappingError('Invalid JV3 unused descriptor.')
+                if position == len(data):
+                    unused_tail = True
+                elif not unused_tail:
+                    position += (512, 1024, 128, 256)[flags & 3]
+                    if position > len(data):
+                        raise MappingError('Truncated JV3 unused sector.')
+                continue
+            address = cylinder, int(bool(flags & 16)), sector
+            if address in observed:
+                raise MappingError(f'Duplicate JV3 sector {address}.')
+            if flags & 0x6c:
+                raise MappingError(f'JV3 sector {address} is damaged, deleted, or uses an unsupported data mark.')
+            size = sizes[flags & 3]
+            if unused_tail or position + size > len(data):
+                raise MappingError(f'Truncated JV3 sector {address}.')
+            if expected.get(address) != (size, bool(flags & 128)):
+                raise MappingError(f'JV3 sector {address} differs from the physical mapping.')
+            observed.add(address)
+            position += size
+    if observed != expected.keys():
+        raise MappingError('JV3 inventory is missing mapped sectors.')
