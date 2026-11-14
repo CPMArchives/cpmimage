@@ -14,6 +14,8 @@
 #include <QClipboard>
 #include <QMimeData>
 #include <QDrag>
+#include <QTextBrowser>
+#include <QDesktopServices>
 #include <QEventLoop>
 #include <QDragEnterEvent>
 #include <QTemporaryDir>
@@ -120,6 +122,31 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
             entries.isEmpty() ? QString("No favorites saved.") : entries.join('\n'));
     });
     auto *help = menuBar()->addMenu("Help");
+    auto *guide = help->addAction("CP/M Image Help");
+    guide->setShortcut(QKeySequence::HelpContents);
+    connect(guide, &QAction::triggered, this, [this] {
+        QDialog dialog(this);
+        dialog.setWindowTitle("CP/M Image Help");
+        dialog.resize(650, 540);
+        auto *layout = new QVBoxLayout(&dialog);
+        auto *search = new QLineEdit(&dialog);
+        search->setPlaceholderText("Find in Help");
+        layout->addWidget(search);
+        auto *text = new QTextBrowser(&dialog);
+        QFile markdown(":/help/guide.md");
+        if (markdown.open(QIODevice::ReadOnly))
+            text->setMarkdown(QString::fromUtf8(markdown.readAll()));
+        layout->addWidget(text);
+        connect(search, &QLineEdit::returnPressed, &dialog, [search, text] {
+            if (search->text().isEmpty() || text->find(search->text())) return;
+            text->moveCursor(QTextCursor::Start);
+            text->find(search->text());
+        });
+        dialog.exec();
+    });
+    connect(help->addAction("Online Help"), &QAction::triggered, this, [] {
+        QDesktopServices::openUrl(QUrl("https://github.com/CPMArchives/cpmimage/blob/main/docs/HELP.md"));
+    });
     auto *licenses = help->addAction("License notices…");
     connect(licenses, &QAction::triggered, this, [this, noticesPath] {
         QDialog dialog(this); dialog.setWindowTitle("License notices"); dialog.resize(760, 540);
@@ -136,7 +163,9 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     resize(580, 580);
     auto *central = new QWidget(this);
     auto *layout = new QVBoxLayout(central);
-    auto *toolbar = new QHBoxLayout;
+    auto *toolbarWidget = new QWidget(central);
+    auto *toolbar = new QHBoxLayout(toolbarWidget);
+    toolbar->setContentsMargins(0,0,0,0);
     formats = new QPushButton("Choose format…");
     formats->setObjectName("chooseFormat");
 
@@ -150,20 +179,29 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     exportButton->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
     openButton->setToolTip("Open image (Ctrl+O / Command+O)");
     exportButton->setToolTip("Export selected (Ctrl+E / Command+E)");
+    auto *newButton = new QPushButton("New");
+    newButton->setObjectName("toolbarNew");
+    auto *saveButton = new QPushButton("Save");
+    saveButton->setObjectName("toolbarSave");
+    auto *importButton = new QPushButton("Import");
+    importButton->setObjectName("toolbarImport");
     toolbar->addWidget(openButton);
+    toolbar->addWidget(newButton);
+    toolbar->addWidget(saveButton);
+    toolbar->addWidget(importButton);
     toolbar->addWidget(exportButton);
-    toolbar->addWidget(areaExportButton);
+    layout->addWidget(toolbarWidget);
     toolbar->addStretch();
     auto *readOnly = new QLabel("Private edits");
     readOnly->setToolTip("Edits affect a private copy until you save.");
-    toolbar->addWidget(readOnly);
-    layout->addLayout(toolbar);
+
     auto *imageRow=new QHBoxLayout;
     imageRow->addWidget(new QLabel("Image layout:"));
     imageRow->addWidget(formats,1);
     imageInfoButton=new QPushButton("Image information…");
     imageInfoButton->setObjectName("imageInformation");
     imageRow->addWidget(imageInfoButton);
+    imageRow->addWidget(readOnly);
     layout->addLayout(imageRow);
     source = new QLabel("No image open");
     source->setTextFormat(Qt::PlainText);
@@ -191,7 +229,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     splitter->addWidget(areaPane);
     class FileTable : public QTableWidget {
     public:
-        FileTable() : QTableWidget(0, 4) {}
+        FileTable() : QTableWidget(0, 8) {}
         std::function<void()> dragFiles;
     protected:
         void startDrag(Qt::DropActions) override { dragFiles(); }
@@ -201,13 +239,40 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     table = fileTable;
     table->setObjectName("fileList");
     table->setAccessibleName("Files in selected user area");
-    table->setHorizontalHeaderLabels({"Name", "Bytes", "Attributes", "User"});
-    table->hideColumn(3);
+    table->setHorizontalHeaderLabels({"Filename", "Size (bytes)", "Attributes", "User", "Records", "Created", "Modified", "Accessed"});
+    auto *header = table->horizontalHeader();
+    header->setSectionsMovable(true);
+    header->moveSection(header->visualIndex(4), 1);
+    for (int column : {3, 5, 6, 7}) table->hideColumn(column);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setSelectionMode(QAbstractItemView::ExtendedSelection);
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Interactive);
     table->setColumnWidth(0, 170);
+    header->restoreState(settings->value("fileColumns/layout").toByteArray());
+    const auto saveColumns = [this, header] {
+        settings->setValue("fileColumns/layout", header->saveState());
+    };
+    connect(header, &QHeaderView::sectionMoved, this, saveColumns);
+    connect(header, &QHeaderView::sectionResized, this, saveColumns);
+    header->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(header, &QHeaderView::customContextMenuRequested, this, [this, header, saveColumns](const QPoint &point) {
+        QMenu menu;
+        auto *columns = menu.addMenu("Choose Columns");
+        for (int column = 1; column < table->columnCount(); ++column) {
+            auto *action = columns->addAction(table->horizontalHeaderItem(column)->text());
+            action->setCheckable(true);
+            action->setChecked(!table->isColumnHidden(column));
+            const bool forceUser = column == 3 && userAreas->currentRow() == 0;
+            action->setEnabled(!forceUser);
+            connect(action, &QAction::toggled, this, [this, column, saveColumns](bool shown) {
+                if (column == 3) settings->setValue("fileColumns/user", shown);
+                table->setColumnHidden(column, !shown);
+                saveColumns();
+            });
+        }
+        menu.exec(header->mapToGlobal(point));
+    });
     table->verticalHeader()->hide();
     table->setAlternatingRowColors(true);
     table->setSortingEnabled(true);
@@ -229,6 +294,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     status->setTextInteractionFlags(Qt::TextSelectableByMouse);
     auto *statusRow=new QHBoxLayout;
     statusRow->addWidget(status,1);
+    statusRow->addWidget(areaExportButton);
     statusRow->addWidget(cancelButton);
     progress=new QProgressBar; progress->setObjectName("exportProgress"); progress->hide();
     layout->addWidget(progress);
@@ -282,6 +348,9 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     });
     auto *saveAction = fileMenu->addAction("Save");
     saveAction->setShortcut(QKeySequence::Save);
+    connect(newButton, &QPushButton::clicked, newAction, &QAction::trigger);
+    connect(saveButton, &QPushButton::clicked, saveAction, &QAction::trigger);
+    connect(importButton, &QPushButton::clicked, this, [this] { chooseEdit("import"); });
     auto *saveAsAction = fileMenu->addAction("Save As…");
     saveAsAction->setShortcut(QKeySequence::SaveAs);
     connect(saveAction, &QAction::triggered, this, [this] { chooseSave(false); });
@@ -345,7 +414,16 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     connect(table, &QTableWidget::itemSelectionChanged, this, [this] {
         setBusy(busy); updateSelectionStatus();
     });
-    showAllAction = menuBar()->addMenu("View")->addAction("Show All User Areas");
+    auto *view = menuBar()->addMenu("View");
+    auto *showToolbar = view->addAction("Toolbar");
+    showToolbar->setCheckable(true);
+    showToolbar->setChecked(settings->value("toolbarVisible", true).toBool());
+    toolbarWidget->setVisible(showToolbar->isChecked());
+    connect(showToolbar, &QAction::toggled, this, [this, toolbarWidget](bool visible) {
+        toolbarWidget->setVisible(visible);
+        settings->setValue("toolbarVisible", visible);
+    });
+    showAllAction = view->addAction("Show All User Areas");
     showAllAction->setCheckable(true);
     showAllAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_A));
     connect(showAllAction, &QAction::triggered, this, [this](bool checked) {
@@ -450,6 +528,9 @@ void Window::resetImage() {
 void Window::setBusy(bool value) {
     busy = value;
     openButton->setEnabled(!busy);
+    findChild<QPushButton *>("toolbarNew")->setEnabled(!busy);
+    for (const auto *name : {"toolbarSave", "toolbarImport"})
+        findChild<QPushButton *>(name)->setEnabled(!busy && !session.isEmpty());
     formats->setEnabled(!busy && !image.isEmpty() && !catalogueRows.isEmpty());
     externalCatalogueAction->setEnabled(!busy);
     bundledCatalogueAction->setEnabled(!busy);
@@ -947,7 +1028,9 @@ void Window::showUserArea() {
     const QSignalBlocker block(table);
     const auto *area = userAreas->currentItem();
     const int currentArea = area ? area->data(Qt::UserRole).toInt() : -1;
-    table->setColumnHidden(3, !area || currentArea != -1);
+    const QSignalBlocker headerBlock(table->horizontalHeader());
+    table->setColumnHidden(3, !(area && currentArea == -1) &&
+                           !settings->value("fileColumns/user", false).toBool());
     table->setSortingEnabled(false);
     table->clearSelection(); table->setCurrentItem(nullptr); table->setRowCount(0);
     for (const auto &value : directoryEntries) {
@@ -958,7 +1041,17 @@ void Window::showUserArea() {
         auto *file = new QTableWidgetItem(name.mid(2).toUpper());
         file->setData(Qt::UserRole, name); table->setItem(row, 0, file);
         auto *size = new QTableWidgetItem;
-        size->setData(Qt::DisplayRole, entry["size"].toInteger());
+        const auto records = (entry["size"].toInteger() + 127) / 128;
+        auto *recordCount = new QTableWidgetItem;
+        recordCount->setData(Qt::DisplayRole, records);
+        table->setItem(row, 4, recordCount);
+        size->setData(Qt::DisplayRole, records * 128);
+        for (const auto &field : QList<QPair<int, QString>>{{5, "ctime"}, {6, "mtime"}, {7, "atime"}}) {
+            const auto seconds = entry[field.second].toInteger();
+            auto *timestamp = new QTableWidgetItem;
+            if (seconds > 0) timestamp->setData(Qt::DisplayRole, QDateTime::fromSecsSinceEpoch(seconds));
+            table->setItem(row, field.first, timestamp);
+        }
         table->setItem(row, 1, size);
         const int bits = entry["attr"].toInt(); QStringList flags;
         for (const auto &flag : QList<QPair<int,QString>>{{1,"F1"},{2,"F2"},{4,"F3"},{8,"F4"},{256,"Read-only"},{512,"System"},{1024,"Archive"}})

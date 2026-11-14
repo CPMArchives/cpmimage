@@ -41,10 +41,18 @@ def zip_tree(folder,destination):
                 info=zipfile.ZipInfo(rel);info.create_system=3;info.external_attr=(stat.S_IFLNK|0o777)<<16;z.writestr(info,os.readlink(f).encode())
             elif f.is_file():z.write(f,rel)
 if not a.source_only:
-    for name in ['CPMImage-macOS-arm64','CPMImage-windows-arm64','CPMImage-linux-arm64']:
-        if not (dist/name).is_dir():raise SystemExit('Missing platform bundle: '+name)
-    with tarfile.open(dist/'CPMImage-linux-arm64.tar.gz','w:gz') as z:z.add(dist/'CPMImage-linux-arm64',arcname='CPMImage-linux-arm64')
-    for name in ['CPMImage-macOS-arm64','CPMImage-windows-arm64']:zip_tree(dist/name,dist/(name+'.zip'))
+    targets = ('macOS-arm64', 'windows-arm64', 'windows-x86-64', 'linux-arm64', 'linux-x86-64')
+    for target in targets:
+        name = 'CPMImage-' + target
+        if not (dist/name).is_dir():
+            raise SystemExit('Missing platform bundle: ' + name)
+    for target in targets:
+        name = 'CPMImage-' + target
+        if target.startswith('linux-'):
+            with tarfile.open(dist/(name+'.tar.gz'),'w:gz') as z:
+                z.add(dist/name,arcname=name)
+        else:
+            zip_tree(dist/name,dist/(name+'.zip'))
 archives=sorted(f for f in dist.iterdir() if f.is_file() and f.suffix in ['.gz','.zip'])
 (dist/'SHA256SUMS.txt').write_text(''.join(hashlib.sha256(f.read_bytes()).hexdigest()+'  '+f.name+'\n' for f in archives))
 for f in archives:print(f.name,f.stat().st_size)
