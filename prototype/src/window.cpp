@@ -395,8 +395,24 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     for (const auto &item : QList<QPair<QString,QString>>{{"Import files…","import"},
             {"Delete…","delete"},{"Move to user area…","move"},{"Properties…","attrs"},
             {"Export system tracks…","systems_export"},{"Replace system tracks…","systems_import"}}) {
-        connect(editMenu->addAction(item.first), &QAction::triggered, this, [this, item] { chooseEdit(item.second); });
+        auto *action = editMenu->addAction(item.first);
+        if (item.second == "delete") action->setShortcut(QKeySequence::Delete);
+        if (item.second == "attrs") action->setShortcut(Qt::Key_F4);
+        if (item.second == "move") action->setShortcut(Qt::Key_F6);
+        connect(action, &QAction::triggered, this, [this, item] { chooseEdit(item.second); });
     }
+    auto *commentAction = editMenu->addAction("Edit IMD comment…");
+    connect(editMenu, &QMenu::aboutToShow, this, [this, commentAction] {
+        commentAction->setEnabled(!busy && !session.isEmpty() && container == "imd");
+    });
+    connect(commentAction, &QAction::triggered, this, [this] {
+        if (busy || session.isEmpty() || container != "imd") return;
+        bool accepted = false;
+        const auto comment = QInputDialog::getMultiLineText(this, "Edit IMD comment",
+            "Comment", imdComment, &accepted);
+        if (accepted && comment != imdComment)
+            begin({{"op","imd_comment"},{"session",session},{"comment",comment}});
+    });
     auto *exportAction=fileMenu->addAction("Export selected…");
     connect(exportAction,&QAction::triggered,exportButton,&QPushButton::click);
     auto *areaAction=fileMenu->addAction("Export user area…");
@@ -1535,19 +1551,7 @@ void Window::showImageInformation() {
     text->setPlainText(details+(exportDiagnostics.isEmpty()?QString():"\n\n"+exportDiagnostics));layout->addWidget(text);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close);
     layout->addWidget(buttons);
-    if (container == "imd") {
-        auto *comment = new QTextEdit;
-        comment->setPlainText(imdComment);
-        layout->insertWidget(1, new QLabel("IMD comment"));
-        layout->insertWidget(2, comment);
-        auto *apply = buttons->addButton("Apply comment", QDialogButtonBox::AcceptRole);
-        connect(apply, &QPushButton::clicked, &dialog, [&] {
-            if (comment->toPlainText() == imdComment) return;
-            const auto value = comment->toPlainText();
-            dialog.accept();
-            begin({{"op","imd_comment"},{"session",session},{"comment",value}});
-        });
-    }
+    if (container == "imd") text->append("\nIMD comment:\n" + imdComment.toHtmlEscaped());
     connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
     dialog.exec();
 }
