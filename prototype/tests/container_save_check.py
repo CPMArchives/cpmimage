@@ -12,7 +12,7 @@ from catalogue_check import CatalogueCheck
 
 class ContainerSaveCheck(unittest.TestCase):
     def test_saved_containers(self):
-        tools = Path(os.environ['CPMIMAGE_UPSTREAM_TOOLS'])
+        tools = os.environ.get('CPMIMAGE_UPSTREAM_TOOLS')
         root = Path(os.environ['CPMIMAGE_ROOT'])
         for container in ('imd', 'jv3', 'dmk'):
             with self.subTest(container=container):
@@ -51,10 +51,17 @@ class ContainerSaveCheck(unittest.TestCase):
                 self.assertTrue(reopened['ok'], reopened)
                 if container == 'imd':
                     self.assertEqual(reopened['result']['imd_comment'], 'Interoperability check')
+                exported = broker.directory / 'broker.bin'
+                result = broker.request('export', session=reopened['result']['session'],
+                                        name='00KNOWN.BIN', destination=str(exported))
+                self.assertTrue(result['ok'], result)
+                self.assertEqual(exported.read_bytes(), payload.read_bytes())
+                if not tools:
+                    continue
                 if container != 'dmk':
                     (broker.directory / 'diskdefs').write_bytes(dst.with_suffix('.FDF').read_bytes())
                     output = broker.directory / 'independent.bin'
-                    subprocess.run([tools / 'cpmcp', '-f', fmt, '-T', container, dst,
+                    subprocess.run([Path(tools) / 'cpmcp', '-f', fmt, '-T', container, dst,
                                     '0:known.bin', output], cwd=broker.directory, check=True)
                     self.assertEqual(output.read_bytes(), payload.read_bytes())
                 else:
@@ -66,7 +73,7 @@ class ContainerSaveCheck(unittest.TestCase):
                     self.assertTrue(saved['ok'], saved)
                     (broker.directory / 'diskdefs').write_bytes(raw_path.with_suffix('.FDF').read_bytes())
                     output = broker.directory / 'independent.bin'
-                    subprocess.run([tools / 'cpmcp', '-f', fmt, '-T', 'raw', raw_path,
+                    subprocess.run([Path(tools) / 'cpmcp', '-f', fmt, '-T', 'raw', raw_path,
                                     '0:known.bin', output], cwd=broker.directory, check=True)
                     self.assertEqual(output.read_bytes(), payload.read_bytes())
 
