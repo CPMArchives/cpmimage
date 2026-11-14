@@ -658,7 +658,7 @@ Save shall produce a validated output before publishing it to the intended desti
 
 The implementation shall protect against incomplete operations and detect relevant changes to the source made by another process.
 
-The exact save-publication mechanism shall be designed during the safe-write milestone.
+The exact save-publication mechanism shall be designed during the safe-write milestone. It shall coordinate publication with the ownership mechanism, including replacement of locked files and failure recovery.
 
 ### 8.4 Save As
 
@@ -722,6 +722,10 @@ The save mechanism shall address:
 - Concurrent source changes.
 - Publication failures.
 - Recovery of unsaved work.
+
+### 9.2.1 Concurrent ownership and external changes
+
+The implementation shall distinguish source identity from a mere path string and enforce one writable owner per source across independent CP/M Image instances. Symlink/hard-link aliases, source replacement, lock acquisition failures, crashes, and stale ownership state shall be covered by targeted tests. Advisory locking shall not be treated as protection against noncooperating external programs; detect source changes before publication and fail safely when the original no longer matches the expected version.
 
 ### 9.3 Validation boundaries
 
@@ -793,7 +797,11 @@ Drop targets shall distinguish opening an image from importing the same file as 
 
 Each application window shall provide tabs for multiple images. Users shall also be able to launch multiple independent application processes, each with its own tabbed workspace. Every tab shall retain its selected format, selected user area, working state, and unsaved-change indicator.
 
-Multiple processes may open the same source read-only, but only one writable session shall own a given source at a time; subsequent sessions shall not silently acquire write access. Source changes shall be revalidated before publication. Closing a modified tab, window, or instance shall offer Save / Discard / Cancel.
+Multiple processes may open the same source read-only, but only one writable session shall own a given source at a time; subsequent sessions shall not silently acquire write access. Source changes shall be revalidated before publication.
+
+Writable ownership shall be enforced using appropriate host operating-system file identity and locking facilities, not pathname-string comparison alone. The implementation shall account for aliases such as symbolic links and hard links where supported, and shall not silently treat two names for the same underlying file as independent writable images. It shall also handle replacement of a source file during safe publication, since a lock on a previous file object may not protect its replacement. Locking is cooperative within CP/M Image; external editors may not honor it, so revalidation of source identity and contents immediately before Save remains mandatory.
+
+When a second instance encounters a source already owned for writing, it shall offer or enter read-only access without silently taking ownership. After a successful Save As, the active session shall acquire writable ownership of the new destination and release ownership of the old source only after publication and the session transition succeed. If the new destination cannot be safely owned, Save As shall not silently leave two writers. Locks shall be released on normal close and recover after process crashes; persistent stale lock files shall not indefinitely prevent access. Closing a modified tab, window, or instance shall offer Save / Discard / Cancel.
 
 Transfers between tabs in one instance may be coordinated internally; cross-instance transfers shall use native operating-system clipboard/drag-and-drop facilities without a dedicated interprocess transfer protocol.
 
@@ -1045,7 +1053,7 @@ Tests shall verify generated `.FDF` files using independent cpmtools, image/side
 
 ### 13.10 Interface and Help qualification
 
-Verify the narrow user-area sidebar, populated/empty indicators, Show All toggle and per-tab return state, automatic User column, multi-area selection identity, flat export deduplication, export conflict choices and batch cancellation, default and optional columns, numeric sorting, column persistence, hideable five-action toolbar, context-menu selection rules, file Properties, independent instances and writable ownership, and native appearance on each supported platform. Exercise image-opening drops, host-to-image imports, image-to-host exports, and cross-image transfers.
+Verify source alias detection, independent-instance single-writer enforcement, read-only secondary access, crash recovery, safe ownership transfer after Save As, and source revalidation across atomic replacement. Verify the narrow user-area sidebar, populated/empty indicators, Show All toggle and per-tab return state, automatic User column, multi-area selection identity, flat export deduplication, export conflict choices and batch cancellation, default and optional columns, numeric sorting, column persistence, hideable five-action toolbar, context-menu selection rules, file Properties, independent instances and writable ownership, and native appearance on each supported platform. Exercise image-opening drops, host-to-image imports, image-to-host exports, and cross-image transfers.
 
 Verify bundled offline Help without network access, search, contextual links, and consistency with the published online documentation.
 
@@ -1082,7 +1090,7 @@ The following decisions remain open and shall be resolved during their relevant 
 | System-track short-input padding policy | v0.4 |
 | Container conversion implementation and fidelity limits | v0.5 |
 | Missing-sector substitution and save policy | v0.5 |
-| Multiple-instance ownership and locking mechanism | v0.4/v0.7 |
+| Platform-specific multiple-instance file identity, locking, and replacement mechanism | v0.4/v0.7 |
 | Assisted format-detection ranking and evidence thresholds | v0.3/v0.8 |
 | Supported operating-system and architecture matrix | Release qualification |
 
