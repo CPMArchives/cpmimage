@@ -32,8 +32,13 @@ New project code is **GPL-3.0-or-later**, as approved by the owner. See [LICENSE
 ### Headless cpmtools
 
 Use the package executable with a utility selector such as
-`cpmimage /cpmls -f ibm-3740 image.raw`. On macOS, run
-`CPMImage.app/Contents/MacOS/cpmimage-review` from Terminal. Selectors include
+`cpmimage /cpmls -f ibm-3740 image.raw`. On macOS, open the DMG, drag **CPMImage.app** to **Applications**, and eject the disk image. From Terminal, run:
+
+```sh
+/Applications/CPMImage.app/Contents/MacOS/cpmimage /cpmls -f ibm-3740 disk.raw
+```
+
+For the v0.8 macOS ZIP, the executable inside the app is named `cpmimage-review`. Selectors include
 `/cpmls`, `/cpmrm`, `/cpmcp`, `/cpmchmod`, `/cpmchattr`, `/mkfs.cpm`,
 `/fsck.cpm`, and `/fsed.cpm`. One selector may appear anywhere in the
 argument list. Use `/diskdefs=PATH` to override the bundled catalogue.
