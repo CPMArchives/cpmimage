@@ -236,9 +236,14 @@ def main():
             elif op == 'inspect':
                 source = Path(request['image']).absolute()
                 data = read_image(source)
-                container = image_container(source, data)
+                container = request.get('container') or image_container(source, data)
                 if data.startswith(b'EXTENDED CPC DSK File'):
                     raise backend.Failure('unsupported_container', 'Extended CPCEMU DSK is outside the supported container scope.')
+                if container not in ('raw', 'dsk', *structured):
+                    raise backend.Failure('unsupported_container', f'Unsupported container: {container}')
+                explicit = request.get('explicit_format')
+                if explicit and explicit not in definitions:
+                    raise backend.Failure('unknown_format', f'{explicit} is absent from the selected catalogue.')
                 fingerprint = hashlib.sha256(data).hexdigest()
                 selected = None
                 warning = ''
@@ -257,43 +262,61 @@ def main():
                     candidates = []
                     raw = directory / 'candidate.raw'
                     ranked = []
-                    choices = () if selected or request.get('explicit_format') or container in structured else sorted(definitions.items())
+                    mapping_warning = ''
+                    choices = () if selected or request.get('explicit_format') else sorted(definitions.items())
                     for fmt, definition in choices:
                         if stop.is_set():
                             raise backend.Failure('cancelled')
                         geometry = describe(fmt, definition, directory)
                         if geometry.get('boot_geometry'):
                             continue
-                        if container == 'dsk':
-                            try:
+                        try:
+                            if container in structured:
+                                # Reuse only the validated open path. Geometry alone
+                                # does not establish equivalence of physical mappings.
+                                raw.unlink(missing_ok=True)
+                                mapped_image(container, source, data, geometry, directory, raw)
+                                tier, evidence = 0, 'Verified sector mapping and readable directory'
+                            elif container == 'dsk':
                                 check_standard_dsk(data, geometry, backend)
-                            except backend.Failure:
-                                continue
-                        else:
-                            try:
-                                if raw_extent(data, geometry, backend) != len(data):
-                                    continue
-                            except backend.Failure:
-                                continue
-                        if not raw.exists():
-                            if container == 'dsk':
-                                encoded = directory / 'source.dsk'
-                                encoded.write_bytes(data)
-                                adapter().native(directory, 'decode', encoded, raw)
+                                if not raw.exists():
+                                    encoded = directory / 'source.dsk'
+                                    encoded.write_bytes(data)
+                                    adapter().native(directory, 'decode', encoded, raw)
+                                tier, evidence = 0, 'Container geometry and readable directory'
                             else:
-                                raw.write_bytes(data)
+                                end = raw_extent(data, geometry, backend)
+                                if len(data) > end:
+                                    continue
+                                if not raw.exists():
+                                    raw.write_bytes(data)
+                                if end == len(data):
+                                    tier, evidence = 0, 'Exact RAW extent and readable directory'
+                                else:
+                                    tier, evidence = 1, 'Short RAW extent and readable directory'
+                        except backend.Failure as error:
+                            if error.code == 'cancelled':
+                                raise
+                            if container in structured and not mapping_warning:
+                                mapping_warning = str(error.message or error.code)
+                            continue
                         probe = adapter().request({
                             'v': 1, 'id': rid, 'op': 'list', 'image': str(raw),
                             'format': fmt, 'container': 'raw'}, defs_override=definition)
                         if probe['ok']:
-                            populated = bool(probe['result']['entries'])
-                            label = 'Geometry and nonempty directory' if populated else 'Geometry and empty directory'
+                            capacity = geometry['tracks'] * geometry['sectors_per_track'] * geometry['sector_size']
+                            if any(not 0 <= entry['size'] <= capacity
+                                   for entry in probe['result']['entries']):
+                                continue
                             maker, model, family = metadata.get(fmt, ('', '', ''))
-                            ranked.append((not populated, fmt, dict(id=fmt, manufacturer=maker, model=model, family=family,
-                                evidence=label, definition_sha256=catalogue.digest(definition))))
+                            ranked.append((tier, fmt, dict(id=fmt, manufacturer=maker, model=model, family=family,
+                                evidence=evidence, definition_sha256=catalogue.digest(definition))))
                     candidates = [row for _, _, row in sorted(ranked)]
                 result = dict(container=container, source_sha256=fingerprint, candidates=candidates,
-                              sidecar_warning=warning)
+                              sidecar_warning=warning,
+                              detection_warning=('No verified container mapping found during detection. '
+                                                 'Select a definition to check its mapping and sector diagnostics.'
+                                                 if mapping_warning and not candidates else ''))
                 if selected:
                     fmt, definition, _ = selected
                     result['sidecar'] = dict(id=fmt, definition_sha256=catalogue.digest(definition))

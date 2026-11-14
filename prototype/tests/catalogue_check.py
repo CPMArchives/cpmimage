@@ -97,7 +97,7 @@ class CatalogueCheck(unittest.TestCase):
         self.assertTrue(result['ok'], result)
         candidates = result['result']['candidates']
         self.assertIn('ibm-3740', [row['id'] for row in candidates])
-        ranking = [(row['evidence'] == 'Geometry and empty directory', row['id']) for row in candidates]
+        ranking = [(row['evidence'].startswith('Short RAW'), row['id']) for row in candidates]
         self.assertEqual(ranking, sorted(ranking))
 
     def test_fdf_is_discovered_and_bound_to_content(self):

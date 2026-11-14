@@ -971,7 +971,7 @@ Multiple utility selectors shall cause a command-line error. GUI-only arguments 
 
 The GUI shall support `/img=PATH` and unambiguous positional image paths, `/f=FORMAT` to select a persistent format for subsequent images, and `/diskdefs=PATH` to select a disk-definition catalogue globally for the invocation. Corresponding long options `--image`, `--format`, and `--diskdefs` shall be available for conventional host-shell usage.
 
-A selected `/f` overrides a matching image sidecar; without `/f`, Section 4.9 governs format selection. `/diskdefs` selects the catalogue, not a particular format, and applies to the invocation as a whole. Conflicting repeated catalogue options or an invalid specified catalogue shall cause explicit errors. Host absolute paths beginning with `/` shall not be misinterpreted as options.
+Each `/f` applies to subsequent command-line images in that invocation until superseded. Interactive opens follow ordinary precedence. A selected `/f` overrides a matching image sidecar; without `/f`, Section 4.9 governs format selection. `/diskdefs` selects the catalogue, not a particular format, and applies to the invocation as a whole. Conflicting repeated catalogue options or an invalid specified catalogue shall cause explicit errors. Host absolute paths beginning with `/` shall not be misinterpreted as options.
 
 ### 12.3 Headless cpmtools invocation
 

@@ -14,29 +14,62 @@
 #include <QMessageBox>
 #include <QSysInfo>
 #include <cstdio>
+#include <functional>
 
 int main(int argc, char **argv) {
     QApplication app(argc, argv);
     QApplication::setWindowIcon(QIcon(":/icons/cpmimage.png"));
     QApplication::setApplicationName("cpmimage Review");
     QCommandLineParser parser;
-    parser.setApplicationDescription("Read-only CP/M image listing and export — local review prototype");
+    parser.setApplicationDescription("Browse and edit CP/M disk images");
     parser.addHelpOption();
+    parser.addPositionalArgument("image", "Disk images to open in order", "[image…]");
     parser.addOption({"root", "Feasibility directory", "path"});
     parser.addOption({"python", "Python 3 executable override", "path"});
     parser.addOption({"helper", "Read-only native helper executable", "path"});
     parser.addOption({"image", "Open an image at startup", "path"});
-    parser.addOption({"format", "Explicit startup image layout", "name"});
+    parser.addOption({"format", "Disk definition for subsequent startup images", "name"});
     parser.addOption({"container", "Startup image container", "type"});
     parser.addOption({"diagnostics", "Report package runtime paths and build information"});
     parser.addOption({"diskdefs", "Use an external disk-definition catalogue", "path"});
-    auto arguments = app.arguments();
-    for (auto &argument : arguments) {
-        if (argument.startsWith("/diskdefs=")) argument.replace(0, 10, "--diskdefs=");
-        else if (argument.startsWith("/f=")) argument.replace(0, 3, "--format=");
-        else if (argument.startsWith("/img=")) argument.replace(0, 5, "--image=");
+    const auto arguments = app.arguments();
+    struct StartupImage { QString path, format, container; };
+    QList<StartupImage> images;
+    QString format, container;
+    QStringList options{arguments.first()};
+    bool positionalOnly = false;
+    for (qsizetype i = 1; i < arguments.size(); ++i) {
+        auto argument = arguments[i];
+        if (!positionalOnly) {
+            if (argument.startsWith("/diskdefs=")) argument.replace(0, 10, "--diskdefs=");
+            else if (argument.startsWith("/f=")) argument.replace(0, 3, "--format=");
+            else if (argument.startsWith("/img=")) argument.replace(0, 5, "--image=");
+        }
+        if (!positionalOnly && argument == "--") {
+            positionalOnly = true;
+            continue;
+        }
+        if (positionalOnly || !argument.startsWith('-')) {
+            images.append({argument, format, container});
+            continue;
+        }
+        const auto name = argument.section('=', 0, 0);
+        options.append(argument);
+        if (name == "--image" || name == "--format" || name == "--container" ||
+            name == "--diskdefs" || name == "--root" || name == "--helper" || name == "--python") {
+            const auto value = argument.contains('=') ? argument.section('=', 1) :
+                (i + 1 < arguments.size() ? arguments[++i] : QString());
+            if (value.isEmpty()) {
+                std::fprintf(stderr, "Missing value for %s.\n", qPrintable(name));
+                return 2;
+            }
+            if (!argument.contains('=')) options.append(value);
+            if (name == "--format") format = value;
+            if (name == "--container") container = value;
+            if (name == "--image") images.append({value, format, container});
+        }
     }
-    parser.process(arguments);
+    parser.process(options);
     const auto catalogueOptions = parser.values("diskdefs");
     if (catalogueOptions.contains(QString()) ||
         (!catalogueOptions.isEmpty() && catalogueOptions.count(catalogueOptions.first()) != catalogueOptions.size())) {
@@ -69,20 +102,23 @@ int main(int argc, char **argv) {
         return 2;
     }
     Workspace workspace(paths);
-    auto &window = workspace.addSession();
     workspace.catalogue = parser.value("diskdefs");
     workspace.show();
-    QTimer::singleShot(0, &window, [&] {
-        if (!parser.isSet("image")) {
-            window.loadCatalogue(parser.value("diskdefs"));
-        } else if (parser.isSet("diskdefs")) {
-            QObject::connect(&window, &Window::completed, &window, [&](bool ok) {
-                if (ok) window.inspectImage(parser.value("image"), parser.value("format"), parser.value("container"));
-            }, Qt::SingleShotConnection);
-            window.loadCatalogue(parser.value("diskdefs"));
-        } else {
-            window.inspectImage(parser.value("image"), parser.value("format"), parser.value("container"));
-        }
-    });
+    qsizetype nextImage = 0;
+    std::function<void()> openNext = [&] {
+        if (nextImage == images.size()) return;
+        const auto image = images.at(nextImage++);
+        auto &window = workspace.addSession();
+        QObject::connect(&window, &Window::completed, &workspace, [&](bool) {
+            QTimer::singleShot(0, &workspace, openNext);
+        }, Qt::SingleShotConnection);
+        window.inspectImage(image.path, image.format, image.container);
+    };
+    if (images.isEmpty()) {
+        auto &window = workspace.addSession();
+        window.loadCatalogue(workspace.catalogue);
+    } else {
+        QTimer::singleShot(0, &workspace, openNext);
+    }
     return app.exec();
 }
