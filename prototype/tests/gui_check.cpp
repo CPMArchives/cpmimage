@@ -178,9 +178,15 @@ private slots:
             auto *search = dialog->findChild<QLineEdit *>();
             auto *list = dialog->findChild<QListWidget *>();
             group->setCurrentIndex(1);
+            search->setText("ibm");
+            search->setFocus();
+            QTest::keyClick(search, Qt::Key_Down);
+            const auto firstRow = list->currentRow();
+            QTest::keyClick(list, Qt::Key_Down);
+            const bool keyboardNavigation = list->hasFocus() && list->currentRow() == firstRow + 1;
             search->setText("ibm-3740");
             const auto exact = list->findItems("ibm-3740", Qt::MatchExactly);
-            chose = exact.size() == 1;
+            chose = keyboardNavigation && exact.size() == 1;
             if (chose) list->setCurrentItem(exact.first());
             for (auto *button : dialog->findChildren<QPushButton *>())
                 if (button->text() == "Toggle favorite") button->click();
@@ -271,7 +277,7 @@ private slots:
         QCOMPARE(QDir(subset.path()).entryList(QDir::Files),QStringList({"BINARY.BIN","TAIL.BIN"}));
         QTemporaryDir areas;files->clearSelection();window.selectEntry(0);window.exportUserArea(areas.path());QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
         QCOMPARE(QDir(areas.filePath("0")).entryList(QDir::Files).size(),3);
-        auto *navigation=window.findChild<QListWidget *>("userAreas");navigation->setCurrentRow(1);
+        auto *navigation=window.findChild<QListWidget *>("userAreas");navigation->setCurrentRow(2);
         window.exportUserArea(areas.path());QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
         QVERIFY(QDir(areas.filePath("1")).exists());QVERIFY(QDir(areas.filePath("1")).isEmpty());
         QVERIFY(image.open(QIODevice::ReadOnly));QCOMPARE(image.readAll(),bytes);
@@ -452,7 +458,7 @@ private slots:
         QCOMPARE(names->item(0,0)->data(Qt::UserRole).toString(), QString("00BINARY.BIN"));
         QTemporaryDir directory; QVERIFY(directory.isValid());
         const auto destination = directory.filePath("user 7 export.bin");
-        window.findChild<QListWidget *>("userAreas")->setCurrentItem(window.findChild<QListWidget *>("userAreas")->item(7));
+        window.findChild<QListWidget *>("userAreas")->setCurrentItem(window.findChild<QListWidget *>("userAreas")->item(8));
         window.selectEntry(0); window.exportFile(destination);
         QVERIFY(done.wait(15000)); QVERIFY(done.takeFirst()[0].toBool());
         QFile file(destination); QVERIFY(file.open(QIODevice::ReadOnly));
@@ -499,12 +505,12 @@ private slots:
         auto *files = window.findChild<QTableWidget *>("fileList");
         auto *status = window.findChild<QLabel *>("selectionStatus");
         QVERIFY(areas); QVERIFY(files); QVERIFY(status);
-        QCOMPARE(areas->count(), 16); QVERIFY(!areas->isEnabled());
+        QCOMPARE(areas->count(), 17); QVERIFY(!areas->isEnabled());
         QSignalSpy done(&window, &Window::completed);
         window.openImage(root + "/fixtures/ibm3740-independent.raw", "ibm-3740", "raw");
         QVERIFY(done.wait(15000)); QVERIFY(done.takeFirst()[0].toBool());
         for (int area = 0; area < 16; ++area) {
-            auto *item = areas->item(area);
+            auto *item = areas->item(area + 1);
             QCOMPARE(item->text(), QString::number(area)); QVERIFY(!item->icon().isNull());
             const bool populated = area == 0 || area == 7 || area == 15;
             QCOMPARE(item->data(Qt::UserRole + 1).toInt(), populated ? 1 : 0);
@@ -514,10 +520,22 @@ private slots:
             QVERIFY(status->text().startsWith(QString("User area %1 ·").arg(area)));
             if (populated) QCOMPARE(files->item(0,0)->data(Qt::UserRole).toString().left(2).toInt(), area);
         }
-        QVERIFY(areas->item(0)->icon().pixmap(24,24).toImage() !=
-                areas->item(1)->icon().pixmap(24,24).toImage());
-        areas->setCurrentItem(areas->item(7));
+        QVERIFY(areas->item(1)->icon().pixmap(24,24).toImage() !=
+                areas->item(2)->icon().pixmap(24,24).toImage());
+        areas->setCurrentItem(areas->item(8));
         QVERIFY(status->text().contains("1 of 1 files selected · 256 bytes"));
+        QAction *showAll = nullptr;
+        for (auto *action : window.findChildren<QAction *>())
+            if (action->text() == "Show All User Areas") showAll = action;
+        QVERIFY(showAll);
+        showAll->trigger();
+        QCOMPARE(areas->currentItem()->text(), QString("All"));
+        QCOMPARE(files->rowCount(), 3);
+        QVERIFY(!files->isColumnHidden(3));
+        QVERIFY(files->selectionModel()->selectedRows().isEmpty());
+        showAll->trigger();
+        QCOMPARE(areas->currentItem()->text(), QString("7"));
+        QVERIFY(files->isColumnHidden(3));
         window.openImage(root + "/fixtures/ibm3740-empty.raw", "ibm-3740", "raw");
         QVERIFY(done.wait(15000)); QVERIFY(done.takeFirst()[0].toBool());
         QVERIFY(areas->isEnabled()); QCOMPARE(files->rowCount(),0);
@@ -569,9 +587,9 @@ private slots:
         const auto output=temp.filePath("sorted.bin"); window.exportFile(output);
         QVERIFY(done.wait(15000)); QVERIFY(done.takeFirst()[0].toBool());
         QFile exported(output); QCOMPARE(exported.size(),qint64(1024));
-        areas->setCurrentItem(areas->item(1));
+        areas->setCurrentItem(areas->item(2));
         QCOMPARE(files->rowCount(),0); QVERIFY(!exportButton->isEnabled());
-        areas->setCurrentItem(areas->item(0));
+        areas->setCurrentItem(areas->item(1));
         QCOMPARE(files->selectionModel()->selectedRows().size(),1);
         QVERIFY(fixture.open(QIODevice::ReadOnly)); QCOMPARE(fixture.readAll(),bytes);
     }

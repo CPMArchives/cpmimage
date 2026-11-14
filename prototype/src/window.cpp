@@ -33,6 +33,7 @@
 #include <QAction>
 #include <QSettings>
 #include <QLineEdit>
+#include <QKeyEvent>
 #include <QInputDialog>
 #include <QCheckBox>
 #include <QProgressBar>
@@ -165,10 +166,11 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     areaLayout->addWidget(new QLabel("User areas"));
     areaLayout->addWidget(userAreas);
     splitter->addWidget(areaPane);
-    table = new QTableWidget(0, 3);
+    table = new QTableWidget(0, 4);
     table->setObjectName("fileList");
     table->setAccessibleName("Files in selected user area");
-    table->setHorizontalHeaderLabels({"Name", "Bytes", "Attributes"});
+    table->setHorizontalHeaderLabels({"Name", "Bytes", "Attributes", "User"});
+    table->hideColumn(3);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setSelectionMode(QAbstractItemView::ExtendedSelection);
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -216,7 +218,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     userAreas->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(userAreas,&QListWidget::customContextMenuRequested,this,[this](const QPoint &point){
         if(busy || session.isEmpty()) return;
-        auto *item=userAreas->itemAt(point); if(!item) return;
+        auto *item=userAreas->itemAt(point); if(!item || userAreas->row(item) == 0) return;
         userAreas->setCurrentItem(item);
         QMenu menu; auto *action=menu.addAction("Export user area…");
         if(menu.exec(userAreas->viewport()->mapToGlobal(point))==action) chooseBatch(true);
@@ -287,7 +289,17 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     connect(table, &QTableWidget::itemSelectionChanged, this, [this] {
         setBusy(busy); updateSelectionStatus();
     });
-    connect(userAreas, &QListWidget::currentItemChanged, this, [this] { showUserArea(); });
+    showAllAction = menuBar()->addMenu("View")->addAction("Show All User Areas");
+    showAllAction->setCheckable(true);
+    showAllAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_A));
+    connect(showAllAction, &QAction::triggered, this, [this](bool checked) {
+        userAreas->setCurrentRow(checked ? 0 : previousUserArea + 1);
+    });
+    connect(userAreas, &QListWidget::currentItemChanged, this, [this](QListWidgetItem *item) {
+        if (item && item->data(Qt::UserRole).toInt() >= 0)
+            previousUserArea = item->data(Qt::UserRole).toInt();
+        showUserArea();
+    });
     externalCatalogueAction = fileMenu->addAction("Load diskdefs catalogue…");
     bundledCatalogueAction = fileMenu->addAction("Use bundled diskdefs");
     connect(externalCatalogueAction, &QAction::triggered, this, [this] {
@@ -387,10 +399,12 @@ void Window::setBusy(bool value) {
     bundledCatalogueAction->setEnabled(!busy);
     table->setEnabled(!busy && !session.isEmpty());
     userAreas->setEnabled(!busy && !session.isEmpty());
+    showAllAction->setEnabled(userAreas->isEnabled());
+    showAllAction->setChecked(userAreas->currentRow() == 0);
     const int selected = table->selectionModel()->selectedRows().size();
     exportButton->setEnabled(!busy && !session.isEmpty() && selected > 0);
     exportButton->setToolTip("Export selected (Ctrl+E / Command+E)");
-    areaExportButton->setEnabled(!busy && !session.isEmpty() && userAreas->currentItem());
+    areaExportButton->setEnabled(!busy && !session.isEmpty() && userAreas->currentRow() > 0);
     cancelButton->setEnabled(busy);
     cancelButton->setVisible(busy);
     imageInfoButton->setEnabled(!busy && !session.isEmpty());
@@ -427,7 +441,13 @@ void Window::chooseEdit(const QString &action) {
         const auto paths = QFileDialog::getOpenFileNames(this, "Import files");
         if (paths.isEmpty() || !userAreas->currentItem()) return;
         const QRegularExpression valid(R"CPM(^[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,8}(\.[A-Z0-9!#$%&'()@^_`{}~+/:\\|"-]{1,3})?$)CPM");
-        const int area = userAreas->currentItem()->data(Qt::UserRole).toInt();
+        int area = userAreas->currentItem()->data(Qt::UserRole).toInt();
+        if (area < 0) {
+            bool accepted = false;
+            area = QInputDialog::getInt(this, "Import destination", "User area",
+                previousUserArea, 0, userAreas->count() - 2, 1, &accepted);
+            if (!accepted) return;
+        }
         const auto prefix = QString("%1").arg(area, 2, 10, QLatin1Char('0'));
         QSet<QString> existing;
         for (const auto &entry : directoryEntries) existing.insert(entry.toObject()["name"].toString());
@@ -545,15 +565,19 @@ QJsonObject Window::initializeOptions(const QJsonObject &geometry) {
     }
     QLineEdit bootPath;
     bootPath.setReadOnly(true);
-    bootPath.setPlaceholderText("Preserve existing reserved bytes or use E5 on a new image");
-    QPushButton bootButton("Choose system-track binary…");
+    bootPath.setPlaceholderText("No system-track file selected");
+    QPushButton bootButton("Choose system-track file…");
     QCheckBox pad("Pad short input with E5");
     if (geometry["boot_sectors"].toInt() > 0) {
+        auto *bootDescription = new QLabel("Optional. Copy a binary file (such as a .bin) into the reserved system sectors.");
+        bootDescription->setWordWrap(true);
+        layout.addWidget(bootDescription);
         layout.addWidget(&bootButton);
         layout.addWidget(&bootPath);
         layout.addWidget(&pad);
         connect(&bootButton, &QPushButton::clicked, &dialog, [&] {
-            bootPath.setText(QFileDialog::getOpenFileName(&dialog, "Select system-track binary"));
+            bootPath.setText(QFileDialog::getOpenFileName(&dialog, "Choose file for reserved system sectors", {},
+                "Binary files (*.bin);;All files (*)"));
         });
     }
     QDialogButtonBox buttons(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
@@ -661,13 +685,28 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
     dialog.setWindowTitle("Choose disk format");
     dialog.resize(650, 480);
     auto *layout = new QVBoxLayout(&dialog);
-    auto *search = new QLineEdit;
+    class FormatSearch : public QLineEdit {
+    public:
+        QListWidget *results = nullptr;
+    protected:
+        void keyPressEvent(QKeyEvent *event) override {
+            if (event->key() == Qt::Key_Down && event->modifiers() == Qt::NoModifier &&
+                results && results->count()) {
+                results->setFocus(Qt::ShortcutFocusReason);
+                event->accept();
+                return;
+            }
+            QLineEdit::keyPressEvent(event);
+        }
+    };
+    auto *search = new FormatSearch;
     search->setPlaceholderText("Search disk definitions");
     layout->addWidget(search);
     auto *group = new QComboBox;
     group->addItems({"Plausible candidates", "All formats", "Manufacturer and model", "System family", "Favorites"});
     layout->addWidget(group);
     auto *list = new QListWidget;
+    search->results = list;
     layout->addWidget(list);
     auto *favorite = new QPushButton("Toggle favorite");
     layout->addWidget(favorite);
@@ -743,12 +782,17 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
 int Window::entryCount() const { return table->rowCount(); }
 void Window::selectEntry(int row) { table->selectRow(row); }
 void Window::updateUserAreas() {
+    if (!userAreas->count() || userAreas->item(0)->data(Qt::UserRole).toInt() != -1) {
+        auto *all = new QListWidgetItem("All");
+        all->setData(Qt::UserRole, -1);
+        userAreas->insertItem(0, all);
+    }
     int areas = 16;
     for (const auto &value : directoryEntries)
         areas = qMax(areas, value.toObject()["name"].toString().left(2).toInt() + 1);
-    while (userAreas->count() > areas) delete userAreas->takeItem(userAreas->count() - 1);
-    while (userAreas->count() < areas) {
-        const int area = userAreas->count();
+    while (userAreas->count() > areas + 1) delete userAreas->takeItem(userAreas->count() - 1);
+    while (userAreas->count() < areas + 1) {
+        const int area = userAreas->count() - 1;
         auto *item = new QListWidgetItem(QString::number(area), userAreas);
         item->setData(Qt::UserRole, area);
     }
@@ -756,7 +800,7 @@ void Window::updateUserAreas() {
         int count = 0;
         for (const auto &value : directoryEntries)
             if (value.toObject()["name"].toString().left(2).toInt() == area) ++count;
-        auto *item = userAreas->item(area);
+        auto *item = userAreas->item(area + 1);
         item->setData(Qt::UserRole + 1, count);
         item->setToolTip(QString("User area %1 · %2 files").arg(area).arg(count));
         auto folder = style()->standardIcon(QStyle::SP_DirIcon).pixmap(24, 24);
@@ -776,12 +820,13 @@ void Window::showUserArea() {
     const QSignalBlocker block(table);
     const auto *area = userAreas->currentItem();
     const int currentArea = area ? area->data(Qt::UserRole).toInt() : -1;
+    table->setColumnHidden(3, !area || currentArea != -1);
     table->setSortingEnabled(false);
     table->clearSelection(); table->setCurrentItem(nullptr); table->setRowCount(0);
     for (const auto &value : directoryEntries) {
         const auto entry = value.toObject();
         const auto name = entry["name"].toString();
-        if (name.left(2).toInt() != currentArea) continue;
+        if (!area || (currentArea >= 0 && name.left(2).toInt() != currentArea)) continue;
         const int row = table->rowCount(); table->insertRow(row);
         auto *file = new QTableWidgetItem(name.mid(2).toUpper());
         file->setData(Qt::UserRole, name); table->setItem(row, 0, file);
@@ -791,10 +836,13 @@ void Window::showUserArea() {
         const int bits = entry["attr"].toInt(); QStringList flags;
         for (const auto &flag : QList<QPair<int,QString>>{{1,"F1"},{2,"F2"},{4,"F3"},{8,"F4"},{256,"Read-only"},{512,"System"},{1024,"Archive"}})
             if (bits & flag.first) flags << flag.second;
+        auto *user = new QTableWidgetItem;
+        user->setData(Qt::DisplayRole, name.left(2).toInt());
+        table->setItem(row, 3, user);
         table->setItem(row, 2, new QTableWidgetItem(flags.isEmpty() ? "—" : flags.join(", ")));
     }
     table->setSortingEnabled(true);
-    if (table->rowCount()) table->selectRow(0);
+    if (table->rowCount() && currentArea >= 0) table->selectRow(0);
     setBusy(busy); updateSelectionStatus();
 }
 void Window::updateSelectionStatus() {
@@ -802,8 +850,9 @@ void Window::updateSelectionStatus() {
     const auto rows = table->selectionModel()->selectedRows();
     qint64 bytes = 0;
     for (const auto &row : rows) bytes += table->item(row.row(), 1)->data(Qt::DisplayRole).toLongLong();
-    status->setText(QString("User area %1 · %2 of %3 files selected · %4 bytes")
-        .arg(userAreas->currentItem()->data(Qt::UserRole).toInt())
+    status->setText(QString("%1 · %2 of %3 files selected · %4 bytes")
+        .arg(userAreas->currentRow() == 0 ? QString("All user areas") :
+            QString("User area %1").arg(userAreas->currentItem()->data(Qt::UserRole).toInt()))
         .arg(rows.size()).arg(table->rowCount()).arg(bytes));
 }
 QString Window::selectedExportName(QString *problem) const {
@@ -1009,10 +1058,10 @@ void Window::finishBatch() {
 void Window::showImageInformation() {
     if(busy || session.isEmpty()) return;
     int populated=0;
-    for(int area=0;area<userAreas->count();++area)
+    for(int area=1;area<userAreas->count();++area)
         if(userAreas->item(area)->data(Qt::UserRole+1).toInt()>0) ++populated;
     const auto details=QString("Source image: %1\nImage layout: %2\nFormat identifier: %3\nContainer: %4\nFiles: %5\nPopulated user areas: %6 of %9\n\nSnapshot SHA-256: %7\nRead-only normalization: %8\n\nEdits affect a private copy until you save.\nThe selected definition is an interpretation of the source image.\nExport retains CP/M record padding.")
-        .arg(image,formats->text(),format,container).arg(directoryEntries.size()).arg(populated).arg(snapshotHash,imageNote).arg(userAreas->count());
+        .arg(image,formats->text(),format,container).arg(directoryEntries.size()).arg(populated).arg(snapshotHash,imageNote).arg(userAreas->count()-1);
     QDialog dialog(this);dialog.setWindowTitle("Image information");dialog.resize(700,420);
     auto *layout=new QVBoxLayout(&dialog);
     auto *text=new QTextEdit;text->setObjectName("imageInformationText");text->setReadOnly(true);
@@ -1149,7 +1198,7 @@ void Window::readReply() {
         if (result["entries"].isArray()) {
             directoryEntries = result["entries"].toArray();
             updateUserAreas();
-            if (!userAreas->currentItem() && !session.isEmpty()) userAreas->setCurrentRow(0);
+            if (!userAreas->currentItem() && !session.isEmpty()) userAreas->setCurrentRow(1);
             showUserArea();
         }
         setWindowTitle("cpmimage — " + QFileInfo(image).fileName() + (dirty ? " *" : ""));
@@ -1270,7 +1319,7 @@ void Window::readReply() {
         source->setText(QFileInfo(image).fileName()); source->setToolTip(image);
         setWindowTitle("cpmimage — "+QFileInfo(image).fileName());
         updateUserAreas();
-        { QSignalBlocker block(userAreas); userAreas->setCurrentItem(userAreas->item(0)); }
+        { QSignalBlocker block(userAreas); userAreas->setCurrentItem(userAreas->item(1)); }
         showUserArea();
     } else {
         const double size = result["size"].toDouble(-1);
