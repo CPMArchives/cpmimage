@@ -40,6 +40,7 @@ argument list. Use `/diskdefs=PATH` to override the bundled catalogue.
 
 For packaging, apply `packaging/scripts/configure-utility-catalogue.py` to a
 pinned cpmtools 2.23 source tree before compiling the standalone utilities.
+The script applies the v0.6 formatter fixes and requires `patch` on PATH.
 Build the complete suite with a curses implementation for `fsed.cpm` and
 set `CPMIMAGE_CPMTOOLS_BIN` to the native build output when assembling the
 package. Include any Windows utility runtime DLLs in that directory.
