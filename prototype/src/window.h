@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include <QMainWindow>
+#include <QPointer>
 #include <functional>
 #include <memory>
 #include "filename_policy.h"
@@ -81,7 +82,16 @@ private:
     bool newImagePicker = false;
     bool unpublished = false;
     QJsonObject newDefinition, imageGeometry;
-    void viewFile();
+    void viewFile(QString mode = "auto");
+    void inspectPreview(const QByteArray &bytes, const QString &name, const QString &title,
+                        QWidget *pane, bool truncated, QString mode = "auto", int member = -1,
+                        QPointer<QWidget> directoryView = {});
+    void showPreview(QByteArray bytes, QByteArray decoded, const QJsonObject &result,
+                     const QString &title, QWidget *pane, bool truncated, QPointer<QWidget> returnTo = {});
+    void showArchive(QByteArray bytes, QByteArray decoded, const QJsonObject &result,
+                     const QString &title, QWidget *pane, QPointer<QWidget> returnTo = {});
+    void finishPreviewDialog(QDialog *dialog, QWidget *pane, QPointer<QWidget> returnTo);
+    QString previewMode;
     void showFilePreview(bool truncated);
     QAction *viewFileAction = nullptr;
     QString previewName;

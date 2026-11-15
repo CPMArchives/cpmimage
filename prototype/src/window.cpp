@@ -58,6 +58,9 @@
 #include <QPlainTextEdit>
 #include <QFontDatabase>
 #include <QStringDecoder>
+#include <QScrollBar>
+#include <QShortcut>
+#include <QTextBlock>
 #ifdef Q_OS_WIN
 #include <windows.h>
 #else
@@ -476,7 +479,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     auto *view = menuBar()->addMenu("View");
     viewFileAction = view->addAction("View File…");
     viewFileAction->setObjectName("viewFileAction");
-    connect(viewFileAction, &QAction::triggered, this, &Window::viewFile);
+    connect(viewFileAction, &QAction::triggered, this, [this] { viewFile(); });
     connect(table, &QTableWidget::cellDoubleClicked, viewFileAction, &QAction::trigger);
     auto *showToolbar = view->addAction("Toolbar");
     showToolbar->setCheckable(true);
@@ -1227,7 +1230,7 @@ void Window::editFilenameSettings() {
 }
 static constexpr qint64 previewLimit = 1024 * 1024;
 
-void Window::viewFile() {
+void Window::viewFile(QString mode) {
     const auto rows = table->selectionModel()->selectedRows();
     if (busy || session.isEmpty() || rows.size() != 1) return;
     const auto name = table->item(rows.first().row(), 0)->data(Qt::UserRole).toString();
@@ -1237,23 +1240,15 @@ void Window::viewFile() {
         return;
     }
     previewName = name;
+    previewMode = std::move(mode);
     previewPane = exportPane == userAreas ? static_cast<QWidget *>(userAreas) : table;
     previewDirectory = std::move(directory);
     begin({{"op", "preview"}, {"session", session}, {"name", name},
            {"destination", previewDirectory->filePath("preview")}});
 }
 
-void Window::showFilePreview(bool truncated) {
-    auto directory = std::move(previewDirectory);
-    if (!directory) { fail("Missing private text preview."); return; }
-    QFile file(directory->filePath("preview"));
-    if (!file.open(QIODevice::ReadOnly)) { fail("Cannot read the text preview."); return; }
-    auto bytes = file.read(previewLimit + 1);
-    if (file.error() != QFile::NoError || bytes.size() > previewLimit) {
-        fail("Invalid text preview size.");
-        return;
-    }
-    file.close();
+static QString previewText(QByteArray bytes, bool truncated, bool highBit, bool *binary = nullptr) {
+    if (highBit) for (auto &byte : bytes) byte = char(byte & 0x7f);
     const auto eof = bytes.indexOf('\x1a');
     if (eof >= 0 && !truncated &&
         std::all_of(bytes.cbegin() + eof, bytes.cend(), [](char value) {
@@ -1268,41 +1263,296 @@ void Window::showFilePreview(bool truncated) {
                value != '\r' && value != '\n' && value != '\t';
     });
     const bool unsupported = controls || decode.hasError();
-    text.replace("\r\n", "\n").replace('\r', '\n');
+    if (binary) *binary = unsupported;
+    if (unsupported)
+        return "This file contains binary data or unsupported text encoding.";
+    return text.replace("\r\n", "\n").replace('\r', '\n');
+}
 
+static QString hexRow(const QByteArray &bytes, qsizetype offset, int width) {
+    static constexpr char digits[] = "0123456789ABCDEF";
+    QString row = QString("%1  ").arg(offset, 8, 16, QChar('0')).toUpper();
+    QString ascii;
+    ascii.reserve(width);
+    for (int i = 0; i < width; ++i) {
+        if (i && i % 8 == 0) row += ' ';
+        if (offset + i < bytes.size()) {
+            const auto byte = static_cast<unsigned char>(bytes[offset + i]);
+            row += QLatin1Char(digits[byte >> 4]);
+            row += QLatin1Char(digits[byte & 15]);
+            ascii += (byte >= 32 && byte < 127) ? QLatin1Char(char(byte)) : QLatin1Char('.');
+            row += ' ';
+        } else {
+            row += "   ";
+        }
+    }
+    return row + " |" + ascii + '|';
+}
+
+class PreviewTextEdit : public QPlainTextEdit {
+public:
+    std::function<void()> viewportResized;
+    bool hex = false;
+    bool highBit = false;
+protected:
+    bool viewportEvent(QEvent *event) override {
+        const auto handled = QPlainTextEdit::viewportEvent(event);
+        if (event->type() == QEvent::Resize && viewportResized) viewportResized();
+        return handled;
+    }
+};
+
+void Window::showFilePreview(bool truncated) {
+    auto directory = std::move(previewDirectory);
+    if (!directory) { fail("Missing private text preview."); return; }
+    QFile file(directory->filePath("preview"));
+    if (!file.open(QIODevice::ReadOnly)) { fail("Cannot read the text preview."); return; }
+    auto bytes = file.read(previewLimit + 1);
+    if (file.error() != QFile::NoError || bytes.size() > previewLimit) {
+        fail("Invalid text preview size.");
+        return;
+    }
+    file.close();
+    const auto name = previewName.mid(2);
+    const auto title = QString("%1 · User area %2").arg(name).arg(previewName.left(2).toInt());
+    inspectPreview(bytes, name, title, previewPane, truncated, previewMode);
+}
+
+void Window::inspectPreview(const QByteArray &bytes, const QString &name, const QString &title,
+                            QWidget *pane, bool truncated, QString mode, int member,
+                            QPointer<QWidget> directoryView) {
+    auto work = std::make_shared<QTemporaryDir>();
+    const auto fallback = [this, bytes, title, pane, truncated, member, directoryView] {
+        if (directoryView) directoryView->setEnabled(true);
+        if (member >= 0) {
+            QMessageBox::warning(this, "Cannot open member", "The archive worker could not read this member.");
+        } else if (!closing) {
+            showPreview(bytes, {}, {{"notice", "Archive worker could not inspect the file. Showing original bytes."}},
+                        title, pane, truncated);
+            emit completed(true);
+        }
+    };
+    QFile input(work->filePath("input"));
+    if (!work->isValid() || !input.open(QIODevice::WriteOnly) || input.write(bytes) != bytes.size()) {
+        fallback();
+        return;
+    }
+    input.close();
+    auto *worker = new QProcess(this);
+    QTimer::singleShot(10000, worker, [worker] { if (worker->state() != QProcess::NotRunning) worker->kill(); });
+    connect(worker, &QProcess::errorOccurred, this, [worker, fallback](QProcess::ProcessError error) {
+        if (error != QProcess::FailedToStart) return;
+        fallback();
+        worker->deleteLater();
+    });
+    connect(worker, &QProcess::finished, this, [=](int code, QProcess::ExitStatus exit) {
+        worker->deleteLater();
+        if (directoryView) directoryView->setEnabled(true);
+        if (closing) return;
+        const auto output = worker->readAllStandardOutput();
+        const auto document = output.size() <= 512 * 1024 ? QJsonDocument::fromJson(output) : QJsonDocument();
+        if (exit != QProcess::NormalExit || code || !document.isObject()) { fallback(); return; }
+        const auto result = document.object();
+        QByteArray original = bytes, decoded;
+        if (member >= 0) {
+            QFile file(work->filePath("original"));
+            if (!file.open(QIODevice::ReadOnly)) { fallback(); return; }
+            original = file.read(previewLimit + 1);
+        }
+        QFile file(work->filePath("decoded"));
+        if (file.exists()) {
+            if (!file.open(QIODevice::ReadOnly)) { fallback(); return; }
+            decoded = file.read(previewLimit + 1);
+            if (decoded.isNull()) decoded = QByteArray("");
+        }
+        if (original.size() > previewLimit || decoded.size() > previewLimit) { fallback(); return; }
+        const auto displayTitle = member >= 0 ? result["name"].toString(title) : title;
+        if (!result["kind"].toString().isEmpty())
+            showArchive(original, decoded, result, displayTitle, pane, directoryView);
+        else showPreview(original, decoded, result, displayTitle, pane, truncated, directoryView);
+        if (member < 0) emit completed(true);
+    });
+    if (directoryView) directoryView->setEnabled(false);
+    worker->start(python, {"-I", "-B", root + "/prototype/archive_view.py", work->path(),
+                           name, mode, member < 0 ? QString("-") : QString::number(member),
+                           truncated ? "1" : "0"});
+}
+
+void Window::showArchive(QByteArray bytes, QByteArray decoded, const QJsonObject &result,
+                         const QString &title, QWidget *pane, QPointer<QWidget> returnTo) {
     auto *dialog = new QDialog(this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowTitle(QString("%1 · User area %2")
-        .arg(previewName.mid(2)).arg(previewName.left(2).toInt()));
-    dialog->resize(680, 480);
+    dialog->setWindowTitle(title);
+    dialog->resize(620, 420);
     auto *layout = new QVBoxLayout(dialog);
-    if (truncated) layout->addWidget(new QLabel("Preview limited to the first 1 MiB."));
-    if (unsupported) {
-        layout->addWidget(new QLabel("This file contains binary data or unsupported text encoding."));
-    } else {
-        auto *viewer = new QPlainTextEdit;
-        viewer->setObjectName("filePreviewText");
-        viewer->setReadOnly(true);
-        viewer->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
-        viewer->setPlainText(text);
-        layout->addWidget(viewer);
-        viewer->setFocus();
+    const auto entries = result["members"].toArray();
+    auto *members = new QTableWidget(entries.size(), 3);
+    members->setObjectName("archiveMembers");
+    members->setHorizontalHeaderLabels({"Member", "Size (bytes)", "Stored (bytes)"});
+    members->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    members->setSelectionBehavior(QAbstractItemView::SelectRows);
+    members->setSelectionMode(QAbstractItemView::SingleSelection);
+    members->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    for (int row = 0; row < entries.size(); ++row) {
+        const auto entry = entries[row].toObject();
+        members->setItem(row, 0, new QTableWidgetItem(entry["name"].toString()));
+        members->setItem(row, 1, new QTableWidgetItem(QString::number(entry["size"].toInteger())));
+        members->setItem(row, 2, new QTableWidgetItem(QString::number(entry["stored"].toInteger())));
     }
+    if (members->rowCount()) members->setCurrentCell(0, 0);
+    layout->addWidget(members);
+    const auto name = result["name"].toString();
+    const auto data = decoded.isNull() ? bytes : decoded;
+    const auto openMember = [=](int row, int) {
+        if (members->isEnabled())
+            inspectPreview(data, name, members->item(row, 0)->text(), pane, false, "auto", row, members);
+    };
+    connect(members, &QTableWidget::cellActivated, dialog, openMember);
+    connect(members, &QTableWidget::cellDoubleClicked, dialog, openMember);
+    auto *viewMember = new QShortcut(QKeySequence(Qt::Key_V), members);
+    viewMember->setContext(Qt::WidgetWithChildrenShortcut);
+    connect(viewMember, &QShortcut::activated, dialog, [=] {
+        if (members->currentRow() >= 0) openMember(members->currentRow(), 0);
+    });
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close);
+    auto *raw = buttons->addButton("View archive bytes…", QDialogButtonBox::ActionRole);
+    connect(raw, &QPushButton::clicked, dialog, [=] { showPreview(bytes, decoded, {}, title, pane, false, members); });
     connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::close);
     layout->addWidget(buttons);
-    auto *pane = previewPane;
-    pane->setFocus(Qt::OtherFocusReason);
-    connect(dialog, &QDialog::finished, this, [this, pane] {
-        QTimer::singleShot(0, this, [pane] {
-            if (!pane->isVisible() || !pane->isEnabled()) return;
-            pane->window()->activateWindow();
-            pane->setFocus(Qt::OtherFocusReason);
+    connect(new QShortcut(QKeySequence(Qt::Key_Q), dialog), &QShortcut::activated, dialog, &QDialog::close);
+    members->setFocus();
+    finishPreviewDialog(dialog, pane, returnTo);
+}
+
+void Window::showPreview(QByteArray bytes, QByteArray decoded, const QJsonObject &result,
+                         const QString &title, QWidget *pane, bool truncated, QPointer<QWidget> returnTo) {
+    auto *dialog = new QDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowTitle(title);
+    auto *layout = new QVBoxLayout(dialog);
+    if (truncated) layout->addWidget(new QLabel("Preview limited to the first 1 MiB."));
+    const auto notice = result["notice"].toString();
+    if (!notice.isEmpty() && !truncated) {
+        auto *label = new QLabel(notice);
+        label->setTextFormat(Qt::PlainText);
+        label->setWordWrap(true);
+        layout->addWidget(label);
+    }
+    auto *viewer = new PreviewTextEdit;
+    viewer->setObjectName("filePreviewText");
+    viewer->setReadOnly(true);
+    viewer->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    layout->addWidget(viewer);
+
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close);
+    auto *mode = new QPushButton("TEXT/hex (T)");
+    mode->setObjectName("previewMode");
+    mode->setAutoDefault(false);
+    auto *highBit = new QPushButton("Highbit: OFF (7)");
+    highBit->setObjectName("previewHighBit");
+    highBit->setAutoDefault(false);
+    connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::close);
+    auto *controls = new QHBoxLayout;
+    controls->addWidget(mode);
+    controls->addWidget(highBit);
+    QComboBox *stream = nullptr;
+    if (!decoded.isNull()) {
+        stream = new QComboBox;
+        stream->setObjectName("previewStream");
+        stream->addItems({"Decompressed", "Original"});
+        controls->addWidget(stream);
+    }
+    const auto activeBytes = [=]() -> const QByteArray & {
+        return stream && stream->currentIndex() == 0 ? decoded : bytes;
+    };
+    controls->addStretch();
+    controls->addWidget(buttons);
+    layout->addLayout(controls);
+
+    const auto rowPixels = [viewer](int width) {
+        return viewer->fontMetrics().horizontalAdvance(hexRow(QByteArray(width, 'W'), 0, width))
+            + 2 * viewer->document()->documentMargin();
+    };
+    const auto margins = layout->contentsMargins();
+    dialog->resize(qMax(680, qCeil(rowPixels(16)) + margins.left() + margins.right() +
+                               viewer->style()->pixelMetric(QStyle::PM_ScrollBarExtent) +
+                               2 * viewer->frameWidth()), 480);
+    auto *resizeTimer = new QTimer(dialog);
+    resizeTimer->setSingleShot(true);
+    resizeTimer->setInterval(40);
+    auto renderHex = [viewer, rowPixels, activeBytes]() {
+        const auto &bytes = activeBytes();
+        int next = 8;
+        for (int candidate : {16, 32, 64})
+            if (rowPixels(candidate) <= viewer->viewport()->width()) next = candidate;
+        const int width = viewer->property("hexWidth").toInt();
+        if (next == width) return;
+        const auto offset = width * viewer->cursorForPosition(QPoint(0, 0)).blockNumber();
+        viewer->setProperty("hexWidth", next);
+        QString text;
+        for (qsizetype position = 0; position < bytes.size(); position += next) {
+            if (position) text += '\n';
+            text += hexRow(bytes, position, next);
+        }
+        viewer->setPlainText(text);
+        viewer->verticalScrollBar()->setValue(offset / next);
+    };
+    connect(resizeTimer, &QTimer::timeout, dialog, renderHex);
+    viewer->viewportResized = [viewer, resizeTimer] {
+        if (viewer->hex) resizeTimer->start();
+    };
+    const auto renderText = [viewer, activeBytes, truncated] {
+        viewer->setPlainText(previewText(activeBytes(), truncated, viewer->highBit));
+    };
+    connect(highBit, &QPushButton::clicked, dialog, [viewer, highBit, renderText] {
+        viewer->highBit = !viewer->highBit;
+        highBit->setText(viewer->highBit ? "Highbit: ON (7)" : "Highbit: OFF (7)");
+        renderText();
+    });
+    connect(mode, &QPushButton::clicked, dialog, [=] {
+        const bool hex = viewer->hex = !viewer->hex;
+        mode->setText(hex ? "text/HEX (T)" : "TEXT/hex (T)");
+        highBit->setEnabled(!hex);
+        viewer->setLineWrapMode(hex ? QPlainTextEdit::NoWrap : QPlainTextEdit::WidgetWidth);
+        viewer->setVerticalScrollBarPolicy(hex ? Qt::ScrollBarAlwaysOn : Qt::ScrollBarAsNeeded);
+        if (hex) resizeTimer->start(0);
+        else {
+            resizeTimer->stop();
+            viewer->setProperty("hexWidth", 0);
+            renderText();
+        }
+    });
+    for (const auto &[key, button] : {std::pair{Qt::Key_T, mode}, std::pair{Qt::Key_7, highBit}})
+        connect(new QShortcut(QKeySequence(key), dialog), &QShortcut::activated, button, &QPushButton::click);
+    connect(new QShortcut(QKeySequence(Qt::Key_Q), dialog), &QShortcut::activated, dialog, &QDialog::close);
+    if (stream) connect(stream, &QComboBox::currentIndexChanged, dialog, [=] {
+        if (viewer->hex) {
+            viewer->setProperty("hexWidth", 0);
+            resizeTimer->start(0);
+        } else renderText();
+    });
+    bool binary = false;
+    previewText(activeBytes(), truncated, false, &binary);
+    if (binary) mode->click();
+    else renderText();
+    viewer->setFocus();
+    finishPreviewDialog(dialog, pane, returnTo);
+}
+
+void Window::finishPreviewDialog(QDialog *dialog, QWidget *pane, QPointer<QWidget> returnTo) {
+    if (!returnTo) pane->setFocus(Qt::OtherFocusReason);
+    connect(dialog, &QDialog::finished, this, [this, pane, returnTo] {
+        QTimer::singleShot(0, this, [pane, returnTo] {
+            auto *target = returnTo && returnTo->isVisible() && returnTo->isEnabled()
+                ? returnTo.data() : pane;
+            if (!target->isVisible() || !target->isEnabled()) return;
+            target->window()->activateWindow();
+            target->setFocus(Qt::OtherFocusReason);
         });
     });
     dialog->show();
+    dialog->activateWindow();
     updateSelectionStatus();
-    emit completed(true);
 }
 
 void Window::updateExportAction() {
@@ -1466,8 +1716,11 @@ bool Window::eventFilter(QObject *watched, QEvent *event) {
         const auto *key = static_cast<QKeyEvent *>(event);
         if (watched == table &&
             (key->modifiers() & ~Qt::KeypadModifier) == Qt::NoModifier &&
-            (key->key() == Qt::Key_V || key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter)) {
-            viewFileAction->trigger();
+            (key->key() == Qt::Key_V || key->key() == Qt::Key_Q || key->key() == Qt::Key_Z ||
+             key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter)) {
+            if (key->key() == Qt::Key_Q) viewFile("sq");
+            else if (key->key() == Qt::Key_Z) viewFile("cr");
+            else viewFileAction->trigger();
             return true;
         }
         if (key->key() == Qt::Key_X && key->modifiers() == Qt::NoModifier) {

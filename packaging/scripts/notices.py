@@ -14,6 +14,7 @@ def copy(source,dest):
 def create(destination,platform):
  destination=Path(destination);destination.mkdir(parents=True,exist_ok=True)
  copy(ROOT/'prototype/LICENSE',destination/'GPL-3.0.txt')
+ copy(ROOT/'prototype/archive_codecs/NOTICE.md',destination/'80un-archive-codecs.md')
  copy(ROOT/'prototype/licenses/libdsk-Library-GPL-2.0.txt',destination/'libdsk-Library-GPL-2.0.txt')
  with tarfile.open(ROOT/'vendor/cpmtools-2.23.tar.gz') as cpm:
   (destination/'cpmtools-README.txt').write_bytes(cpm.extractfile('cpmtools-2.23/README').read())

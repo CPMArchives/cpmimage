@@ -30,7 +30,8 @@ for f in (py/'lib').glob('libpython*.so*'):
  if f.is_symlink(): (runtime/'lib'/f.name).symlink_to(os.readlink(f))
  else:shutil.copy2(f,runtime/'lib'/f.name)
 shutil.copytree(py/'lib/python3.13',runtime/'lib/python3.13',symlinks=True,ignore=shutil.ignore_patterns('__pycache__','test','config-*'))
-for rel in ['prototype/broker.py','prototype/catalogue.py','prototype/container_mapping.py','prototype/publication.py','prototype/source_ownership.py','prototype/helper_guard.py','experiments/process-comparison/adapters.py','experiments/process-comparison/windows_supervisor.py','fixtures/diskdefs','fixtures/diskdefs-metadata.json']:
+archive_codecs = sorted(str(path.relative_to(ROOT)) for path in (ROOT/'prototype/archive_codecs').iterdir() if path.is_file())
+for rel in ['prototype/archive_view.py', 'prototype/broker.py','prototype/catalogue.py','prototype/container_mapping.py','prototype/publication.py','prototype/source_ownership.py','prototype/helper_guard.py','experiments/process-comparison/adapters.py','experiments/process-comparison/windows_supervisor.py','fixtures/diskdefs','fixtures/diskdefs-metadata.json'] + archive_codecs:
  dst=out/'share/cpmimage'/rel;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(ROOT/rel,dst)
 install_utilities(out/'bin/cpmtools', 'linux')
 (out/'bin/qt.conf').write_text('[Paths]\nPrefix=..\nLibraries=lib\nPlugins=plugins\n')

@@ -23,6 +23,7 @@
 #include <QDialogButtonBox>
 #include <QMessageBox>
 #include <memory>
+#include <tuple>
 #include <QTextEdit>
 #include <QPlainTextEdit>
 
@@ -1063,10 +1064,11 @@ private slots:
         QVERIFY(QFile::copy(root + "/fixtures/ibm3740-independent.raw", image));
         QVERIFY(QFile::copy(root + "/fixtures/diskdefs", scratch.filePath("diskdefs")));
         const auto input = scratch.filePath("input");
-        for (const auto &name : {QString("00NOTE.TXT"), QString("00EMPTY.TXT")}) {
+        for (const auto &name : {QString("00NOTE.TXT"), QString("00EMPTY.TXT"), QString("00HIGH.TXT")}) {
             QFile payload(input);
             QVERIFY(payload.open(QIODevice::WriteOnly));
-            if (name.contains("NOTE")) QVERIFY(payload.write("Hello\r\nWorld\x1a") > 0);
+            if (name.contains("NOTE")) QVERIFY(payload.write("Hello\r\nWorld\x1a ") > 0);
+            if (name.contains("HIGH")) QCOMPARE(payload.write(QByteArray::fromHex("c8e9")), 2);
             payload.close();
             QProcess import;
             import.setWorkingDirectory(scratch.path());
@@ -1090,16 +1092,18 @@ private slots:
         auto *table = window.findChild<QTableWidget *>("fileList");
         auto *action = window.findChild<QAction *>("viewFileAction");
         QVERIFY(table && action);
-        for (const auto &name : {QString("NOTE.TXT"), QString("EMPTY.TXT"), QString("BINARY.BIN")}) {
+        for (const auto &name : {QString("NOTE.TXT"), QString("EMPTY.TXT"), QString("BINARY.BIN"), QString("HIGH.TXT")}) {
             const auto matches = table->findItems(name, Qt::MatchExactly);
             QCOMPARE(matches.size(), 1);
             window.activateWindow();
             table->setFocus();
-            table->selectRow(matches.first()->row());
+            table->selectionModel()->select(table->model()->index(matches.first()->row(), 0),
+                QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
             QTRY_VERIFY(table->hasFocus());
             QVERIFY(action->isEnabled());
             if (name == "NOTE.TXT") QTest::keyClick(table, Qt::Key_V);
             else if (name == "EMPTY.TXT") QTest::keyClick(table, Qt::Key_Return);
+            else if (name == "HIGH.TXT") action->trigger();
             else {
                 const auto point = table->visualItemRect(matches.first()).center();
                 QTest::mouseClick(table->viewport(), Qt::LeftButton, Qt::NoModifier, point);
@@ -1113,19 +1117,204 @@ private slots:
             QVERIFY(viewer);
             QCOMPARE(viewer->windowTitle(), name + " · User area 0");
             auto *text = viewer->findChild<QPlainTextEdit *>("filePreviewText");
-            if (name == "BINARY.BIN") {
-                QVERIFY(!text);
+            QVERIFY(text && text->isReadOnly());
+            QTRY_VERIFY(text->hasFocus());
+            auto *mode = viewer->findChild<QPushButton *>("previewMode");
+            auto *high = viewer->findChild<QPushButton *>("previewHighBit");
+            QVERIFY(mode && high);
+            QCOMPARE(high->text(), QString("Highbit: OFF (7)"));
+            QCOMPARE(mode->text(), QString(name == "HIGH.TXT" || name == "BINARY.BIN" ? "text/HEX (T)" : "TEXT/hex (T)"));
+            QVERIFY(!high->isChecked());
+            if (name == "NOTE.TXT") {
+                QCOMPARE(text->toPlainText(), QString("Hello\nWorld"));
+                QTest::keyClick(text, Qt::Key_T);
+                QTRY_VERIFY(text->toPlainText().startsWith("00000000  48 65 6C 6C 6F 0D 0A 57  6F 72 6C 64 1A"));
+                QVERIFY(text->toPlainText().contains("1A 20"));
+                QCOMPARE(mode->text(), QString("text/HEX (T)"));
+                QVERIFY(!mode->isCheckable());
+                mode->click();
+                QCOMPARE(text->toPlainText(), QString("Hello\nWorld"));
+                action->trigger();
+                QTRY_COMPARE(done.size(), 1);
+                QVERIFY(done.takeFirst().first().toBool());
+                QDialog *second = nullptr;
+                for (auto *dialog : window.findChildren<QDialog *>())
+                    if (dialog != viewer && dialog->isVisible()) second = dialog;
+                QVERIFY(second);
+                auto *secondText = second->findChild<QPlainTextEdit *>("filePreviewText");
+                QVERIFY(secondText);
+                QTRY_VERIFY(secondText->hasFocus());
+                QTest::keyClick(secondText, Qt::Key_T);
+                QTRY_VERIFY(secondText->toPlainText().startsWith("00000000"));
+                QCOMPARE(text->toPlainText(), QString("Hello\nWorld"));
+                QTest::keyClick(secondText, Qt::Key_Q);
+                QTRY_VERIFY(viewer->isVisible());
+                auto *close = viewer->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Close);
+                close->click();
+            } else if (name == "HIGH.TXT") {
+                mode->click();
+                QVERIFY(text->toPlainText().contains("unsupported text encoding"));
+                QTest::keyClick(text, Qt::Key_7);
+                QCOMPARE(high->text(), QString("Highbit: ON (7)"));
+                QVERIFY(text->toPlainText().startsWith("Hi"));
+                mode->click();
+                QTRY_VERIFY(text->toPlainText().startsWith("00000000  C8 E9"));
+                QVERIFY(!high->isEnabled());
+                QTest::keyClick(text, Qt::Key_7);
+                mode->click();
+                QCOMPARE(high->text(), QString("Highbit: ON (7)"));
+                QVERIFY(text->toPlainText().startsWith("Hi"));
+                QTest::keyClick(text, Qt::Key_Escape);
+            } else if (name == "BINARY.BIN") {
+                QTRY_VERIFY(text->toPlainText().startsWith("00000000"));
+                for (const int width : {8, 16, 32, 64}) {
+                    const int cells = 10 + 3 * width + (width - 1) / 8 + 2 + width + 1;
+                    viewer->resize(text->fontMetrics().horizontalAdvance(QString(cells, 'W')) + 55, 400);
+                    QTRY_COMPARE(text->property("hexWidth").toInt(), width);
+                    const auto rows = text->toPlainText().split('\n');
+                    QVERIFY(rows.size() >= 2);
+                    QCOMPARE(rows[0].indexOf('|'), rows[1].indexOf('|'));
+                    QCOMPARE(rows[1].left(8).toInt(nullptr, 16), width);
+                }
+                QTest::keyClick(text, Qt::Key_Q);
             } else {
-                QVERIFY(text && text->isReadOnly());
-                QCOMPARE(text->toPlainText(), name == "NOTE.TXT" ? QString("Hello\nWorld") : QString());
+                QCOMPARE(text->toPlainText(), QString());
+                viewer->close();
             }
-            viewer->close();
+            QTRY_VERIFY(!window.findChild<QPlainTextEdit *>("filePreviewText"));
             QTRY_VERIFY(table->hasFocus());
             QCOMPARE(table->selectionModel()->selectedRows().first().row(), matches.first()->row());
         }
         QVERIFY(source.open(QIODevice::ReadOnly));
         QCOMPARE(source.readAll(), before);
         QVERIFY(!window.windowTitle().endsWith('*'));
+    }
+
+    void archiveViewer() {
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        const auto helper = qEnvironmentVariable("CPMIMAGE_HELPER");
+        const auto python = qEnvironmentVariable("CPMIMAGE_PYTHON", "python3");
+        QTemporaryDir scratch;
+        QVERIFY(scratch.isValid());
+        QProcess generator;
+        generator.start(python, {"-B", root + "/prototype/tests/archive_check.py", scratch.path()});
+        QVERIFY(generator.waitForFinished());
+        QCOMPARE(generator.exitCode(), 0);
+        const auto image = scratch.filePath("preview.raw");
+        QVERIFY(QFile::copy(root + "/fixtures/ibm3740-independent.raw", image));
+        QVERIFY(QFile::copy(root + "/fixtures/diskdefs", scratch.filePath("diskdefs")));
+        for (const auto &[name, file] : {std::pair{"00NOTE.TQT", "sq"},
+                                       std::pair{"00NOTE.TZT", "cr"},
+                                       std::pair{"00OUTER.ARK", "ark"}}) {
+            QProcess import;
+            import.setWorkingDirectory(scratch.path());
+            import.start(helper, {"edit_import", image, "ibm-3740", "raw", name, scratch.filePath(file)});
+            QVERIFY(import.waitForFinished());
+            QCOMPARE(import.exitCode(), 0);
+        }
+        QFile source(image);
+        QVERIFY(source.open(QIODevice::ReadOnly));
+        const auto original = source.readAll();
+        source.close();
+        Window window(root, python, helper, 30000, 2000, {}, scratch.filePath("settings.ini"));
+        window.show();
+        window.activateWindow();
+        QSignalSpy done(&window, &Window::completed);
+        window.openImage(image, "ibm-3740", "raw");
+        QTRY_COMPARE(done.size(), 1);
+        QVERIFY(done.takeFirst().first().toBool());
+        auto *files = window.findChild<QTableWidget *>("fileList");
+        QVERIFY(files);
+        const auto opened = [&](const QString &title) -> QDialog * {
+            for (auto *dialog : window.findChildren<QDialog *>())
+                if (dialog->isVisible() && dialog->windowTitle() == title) return dialog;
+            return nullptr;
+        };
+        const auto open = [&](QString name, Qt::Key key) {
+            window.activateWindow();
+            files->setFocus();
+            const auto matches = files->findItems(name, Qt::MatchExactly);
+            QCOMPARE(matches.size(), 1);
+            files->selectionModel()->select(files->model()->index(matches.first()->row(), 0),
+                QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            QTRY_VERIFY(files->hasFocus());
+            QTest::keyClick(files, key);
+            QTRY_VERIFY(opened(name + " · User area 0"));
+        };
+        for (const auto &[name, key, text] : {
+                std::tuple{"NOTE.TQT", Qt::Key_V, "A"}, std::tuple{"NOTE.TQT", Qt::Key_Q, "A"},
+                std::tuple{"NOTE.TZT", Qt::Key_Z, "B"}}) {
+            open(name, key);
+            auto *dialog = opened(QString(name) + " · User area 0");
+            QVERIFY(dialog);
+            auto *view = dialog->findChild<QPlainTextEdit *>("filePreviewText");
+            auto *stream = dialog->findChild<QComboBox *>("previewStream");
+            QVERIFY(view && stream);
+            QTRY_VERIFY(view->hasFocus());
+            QCOMPARE(view->toPlainText(), QString(text));
+            QTest::keyClick(view, Qt::Key_T);
+            stream->setCurrentIndex(1);
+            QTRY_VERIFY(view->toPlainText().startsWith(key == Qt::Key_Z ? "00000000  76 FE" : "00000000  76 FF"));
+            stream->setCurrentIndex(0);
+            QTRY_VERIFY(view->toPlainText().startsWith(key == Qt::Key_Z ? "00000000  42" : "00000000  41"));
+            dialog->close();
+        }
+        open("BINARY.BIN", Qt::Key_Z);
+        auto *raw = opened("BINARY.BIN · User area 0");
+        QVERIFY(raw && !raw->findChild<QComboBox *>("previewStream"));
+        raw->close();
+        open("OUTER.ARK", Qt::Key_V);
+        auto *outer = opened("OUTER.ARK · User area 0");
+        QVERIFY(outer);
+        const auto openMember = [](QDialog *dialog, const QString &name) {
+            auto *members = dialog->findChild<QTableWidget *>("archiveMembers");
+            QVERIFY(members && members->rowCount() > 0);
+            QCOMPARE(members->item(0, 0)->text(), name);
+            const auto point = members->visualItemRect(members->item(0, 0)).center();
+            QTest::mouseClick(members->viewport(), Qt::LeftButton, Qt::NoModifier, point);
+            QTest::mouseDClick(members->viewport(), Qt::LeftButton, Qt::NoModifier, point);
+        };
+        auto *outerMembers = outer->findChild<QTableWidget *>("archiveMembers");
+        QVERIFY(outerMembers);
+        QTRY_VERIFY(outerMembers->hasFocus());
+        QCOMPARE(outerMembers->currentRow(), 0);
+        QTest::keyClick(outerMembers, Qt::Key_Down);
+        QCOMPARE(outerMembers->currentRow(), 1);
+        QTest::keyClick(outerMembers, Qt::Key_Up);
+        QCOMPARE(outerMembers->currentRow(), 0);
+        QTest::keyClick(outerMembers, Qt::Key_V);
+        QTRY_VERIFY(opened("INNER.LBR"));
+        auto *innerMembers = opened("INNER.LBR")->findChild<QTableWidget *>("archiveMembers");
+        QVERIFY(innerMembers);
+        QTRY_VERIFY(innerMembers->hasFocus());
+        QTest::keyClick(innerMembers, Qt::Key_V);
+        QTRY_VERIFY(opened("HELLO.TQT"));
+        auto *memberText = opened("HELLO.TQT")->findChild<QPlainTextEdit *>("filePreviewText");
+        QVERIFY(memberText);
+        QTest::keyClick(memberText, Qt::Key_Escape);
+        QTRY_VERIFY(!opened("HELLO.TQT"));
+        QTRY_VERIFY(innerMembers->hasFocus());
+        QCOMPARE(innerMembers->currentRow(), 0);
+        QTest::keyClick(innerMembers, Qt::Key_Escape);
+        QTRY_VERIFY(!opened("INNER.LBR"));
+        QTRY_VERIFY(outerMembers->hasFocus());
+        QCOMPARE(outerMembers->currentRow(), 0);
+        openMember(outer, "INNER.LBR");
+        QTRY_VERIFY(opened("INNER.LBR"));
+        outer->close();
+        auto *inner = opened("INNER.LBR");
+        QVERIFY(inner);
+        openMember(inner, "HELLO.TQT");
+        QTRY_VERIFY(opened("HELLO.TQT"));
+        inner->close();
+        auto *child = opened("HELLO.TQT");
+        QVERIFY(child);
+        auto *text = child->findChild<QPlainTextEdit *>("filePreviewText");
+        QVERIFY(text);
+        QCOMPARE(text->toPlainText(), QString("A"));
+        child->close();
+        QVERIFY(source.open(QIODevice::ReadOnly));
+        QCOMPARE(source.readAll(), original);
     }
 
 };
