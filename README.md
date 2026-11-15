@@ -2,9 +2,9 @@
 
 CP/M Image is a graphical file manager for CP/M disk images on macOS, Windows, and Linux. It bundles cpmtools for command-line use.
 
-## Download v1.1
+## Download v1.2
 
-Get the five platform packages, corresponding source, and SHA-256 checksums from the [v1.1 release downloads](https://github.com/CPMArchives/cpmimage/releases/tag/v1.1#assets). The release notes cover the changes and supported formats.
+Get the five platform packages, corresponding source, and SHA-256 checksums from the [v1.2 release downloads](https://github.com/CPMArchives/cpmimage/releases/tag/v1.2#assets). The release notes cover the changes and supported formats.
 
 - **macOS ARM64 (Apple silicon):** Open the DMG and drag **CPMImage.app** to **Applications**.
 - **Windows ARM64 and x86-64:** Download the executable for your architecture and run it.
@@ -13,7 +13,7 @@ Get the five platform packages, corresponding source, and SHA-256 checksums from
 ## What you can do
 
 - Open RAW, IMD, JV3, DMK, and supported standard CPCEMU DSK images. Some structured layouts and conversions require a physical mapping profile.
-- Browse user areas and export individual files, selections, or entire user areas. The file list shows record counts and the footer shows free filesystem space.
+- Browse user areas and export individual files, selections, or entire user areas. In batch exports, choose which files to convert from CRLF to LF and trim at the first CP/M Ctrl+Z marker. Unchecked files keep their stored bytes. The file list shows record counts and the footer shows free filesystem space.
 - Import, rename, delete, and move files between user areas, edit supported attributes, and transfer files between open images.
 - Create or format images using a selected disk definition and manage reserved system tracks. Edits stay in a private working copy until Save or Save As.
 - Choose a disk definition from the bundled cpmtools catalogue or supply your own definitions. The format picker can suggest candidates and accepts manual selection.
@@ -23,6 +23,8 @@ Get the five platform packages, corresponding source, and SHA-256 checksums from
 - Select a file and press **V** or **Enter**, or double-click it to open the read-only viewer. Press **T** to switch between text and hex. In text mode, press **7** to toggle stripping the high bit for WordStar-style text.
 - Preview supported Squeeze (SQ) and Crunch (CR) files. After successful decompression, switch between the original and decompressed bytes.
 - Browse LBR and ARK archives, including nested archives. Use **Up/Down** to select a member, **V** to view it, and **Esc** to return to the parent archive.
+- Export a viewed archive member using its active byte stream, or select several members in the current LBR or ARK and export them to a folder. Choose original bytes or decompressed bytes when available. Multi-member export skips existing destination names.
+- Text mode recognizes Ctrl+Z in the last CP/M record even when leftover bytes follow it, handles high-bit line endings like the one in `ABSTRACT.062`, and shows embedded bell characters visibly, as in `KFORMAT.SUB`. Hex still shows the stored bytes.
 
 See [CP/M Image Help](docs/HELP.md) for everyday workflows. The same guide is available offline from the application's **Help** menu.
 
