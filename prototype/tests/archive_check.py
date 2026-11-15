@@ -70,6 +70,13 @@ class ArchiveCheck(unittest.TestCase):
             name = result['name']
         self.assertEqual(decoded, b'A')
 
+    def test_invalid_member_does_not_return_archive_bytes(self):
+        data = library('HELLO.TQT', squeezed())
+        result, original, decoded = inspect(data, 'INNER.LBR', index=1)
+        self.assertIn('Unknown archive member', result['notice'])
+        self.assertIsNone(original)
+        self.assertIsNone(decoded)
+
     def test_malformed_archive_and_bad_crc(self):
         for data, name in [(ark('A.TXT', b'A')[:-2], 'OUTER.ARK'),
                            (library('A.TXT', b'A')[:-1], 'OUTER.LBR')]:

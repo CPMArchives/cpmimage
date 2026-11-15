@@ -1251,9 +1251,10 @@ static QString previewText(QByteArray bytes, bool truncated, bool highBit, bool 
     if (highBit) for (auto &byte : bytes) byte = char(byte & 0x7f);
     const auto eof = bytes.indexOf('\x1a');
     if (eof >= 0 && !truncated &&
-        std::all_of(bytes.cbegin() + eof, bytes.cend(), [](char value) {
+        ((eof > 0 && eof / 128 == (bytes.size() - 1) / 128) ||
+         std::all_of(bytes.cbegin() + eof, bytes.cend(), [](char value) {
             return value == '\x1a' || value == '\0' || value == ' ';
-        })) bytes.truncate(eof);
+        }))) bytes.truncate(eof);
 
     QStringDecoder decode(QStringDecoder::Utf8, truncated ? QStringDecoder::Flag::Default :
                                                QStringDecoder::Flag::Stateless);
@@ -1352,7 +1353,8 @@ void Window::inspectPreview(const QByteArray &bytes, const QString &name, const 
         const auto output = worker->readAllStandardOutput();
         const auto document = output.size() <= 512 * 1024 ? QJsonDocument::fromJson(output) : QJsonDocument();
         if (exit != QProcess::NormalExit || code || !document.isObject()) { fallback(); return; }
-        const auto result = document.object();
+        auto result = document.object();
+        if (member >= 0) result.insert("memberExportName", result.value("name").toString());
         QByteArray original = bytes, decoded;
         if (member >= 0) {
             QFile file(work->filePath("original"));
@@ -1416,7 +1418,8 @@ void Window::showArchive(QByteArray bytes, QByteArray decoded, const QJsonObject
     });
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close);
     auto *raw = buttons->addButton("View archive bytes…", QDialogButtonBox::ActionRole);
-    connect(raw, &QPushButton::clicked, dialog, [=] { showPreview(bytes, decoded, {}, title, pane, false, members); });
+    connect(raw, &QPushButton::clicked, dialog, [=] { showPreview(bytes, decoded, {{"memberExportName", result["memberExportName"]}},
+                                                             title, pane, false, members); });
     connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::close);
     layout->addWidget(buttons);
     connect(new QShortcut(QKeySequence(Qt::Key_Q), dialog), &QShortcut::activated, dialog, &QDialog::close);
@@ -1465,6 +1468,41 @@ void Window::showPreview(QByteArray bytes, QByteArray decoded, const QJsonObject
     const auto activeBytes = [=]() -> const QByteArray & {
         return stream && stream->currentIndex() == 0 ? decoded : bytes;
     };
+    const auto memberName = result["memberExportName"].toString();
+    if (!memberName.isEmpty()) {
+        auto *save = new QPushButton("Export member…");
+        save->setObjectName("exportArchiveMember");
+        save->setAutoDefault(false);
+        controls->addWidget(save);
+        connect(save, &QPushButton::clicked, dialog, [=] {
+            const auto hostName = filenamePolicy.translate(memberName);
+            const auto problem = FilenamePolicy::validateHostName(hostName);
+            if (!problem.isEmpty()) {
+                QMessageBox::warning(dialog, "Cannot export member", problem);
+                return;
+            }
+            const auto directory = settings->value("exports/directory", QDir::homePath()).toString();
+            const QString caption = stream
+                ? QString("Export member (%1)").arg(stream->currentText())
+                : QString("Export archive member");
+            const auto destination = QFileDialog::getSaveFileName(dialog, caption,
+                QDir(directory).filePath(hostName), "All files (*)");
+            if (destination.isEmpty()) return;
+            const QFileInfo info(destination);
+            if (info.isSymLink() || (info.exists() && !info.isFile()) ||
+                !FilenamePolicy::validateHostName(info.fileName()).isEmpty()) {
+                QMessageBox::warning(dialog, "Cannot export member", "Choose a valid regular file destination.");
+                return;
+            }
+            const auto &payload = activeBytes();
+            QSaveFile output(destination);
+            if (!output.open(QIODevice::WriteOnly) || output.write(payload) != payload.size() || !output.commit()) {
+                QMessageBox::warning(dialog, "Cannot export member", output.errorString());
+                return;
+            }
+            settings->setValue("exports/directory", info.absolutePath());
+        });
+    }
     controls->addStretch();
     controls->addWidget(buttons);
     layout->addLayout(controls);
@@ -1793,7 +1831,7 @@ QJsonArray Window::exportEntries(bool wholeArea) const {
     }
     return entries;
 }
-void Window::exportFlat(const QJsonArray &entries, const QString &directory) {
+void Window::exportFlat(const QJsonArray &entries, const QString &directory, const QSet<QString> &textFiles) {
     auto staging = std::make_shared<QTemporaryDir>();
     if (!staging->isValid()) return;
     ExportPlan plan;
@@ -1804,6 +1842,7 @@ void Window::exportFlat(const QJsonArray &entries, const QString &directory) {
         item.name = entry["name"].toString();
         item.size = entry["size"].toInteger();
         item.destination = staging->filePath(QString::number(plan.items.size()));
+        item.text = textFiles.contains(item.name);
         plan.items.append(item);
     }
     connect(this, &Window::completed, this, [this, staging, plan, directory](bool ok) {
@@ -1901,11 +1940,37 @@ void Window::chooseBatch(bool wholeArea) {
     const auto title = allAreas ? QString("Export all user areas") :
         wholeArea ? QString("Export user area %1").arg(area) :
         QString("Export %1 selected file(s)").arg(entries.size());
+    QSet<QString> textFiles;
+    if (!entries.isEmpty()) {
+        QDialog review(this);
+        review.setObjectName("batchTextExportReview");
+        review.setWindowTitle("Review text conversion");
+        auto *layout = new QVBoxLayout(&review);
+        layout->addWidget(new QLabel("Check the files to convert to text. Unchecked files keep their original bytes."));
+        auto *files = new QListWidget;
+        files->setObjectName("batchTextExportFiles");
+        for (const auto &value : entries) {
+            const auto name = value.toObject()["name"].toString();
+            auto *item = new QListWidgetItem(QString("%1 (user %2)").arg(name.mid(2)).arg(name.left(2).toInt()), files);
+            item->setData(Qt::UserRole, name);
+            item->setCheckState(Qt::Unchecked);
+        }
+        layout->addWidget(files);
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        connect(buttons, &QDialogButtonBox::accepted, &review, &QDialog::accept);
+        connect(buttons, &QDialogButtonBox::rejected, &review, &QDialog::reject);
+        layout->addWidget(buttons);
+        if (review.exec() != QDialog::Accepted) return;
+        for (int row = 0; row < files->count(); ++row) {
+            const auto *item = files->item(row);
+            if (item->checkState() == Qt::Checked) textFiles.insert(item->data(Qt::UserRole).toString());
+        }
+    }
     while(true) {
         const auto directory = QFileDialog::getExistingDirectory(this, title, previous);
         if(directory.isEmpty()) return;
         previous=directory;
-        if (!wholeArea && userAreas->currentRow() == 0) { exportFlat(entries, directory); return; }
+        if (!wholeArea && userAreas->currentRow() == 0) { exportFlat(entries, directory, textFiles); return; }
         auto plan = planExport(entries, directory, area, filenamePolicy, allAreas);
         if(!plan.error.isEmpty()) { QMessageBox::warning(this,"Cannot export",plan.error);return; }
         bool skip=false;
@@ -1920,6 +1985,7 @@ void Window::chooseBatch(bool wholeArea) {
             skip=true;
         }
         settings->setValue("exports/directory",directory);
+        for (auto &item : plan.items) item.text = textFiles.contains(item.name);
         startBatch(plan,skip); return;
     }
 }
@@ -1969,7 +2035,7 @@ void Window::nextBatchFile() {
     }
     batchInFlight=true;
     const auto &item=batch.items[batchIndex];
-    begin({{"op","export"},{"session",session},{"name",item.name},{"destination",item.destination}});
+    begin({{"op","export"},{"session",session},{"name",item.name},{"destination",item.destination},{"text",item.text}});
 }
 void Window::finishBatch() {
     if(!batchActive) return;
@@ -2265,7 +2331,10 @@ void Window::readReply() {
         showUserArea();
     } else {
         const double size = result["size"].toDouble(-1);
-        if(batchActive && size!=batch.items[batchIndex].size) { invalid();return; }
+        if (batchActive) {
+            const auto &item = batch.items[batchIndex];
+            if (size > item.size || (!item.text && size != item.size)) { invalid(); return; }
+        }
         if (size < 0 || size > 16777216 || std::floor(size) != size ||
             !hash.match(result["sha256"].toString()).hasMatch()) { invalid(); return; }
         exportDiagnostics=QString("Last completed export\nBytes: %1\nSHA-256: %2")

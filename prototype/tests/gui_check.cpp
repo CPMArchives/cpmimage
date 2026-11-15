@@ -544,6 +544,7 @@ private slots:
         bool visited=false;
         QTimer poll;poll.setInterval(25);
         connect(&poll,&QTimer::timeout,&window,[&]{
+            if (auto *review = window.findChild<QDialog *>("batchTextExportReview"); review && review->isVisible()) review->accept();
             if(auto *dialog=fileDialog()) { visited=true;dialog->setDirectory(output.path());QMetaObject::invokeMethod(dialog,"accept"); }
         });poll.start();
         window.findChild<QPushButton *>("toolbarExport")->click();QVERIFY(visited);
@@ -567,6 +568,7 @@ private slots:
         QString title;
         QTimer choose;
         connect(&choose, &QTimer::timeout, &window, [&] {
+            if (auto *review = window.findChild<QDialog *>("batchTextExportReview"); review && review->isVisible()) review->accept();
             if (auto *dialog = fileDialog()) {
                 title = dialog->windowTitle();
                 dialog->setDirectory(destination);
@@ -1067,7 +1069,7 @@ private slots:
         for (const auto &name : {QString("00NOTE.TXT"), QString("00EMPTY.TXT"), QString("00HIGH.TXT")}) {
             QFile payload(input);
             QVERIFY(payload.open(QIODevice::WriteOnly));
-            if (name.contains("NOTE")) QVERIFY(payload.write("Hello\r\nWorld\x1a ") > 0);
+            if (name.contains("NOTE")) QVERIFY(payload.write("Hello\r\nWorld\x1a stale final record bytes") > 0);
             if (name.contains("HIGH")) QCOMPARE(payload.write(QByteArray::fromHex("c8e9")), 2);
             payload.close();
             QProcess import;
@@ -1190,6 +1192,97 @@ private slots:
         QVERIFY(!window.windowTitle().endsWith('*'));
     }
 
+    void sigmPascalViewerAndBatchExport() {
+        const auto source = qEnvironmentVariable("CPMIMAGE_SIGM_062");
+        if (source.isEmpty()) QSKIP("Set CPMIMAGE_SIGM_062 to test the historical SIG/M image.");
+        QTemporaryDir scratch;
+        const auto image = scratch.filePath("sigm.raw");
+        QVERIFY(QFile::copy(source, image));
+        QFile imageFile(image);
+        QVERIFY(imageFile.open(QIODevice::ReadOnly));
+        const auto before = imageFile.readAll();
+        imageFile.close();
+        Window window(qEnvironmentVariable("CPMIMAGE_ROOT"), qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                      qEnvironmentVariable("CPMIMAGE_HELPER"), 30000, 2000, {}, scratch.filePath("settings.ini"));
+        window.show();
+        QSignalSpy done(&window, &Window::completed);
+        window.openImage(image, "ibm-3740", "raw");
+        QTRY_COMPARE(done.size(), 1);
+        QVERIFY(done.takeFirst().first().toBool());
+        auto *files = window.findChild<QTableWidget *>("fileList");
+        QVERIFY(files);
+        QStringList names{"DOCOMM.PAS", "DOTEXT.PAS", "CRCK.COM"};
+        for (const auto &name : names) {
+            const auto matches = files->findItems(name, Qt::MatchExactly);
+            QCOMPARE(matches.size(), 1);
+            window.activateWindow();
+            files->setFocus();
+            files->setCurrentCell(matches.first()->row(), 0);
+            QTRY_VERIFY(files->hasFocus());
+            QTest::keyClick(files, Qt::Key_V);
+            QTRY_VERIFY(window.findChild<QPlainTextEdit *>("filePreviewText"));
+            auto *view = window.findChild<QPlainTextEdit *>("filePreviewText");
+            const auto text = view->toPlainText();
+            if (name.endsWith(".PAS")) {
+                QVERIFY(!text.startsWith("00000000"));
+                QVERIFY(!text.contains(QChar(0x1a)));
+                QVERIFY(text.contains("KFORMAT", Qt::CaseInsensitive));
+            } else {
+                QTRY_VERIFY(view->toPlainText().startsWith("00000000"));
+            }
+            view->window()->close();
+            QTRY_VERIFY(!window.findChild<QPlainTextEdit *>("filePreviewText"));
+        }
+        done.clear();
+        files->clearSelection();
+        for (const auto &name : names) {
+            const auto row = files->findItems(name, Qt::MatchExactly).first()->row();
+            files->selectionModel()->select(files->model()->index(row, 0),
+                                           QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        }
+        QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, true);
+        QTimer chooser;
+        connect(&chooser, &QTimer::timeout, &window, [&] {
+            if (auto *review = window.findChild<QDialog *>("batchTextExportReview"); review && review->isVisible()) {
+                auto *choices = review->findChild<QListWidget *>("batchTextExportFiles");
+                for (int row = 0; row < choices->count(); ++row)
+                    if (choices->item(row)->text().contains(".PAS")) choices->item(row)->setCheckState(Qt::Checked);
+                review->accept();
+            }
+            if (auto *dialog = fileDialog()) {
+                dialog->setDirectory(scratch.path());
+                QMetaObject::invokeMethod(dialog, "accept");
+            }
+        });
+        chooser.start(25);
+        window.findChild<QPushButton *>("toolbarExport")->click();
+        chooser.stop();
+        QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, false);
+        QTRY_COMPARE(done.size(), 1);
+        QVERIFY2(done.takeFirst().first().toBool(), qPrintable(window.lastBatchReport() + window.lastError()));
+        // Reference hashes from standalone cpmcp, with -t for the Pascal sources.
+        const QStringList hashes{
+            "8fb58afdc3eccdc52dc39674185b6b2902381ce9c6716442372b325e1d1c8ced",
+            "645ee7b03e829789e4463160a0a0dc8357042ec89be1d61e7d650ebde52ed938",
+            "aa6960f95c1415476bcaebc5aae8ccd08a04e0509d4aa0724a4ffc265453f20f"
+        };
+        for (qsizetype index = 0; index < names.size(); ++index) {
+            const auto &name = names[index];
+            QFile exported(scratch.filePath(name));
+            QVERIFY(exported.open(QIODevice::ReadOnly));
+            const auto bytes = exported.readAll();
+            if (name.endsWith(".PAS")) {
+                QCOMPARE(bytes.size(), name == "DOCOMM.PAS" ? 4034 : 4712);
+                QVERIFY(!bytes.contains('\x1a'));
+                QVERIFY(!bytes.contains('\r'));
+            } else QCOMPARE(bytes.size(), 1280);
+            QCOMPARE(QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex()),
+                     hashes[index]);
+        }
+        QVERIFY(imageFile.open(QIODevice::ReadOnly));
+        QCOMPARE(imageFile.readAll(), before);
+    }
+
     void archiveViewer() {
         const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
         const auto helper = qEnvironmentVariable("CPMIMAGE_HELPER");
@@ -1291,6 +1384,41 @@ private slots:
         QTRY_VERIFY(opened("HELLO.TQT"));
         auto *memberText = opened("HELLO.TQT")->findChild<QPlainTextEdit *>("filePreviewText");
         QVERIFY(memberText);
+        auto *memberDialog = opened("HELLO.TQT");
+        auto *exportMember = memberDialog->findChild<QPushButton *>("exportArchiveMember");
+        auto *memberStream = memberDialog->findChild<QComboBox *>("previewStream");
+        QVERIFY(exportMember && memberStream);
+        QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, true);
+        for (int index : {0, 1}) {
+            memberStream->setCurrentIndex(index);
+            const auto destination = scratch.filePath(QString("export-%1").arg(index));
+            QTimer chooser;
+            connect(&chooser, &QTimer::timeout, this, [&] {
+                if (auto *dialog = fileDialog()) {
+                    auto *edit = dialog->findChild<QLineEdit *>("fileNameEdit");
+                    if (!edit) return;
+                    edit->setText(destination);
+                    QMetaObject::invokeMethod(dialog, "accept");
+                }
+            });
+            chooser.start(25);
+            exportMember->click();
+            chooser.stop();
+            QFile exported(destination), squeezed(scratch.filePath("sq"));
+            QVERIFY2(exported.open(QIODevice::ReadOnly), qPrintable(QDir(scratch.path()).entryList(QDir::Files).join(", ")));
+            QVERIFY(squeezed.open(QIODevice::ReadOnly));
+            QCOMPARE(exported.readAll(), index == 0 ? QByteArray("A") : squeezed.readAll());
+        }
+        const auto beforeCancel = QDir(scratch.path()).entryList();
+        QTimer cancelExport;
+        connect(&cancelExport, &QTimer::timeout, this, [] {
+            if (auto *dialog = fileDialog()) dialog->reject();
+        });
+        cancelExport.start(25);
+        exportMember->click();
+        cancelExport.stop();
+        QCOMPARE(QDir(scratch.path()).entryList(), beforeCancel);
+        QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, false);
         QTest::keyClick(memberText, Qt::Key_Escape);
         QTRY_VERIFY(!opened("HELLO.TQT"));
         QTRY_VERIFY(innerMembers->hasFocus());

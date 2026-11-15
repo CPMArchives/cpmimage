@@ -150,6 +150,14 @@ The initial release is focused on filesystem and image management, not disk pres
 
 Use V, Return, double-click, or View → View File to inspect one selected file in the current working image. Support ASCII and UTF-8 text with CP/M line endings and EOF padding, a labeled 1 MiB limit, and text selection and copy. Use T for Text/Hex and 7 for optional high-bit filtering in Text mode. Hex displays original bytes and adapts to the window width. Recognize and decode standalone SQ/CR and browse LBR/ARK, including nested members, in independent windows. Use Q and Z in the main file list to force SQ and CR. Qualify supported variants and surface raw fallback for unsupported data. File editing remains deferred.
 
+## v1.2 — Text export and archive-member extraction
+
+- Recognize Ctrl-Z in the final CP/M record of valid text even when leftover bytes follow it. Preserve the complete stream in Hex.
+- Allow explicit per-file text conversion when exporting selections, one user area, or All user areas. Preserve stored bytes by default.
+- Export one viewed LBR or ARK member at any nesting level using the selected original or decompressed byte stream and the viewer's existing limits.
+
+**Acceptance:** The SIG/M Pascal examples open as text, a binary fixture opens in Hex, mixed batches preserve unchecked file bytes, and exported archive members match their selected streams. Exports leave source images unchanged.
+
 ## Explicitly deferred beyond v1.0
 
 - Graphical `fsck.cpm`-style consistency checking and repair.
