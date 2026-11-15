@@ -24,6 +24,7 @@
 #include <QMessageBox>
 #include <memory>
 #include <QTextEdit>
+#include <QPlainTextEdit>
 
 static QFileDialog *fileDialog() {
     for (auto *w : QApplication::topLevelWidgets())
@@ -1053,6 +1054,80 @@ private slots:
         toolbar->click();
         QVERIFY(opened);
     }
+    void fileViewer() {
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        const auto helper = qEnvironmentVariable("CPMIMAGE_HELPER");
+        QTemporaryDir scratch;
+        QVERIFY(scratch.isValid());
+        const auto image = scratch.filePath("preview.raw");
+        QVERIFY(QFile::copy(root + "/fixtures/ibm3740-independent.raw", image));
+        QVERIFY(QFile::copy(root + "/fixtures/diskdefs", scratch.filePath("diskdefs")));
+        const auto input = scratch.filePath("input");
+        for (const auto &name : {QString("00NOTE.TXT"), QString("00EMPTY.TXT")}) {
+            QFile payload(input);
+            QVERIFY(payload.open(QIODevice::WriteOnly));
+            if (name.contains("NOTE")) QVERIFY(payload.write("Hello\r\nWorld\x1a") > 0);
+            payload.close();
+            QProcess import;
+            import.setWorkingDirectory(scratch.path());
+            import.start(helper, {"edit_import", image, "ibm-3740", "raw", name, input});
+            QVERIFY(import.waitForFinished());
+            QCOMPARE(import.exitCode(), 0);
+        }
+        QFile source(image);
+        QVERIFY(source.open(QIODevice::ReadOnly));
+        const auto before = source.readAll();
+        source.close();
+
+        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"), helper,
+                      30000, 2000, {}, scratch.filePath("settings.ini"));
+        window.show();
+        window.activateWindow();
+        QSignalSpy done(&window, &Window::completed);
+        window.openImage(image, "ibm-3740", "raw");
+        QTRY_COMPARE(done.size(), 1);
+        QVERIFY(done.takeFirst().first().toBool());
+        auto *table = window.findChild<QTableWidget *>("fileList");
+        auto *action = window.findChild<QAction *>("viewFileAction");
+        QVERIFY(table && action);
+        for (const auto &name : {QString("NOTE.TXT"), QString("EMPTY.TXT"), QString("BINARY.BIN")}) {
+            const auto matches = table->findItems(name, Qt::MatchExactly);
+            QCOMPARE(matches.size(), 1);
+            window.activateWindow();
+            table->setFocus();
+            table->selectRow(matches.first()->row());
+            QTRY_VERIFY(table->hasFocus());
+            QVERIFY(action->isEnabled());
+            if (name == "NOTE.TXT") QTest::keyClick(table, Qt::Key_V);
+            else if (name == "EMPTY.TXT") QTest::keyClick(table, Qt::Key_Return);
+            else {
+                const auto point = table->visualItemRect(matches.first()).center();
+                QTest::mouseClick(table->viewport(), Qt::LeftButton, Qt::NoModifier, point);
+                QTest::mouseDClick(table->viewport(), Qt::LeftButton, Qt::NoModifier, point);
+            }
+            QTRY_COMPARE(done.size(), 1);
+            QVERIFY(done.takeFirst().first().toBool());
+            QDialog *viewer = nullptr;
+            for (auto *dialog : window.findChildren<QDialog *>())
+                if (dialog->isVisible()) viewer = dialog;
+            QVERIFY(viewer);
+            QCOMPARE(viewer->windowTitle(), name + " · User area 0");
+            auto *text = viewer->findChild<QPlainTextEdit *>("filePreviewText");
+            if (name == "BINARY.BIN") {
+                QVERIFY(!text);
+            } else {
+                QVERIFY(text && text->isReadOnly());
+                QCOMPARE(text->toPlainText(), name == "NOTE.TXT" ? QString("Hello\nWorld") : QString());
+            }
+            viewer->close();
+            QTRY_VERIFY(table->hasFocus());
+            QCOMPARE(table->selectionModel()->selectedRows().first().row(), matches.first()->row());
+        }
+        QVERIFY(source.open(QIODevice::ReadOnly));
+        QCOMPARE(source.readAll(), before);
+        QVERIFY(!window.windowTitle().endsWith('*'));
+    }
+
 };
 QTEST_MAIN(GuiCheck)
 #include "gui_check.moc"

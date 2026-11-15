@@ -883,7 +883,7 @@ CP/M Image shall provide the following function-key assignments, subject to nati
 |---|---|
 | F1 | Open Help, context-sensitive where available |
 | F2 | Rename the selected file |
-| F3 | Reserved for a future file viewer; no 1.0 action |
+| F3 | Unassigned |
 | F4 | Open File Properties |
 | F5 | Refresh the current file listing |
 | F6 | Move the selected file(s) to another user area |
@@ -904,7 +904,7 @@ Standard application shortcuts shall be:
 | Ctrl/Cmd+Shift+A | Toggle Show All User Areas |
 | Delete | Delete selected files, with confirmation |
 
-Use Command on macOS and Control on Windows/Linux as appropriate. Do not override operating-system function-key or hardware-control behavior. Keyboard shortcuts, menus, context menus, and toolbar controls shall invoke the same underlying commands, with availability governed by current selection and image state. F3 is reserved rather than implemented as a viewer in 1.0.
+Use Command on macOS and Control on Windows/Linux as appropriate. Do not override operating-system function-key or hardware-control behavior. Keyboard shortcuts, menus, context menus, and toolbar controls shall invoke the same underlying commands, with availability governed by current selection and image state. In v1.1, V and Return in the file list, double-click, and View → View File open the selected file from the current working image, including unsaved changes. The viewer supports ASCII and UTF-8 text, limits reads to 1 MiB, and identifies truncated previews and unsupported data. Viewing leaves the filesystem and its dirty state unchanged.
 
 ### 10.8 Recent images
 

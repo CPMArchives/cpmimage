@@ -2,6 +2,7 @@
 #pragma once
 #include <QMainWindow>
 #include <functional>
+#include <memory>
 #include "filename_policy.h"
 #include "export_plan.h"
 #include <QJsonObject>
@@ -18,6 +19,7 @@ class QProgressBar;
 class QAction;
 class TransferFiles;
 
+class QTemporaryDir;
 class Window : public QMainWindow {
     Q_OBJECT
 public:
@@ -79,6 +81,12 @@ private:
     bool newImagePicker = false;
     bool unpublished = false;
     QJsonObject newDefinition, imageGeometry;
+    void viewFile();
+    void showFilePreview(bool truncated);
+    QAction *viewFileAction = nullptr;
+    QString previewName;
+    QWidget *previewPane = nullptr;
+    std::unique_ptr<QTemporaryDir> previewDirectory;
     void chooseExport();
     void chooseContextExport();
     void updateExportAction();
