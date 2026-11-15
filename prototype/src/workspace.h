@@ -13,6 +13,7 @@
 #include <QMimeData>
 #include <QFileInfo>
 #include <QSettings>
+#include <QScopedValueRollback>
 #include <utility>
 
 class Workspace : public QMainWindow {
@@ -100,10 +101,11 @@ public:
         connect(page, &Window::sessionClosed, this, [this, page] {
             tabs->removeTab(tabs->indexOf(page));
             page->deleteLater();
-            if (!tabs->count()) QTimer::singleShot(0, this, [this] {
-                if (!tabs->count()) close();
+            if (!closingWorkspace && !tabs->count()) QTimer::singleShot(0, this, [this] {
+                if (!tabs->count() && isVisible()) addSession();
             });
         });
+        connect(page, &Window::newImageRequested, this, [this] { addSession().createImage(); });
         connect(page, &Window::imagePicked, this, [this](const QString &path) { openPath(path); });
         connect(page, &Window::imageOpened, this, [this, page](const QString &path) {
             page->setProperty("imagePath", path);
@@ -130,6 +132,7 @@ protected:
         }
     }
     void closeEvent(QCloseEvent *event) override {
+        QScopedValueRollback<bool> closing(closingWorkspace, true);
         while (tabs->count()) {
             auto *page = tabs->currentWidget();
             if (!page->close()) { event->ignore(); return; }
@@ -184,6 +187,7 @@ private:
     }
     RuntimePaths runtime;
     QTabWidget *tabs = new QTabWidget;
+    bool closingWorkspace = false;
     QAction *newTabAction = nullptr;
     QAction *closeTabAction = nullptr;
     QMenu *recentImages = nullptr;

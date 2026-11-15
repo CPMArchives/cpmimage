@@ -2,6 +2,8 @@
 #include <QDateTime>
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "window.h"
+#include <QMetaMethod>
+#include <QLocale>
 #include <QCryptographicHash>
 #include <algorithm>
 #include <utility>
@@ -326,6 +328,11 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     status->setTextInteractionFlags(Qt::TextSelectableByMouse);
     auto *statusRow=new QHBoxLayout;
     statusRow->addWidget(status,1);
+    diskSpace = new QLabel;
+    diskSpace->setObjectName("diskSpace");
+    diskSpace->setToolTip("Free and total CP/M filesystem space across all user areas.");
+    diskSpace->hide();
+    statusRow->addWidget(diskSpace);
     statusRow->addWidget(cancelButton);
     progress=new QProgressBar; progress->setObjectName("exportProgress"); progress->hide();
     layout->addWidget(progress);
@@ -358,12 +365,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     connect(openAction,&QAction::triggered,openButton,&QPushButton::click);
     auto *newAction = fileMenu->addAction("New Image…");
     newAction->setShortcut(QKeySequence::New);
-    connect(newAction, &QAction::triggered, this, [this, newAction] {
-        if (busy || !resolveEdits([newAction] { newAction->trigger(); })) return;
-        newImagePicker = true;
-        if (catalogueRows.isEmpty()) loadCatalogue(cataloguePath);
-        else chooseFormat({}, false);
-    });
+    connect(newAction, &QAction::triggered, this, &Window::createImage);
     connect(fileMenu->addAction("Format Image…"), &QAction::triggered, this, [this] {
         if (busy || session.isEmpty()) return;
         const auto answer = QMessageBox::warning(this, "Format working image",
@@ -556,6 +558,7 @@ void Window::resetImage() {
     dirty = false; writeConfirmed = false; unpublished = false;
     session.clear(); image.clear(); directoryEntries = {}; imageNote.clear();
     snapshotHash.clear(); exportDiagnostics.clear();
+    diskSpace->hide();
     { QSignalBlocker block(userAreas); userAreas->setCurrentItem(nullptr); userAreas->clearSelection(); }
     // Selection callbacks can enter widget/accessibility code while rows are being
     // removed. Clear selection before deleting items and notify only after reset.
@@ -862,6 +865,18 @@ bool Window::resolveEdits(std::function<void()> next) {
     }
     return false;
 }
+void Window::createImage() {
+    if (busy) return;
+    if (!session.isEmpty() && isSignalConnected(QMetaMethod::fromSignal(&Window::newImageRequested))) {
+        emit newImageRequested();
+        return;
+    }
+    if (!resolveEdits([this] { createImage(); })) return;
+    newImagePicker = true;
+    if (catalogueRows.isEmpty()) loadCatalogue(cataloguePath);
+    else chooseFormat({}, false);
+}
+
 void Window::chooseImage() {
     if (receivers(SIGNAL(imagePicked(QString))) && (!session.isEmpty() || busy)) {
         const auto path = QFileDialog::getOpenFileName(this, "Open CP/M image", image,
@@ -1112,6 +1127,17 @@ void Window::showUserArea() {
     if (table->rowCount() && currentArea >= 0) table->selectRow(0);
     setBusy(busy); updateSelectionStatus();
 }
+void Window::updateDiskSpace(const QJsonObject &result) {
+    const auto free = result["free_bytes"].toInteger(-1);
+    const auto total = result["total_bytes"].toInteger(-1);
+    diskSpace->setVisible(free >= 0 && total >= free);
+    if (free >= 0 && total >= free) {
+        diskSpace->setText(QString("%1/%2 KiB free")
+            .arg(QLocale().toString(free / 1024.0, 'f', free % 1024 ? 1 : 0),
+                 QLocale().toString(total / 1024.0, 'f', total % 1024 ? 1 : 0)));
+    }
+}
+
 void Window::updateSelectionStatus() {
     if (busy || session.isEmpty() || !userAreas->currentItem()) return;
     const auto rows = table->selectionModel()->selectedRows();
@@ -1700,6 +1726,7 @@ void Window::readReply() {
         if (operation == "edit" || operation == "discard" || operation == "systems_import") writeConfirmed = dirty;
         if (result["entries"].isArray()) {
             directoryEntries = result["entries"].toArray();
+            updateDiskSpace(result);
             updateUserAreas();
             if (!userAreas->currentItem() && !session.isEmpty()) userAreas->setCurrentRow(1);
             showUserArea();
@@ -1807,6 +1834,7 @@ void Window::readReply() {
         }
         session = result["session"].toString();
         directoryEntries = rows;
+        updateDiskSpace(result);
         const auto tail = result["unused_tail_filled"];
         if (!tail.isUndefined() && !tail.isBool()) { invalid(); return; }
         imageNote = tail.toBool() ? "Unused image tail filled with E5 in the temporary snapshot; original unchanged." : "None.";
