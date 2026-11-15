@@ -80,6 +80,10 @@ private:
     bool unpublished = false;
     QJsonObject newDefinition, imageGeometry;
     void chooseExport();
+    void chooseContextExport();
+    void updateExportAction();
+    QWidget *exportPane = nullptr;
+    QAction *exportAction = nullptr;
     void editFilenameSettings();
     void chooseBatch(bool wholeArea);
     QJsonArray exportEntries(bool wholeArea) const;
@@ -113,8 +117,8 @@ private:
     QString imageNote, imdComment;
     FilenamePolicy filenamePolicy;
     QSettings *settings;
-    QPushButton *areaExportButton, *reportButton, *imageInfoButton;
-    QAction *imageInfoAction;
+    QPushButton *reportButton, *imageInfoButton;
+    QAction *openAction, *imageInfoAction;
     QString snapshotHash, exportDiagnostics;
     QProgressBar *progress;
     ExportPlan batch;

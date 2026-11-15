@@ -10,8 +10,8 @@ struct ExportItem {
 struct ExportPlan {
     QString directory, error;
     QList<ExportItem> items;
-    QStringList conflicts;
+    QStringList conflicts, areaDirectories;
 };
 // Planning never creates folders or files. An area >= 0 adds a numbered folder.
 ExportPlan planExport(const QJsonArray &entries, const QString &destination,
-                      int area, const FilenamePolicy &policy);
+                      int area, const FilenamePolicy &policy, bool allAreas = false);

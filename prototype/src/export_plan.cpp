@@ -4,11 +4,26 @@
 #include <QFileInfo>
 #include <QSet>
 #include <QJsonObject>
-ExportPlan planExport(const QJsonArray &entries,const QString &destination,int area,const FilenamePolicy &policy) {
+ExportPlan planExport(const QJsonArray &entries,const QString &destination,int area,const FilenamePolicy &policy, bool allAreas) {
     ExportPlan plan;
     const QFileInfo parent(destination);
     if (!parent.isDir() || area < -1 || area > 15) { plan.error="Choose an existing destination folder."; return plan; }
     plan.directory=area<0?parent.absoluteFilePath():QDir(parent.absoluteFilePath()).filePath(QString::number(area));
+    if (allAreas) {
+        for (int user = 0; user < 16; ++user) {
+            QJsonArray files;
+            for (const auto &value : entries)
+                if (value.toObject()["name"].toString().left(2).toInt() == user)
+                    files.append(value);
+            if (files.isEmpty()) continue;
+            auto userPlan = planExport(files, plan.directory, user, policy);
+            if (!userPlan.error.isEmpty()) return userPlan;
+            plan.areaDirectories.append(userPlan.directory);
+            plan.items.append(userPlan.items);
+            plan.conflicts.append(userPlan.conflicts);
+        }
+        return plan;
+    }
     const QFileInfo folder(plan.directory);
     if (area>=0 && (folder.isSymLink() || (folder.exists() && !folder.isDir()))) {
         plan.error="The numbered user-area destination must be a folder, not a file or symbolic link."; return plan;
