@@ -146,9 +146,9 @@ Publish the completed, qualified cross-platform CP/M disk-image file manager aga
 
 The initial release is focused on filesystem and image management, not disk preservation or forensic editing.
 
-## v1.1 — Read-only text viewer
+## v1.1 — Read-only file viewer
 
-Use V, Return, double-click, or View → View File to inspect one selected file in the current working image. Support ASCII and UTF-8 text with CP/M line endings and EOF padding, a labeled 1 MiB limit, and text selection and copy. Hex viewing and editing remain deferred.
+Use V, Return, double-click, or View → View File to inspect one selected file in the current working image. Support ASCII and UTF-8 text with CP/M line endings and EOF padding, a labeled 1 MiB limit, and text selection and copy. Use T for Text/Hex and 7 for optional high-bit filtering in Text mode. Hex displays original bytes and adapts to the window width. Recognize and decode standalone SQ/CR and browse LBR/ARK, including nested members, in independent windows. Use Q and Z in the main file list to force SQ and CR. Qualify supported variants and surface raw fallback for unsupported data. File editing remains deferred.
 
 ## Explicitly deferred beyond v1.0
 

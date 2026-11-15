@@ -34,7 +34,8 @@ py=a.python_runtime or ROOT/'windows-runtime/offline-media/CPMImageTests/python'
 for name in ['python.exe','python3.dll','python313.dll','python313.zip','python313._pth','LICENSE.txt','_ctypes.pyd','libffi-8.dll','select.pyd','unicodedata.pyd']:
  shutil.copy2(py/name,runtime/name)
 for f in crt.glob('vcruntime*.dll'):shutil.copy2(f,runtime)
-for rel in ['prototype/broker.py','prototype/catalogue.py','prototype/container_mapping.py','prototype/publication.py','prototype/source_ownership.py','prototype/helper_guard.py','experiments/process-comparison/adapters.py','experiments/process-comparison/windows_supervisor.py','fixtures/diskdefs','fixtures/diskdefs-metadata.json']:
+archive_codecs = sorted(str(path.relative_to(ROOT)) for path in (ROOT/'prototype/archive_codecs').iterdir() if path.is_file())
+for rel in ['prototype/archive_view.py', 'prototype/broker.py','prototype/catalogue.py','prototype/container_mapping.py','prototype/publication.py','prototype/source_ownership.py','prototype/helper_guard.py','experiments/process-comparison/adapters.py','experiments/process-comparison/windows_supervisor.py','fixtures/diskdefs','fixtures/diskdefs-metadata.json'] + archive_codecs:
  dst=out/'resources/cpmimage'/rel;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(ROOT/rel,dst)
 install_utilities(out/'cpmtools', 'windows')
 create(out/'notices','windows')
