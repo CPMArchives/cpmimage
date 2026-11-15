@@ -171,16 +171,13 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     formats = new QPushButton("Choose format…");
     formats->setObjectName("chooseFormat");
 
-    openButton = new QPushButton("Open image…");
-    exportButton = new QPushButton("Export selected…");
-    areaExportButton = new QPushButton("Export user area…");
-    areaExportButton->setObjectName("exportUserArea");
+    openButton = new QPushButton("Open Image…");
+    exportButton = new QPushButton("Export…");
+    exportButton->setObjectName("toolbarExport");
+    exportButton->setToolTip("Export… (X)");
     cancelButton = new QPushButton("Cancel");
     cancelButton->setObjectName("cancelOperation");
-    openButton->setShortcut(QKeySequence::Open);
-    exportButton->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
     openButton->setToolTip("Open image (Ctrl+O / Command+O)");
-    exportButton->setToolTip("Export selected (Ctrl+E / Command+E)");
     auto *newButton = new QPushButton("New");
     newButton->setObjectName("toolbarNew");
     auto *saveButton = new QPushButton("Save");
@@ -190,7 +187,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     for (const auto &[button, icon] : {
              std::pair{openButton, "open"}, std::pair{newButton, "new"},
              std::pair{saveButton, "save"}, std::pair{importButton, "import"},
-             std::pair{exportButton, "export"}, std::pair{areaExportButton, "export-area"}}) {
+             std::pair{exportButton, "export"}}) {
         button->setAccessibleName(button->text());
         if (button->toolTip().isEmpty()) button->setToolTip(button->text());
         button->setIcon(QIcon(QString(":/icons/toolbar/%1.png").arg(icon)));
@@ -205,7 +202,6 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     toolbar->addWidget(saveButton);
     toolbar->addWidget(importButton);
     toolbar->addWidget(exportButton);
-    toolbar->addWidget(areaExportButton);
     layout->addWidget(toolbarWidget);
     toolbar->addStretch();
 
@@ -278,6 +274,13 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     header->setSectionsMovable(true);
     header->moveSection(header->visualIndex(4), 1);
     for (int column : {3, 5, 6, 7}) table->hideColumn(column);
+    table->setTabKeyNavigation(false);
+    for (auto *pane : {static_cast<QAbstractItemView *>(userAreas),
+                       static_cast<QAbstractItemView *>(table)}) {
+        pane->installEventFilter(this);
+        pane->setStyleSheet("QAbstractItemView { border: 2px solid transparent; }"
+                            "QAbstractItemView:focus { border-color: palette(highlight); }");
+    }
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setSelectionMode(QAbstractItemView::ExtendedSelection);
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -341,27 +344,29 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     statusRow->addWidget(reportButton);
     layout->addLayout(statusRow);
     connect(reportButton,&QPushButton::clicked,this,&Window::showExportReport);
-    connect(areaExportButton,&QPushButton::clicked,this,[this]{chooseBatch(true);});
     table->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(table,&QTableWidget::customContextMenuRequested,this,[this](const QPoint &point){
         if(busy || session.isEmpty()) return;
         const auto *item=table->itemAt(point);
         if(item && !item->isSelected()) table->selectRow(item->row());
-        QMenu menu; auto *action=menu.addAction("Export selected…");
+        QMenu menu; auto *action=menu.addAction("Export…");
         action->setEnabled(!table->selectionModel()->selectedRows().isEmpty());
-        if(menu.exec(table->viewport()->mapToGlobal(point))==action) chooseExport();
+        table->setFocus(Qt::MouseFocusReason);
+        if(menu.exec(table->viewport()->mapToGlobal(point))==action) exportAction->trigger();
     });
     userAreas->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(userAreas,&QListWidget::customContextMenuRequested,this,[this](const QPoint &point){
         if(busy || session.isEmpty()) return;
-        auto *item=userAreas->itemAt(point); if(!item || userAreas->row(item) == 0) return;
+        auto *item=userAreas->itemAt(point); if(!item) return;
         userAreas->setCurrentItem(item);
-        QMenu menu; auto *action=menu.addAction("Export user area…");
-        if(menu.exec(userAreas->viewport()->mapToGlobal(point))==action) chooseBatch(true);
+        userAreas->setFocus(Qt::MouseFocusReason);
+        QMenu menu; auto *action=menu.addAction("Export…");
+        if(menu.exec(userAreas->viewport()->mapToGlobal(point))==action) exportAction->trigger();
     });
     auto *fileMenu=new QMenu("File",this);
     menuBar()->insertMenu(preferences->menuAction(),fileMenu);
-    auto *openAction=fileMenu->addAction("Open image…");
+    openAction = fileMenu->addAction("Open Image…");
+    openAction->setShortcut(QKeySequence::Open);
     connect(openAction,&QAction::triggered,openButton,&QPushButton::click);
     auto *newAction = fileMenu->addAction("New Image…");
     newAction->setShortcut(QKeySequence::New);
@@ -446,19 +451,17 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         if (accepted && comment != imdComment)
             begin({{"op","imd_comment"},{"session",session},{"comment",comment}});
     });
-    auto *exportAction=fileMenu->addAction("Export selected…");
-    connect(exportAction,&QAction::triggered,exportButton,&QPushButton::click);
-    auto *areaAction=fileMenu->addAction("Export user area…");
-    connect(areaAction,&QAction::triggered,areaExportButton,&QPushButton::click);
+    exportAction = fileMenu->addAction("Export…");
+    exportAction->setObjectName("exportAction");
+    connect(exportAction, &QAction::triggered, this, &Window::chooseContextExport);
     fileMenu->addSeparator();
     imageInfoAction=fileMenu->addAction("Image information…");
     imageInfoAction->setObjectName("imageInformationAction");
     connect(imageInfoAction,&QAction::triggered,this,&Window::showImageInformation);
     connect(imageInfoButton,&QPushButton::clicked,this,&Window::showImageInformation);
-    connect(fileMenu,&QMenu::aboutToShow,this,[=]{openAction->setEnabled(openButton->isEnabled());exportAction->setEnabled(exportButton->isEnabled());areaAction->setEnabled(areaExportButton->isEnabled());});
     setCentralWidget(central);
     connect(openButton, &QPushButton::clicked, this, &Window::chooseImage);
-    connect(exportButton, &QPushButton::clicked, this, &Window::chooseExport);
+    connect(exportButton, &QPushButton::clicked, exportAction, &QAction::trigger);
     connect(cancelButton, &QPushButton::clicked, this, &Window::cancel);
     connect(table, &QTableWidget::itemSelectionChanged, this, [this] {
         setBusy(busy); updateSelectionStatus();
@@ -578,6 +581,7 @@ void Window::resetImage() {
 void Window::setBusy(bool value) {
     busy = value;
     openButton->setEnabled(!busy);
+    openAction->setEnabled(!busy);
     findChild<QPushButton *>("toolbarNew")->setEnabled(!busy);
     for (const auto *name : {"toolbarSave", "toolbarImport"})
         findChild<QPushButton *>(name)->setEnabled(!busy && !session.isEmpty());
@@ -588,10 +592,7 @@ void Window::setBusy(bool value) {
     userAreas->setEnabled(!busy && !session.isEmpty());
     showAllAction->setEnabled(userAreas->isEnabled());
     showAllAction->setChecked(userAreas->currentRow() == 0);
-    const int selected = table->selectionModel()->selectedRows().size();
-    exportButton->setEnabled(!busy && !session.isEmpty() && selected > 0);
-    exportButton->setToolTip("Export selected (Ctrl+E / Command+E)");
-    areaExportButton->setEnabled(!busy && !session.isEmpty() && userAreas->currentRow() > 0);
+    updateExportAction();
     cancelButton->setEnabled(busy);
     cancelButton->setVisible(busy);
     imageInfoButton->setEnabled(!busy && !session.isEmpty());
@@ -1211,6 +1212,20 @@ void Window::editFilenameSettings() {
     connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
     refresh();dialog.exec();
 }
+void Window::updateExportAction() {
+    const bool available = !busy && !session.isEmpty() &&
+        ((exportPane == userAreas && userAreas->currentItem()) ||
+         (exportPane == table && !table->selectionModel()->selectedRows().isEmpty()));
+    exportAction->setEnabled(available);
+    exportButton->setEnabled(available);
+}
+
+void Window::chooseContextExport() {
+    if (!exportAction->isEnabled()) return;
+    if (exportPane == userAreas) chooseBatch(true);
+    else if (exportPane == table) chooseExport();
+}
+
 void Window::chooseExport() {
     const auto selected = table->selectionModel()->selectedRows();
     if (busy || session.isEmpty() || selected.isEmpty()) return;
@@ -1221,7 +1236,7 @@ void Window::chooseExport() {
     const QString hostName = selectedExportName(&problem);
     if (!problem.isEmpty()) { status->setText(problem); return; }
     const QString suggested = QDir(directory).filePath(hostName);
-    const auto destination = QFileDialog::getSaveFileName(this, "Export file", suggested,
+    const auto destination = QFileDialog::getSaveFileName(this, "Export 1 selected file", suggested,
         "All files (*)", nullptr, QFileDialog::DontConfirmOverwrite);
     if (!destination.isEmpty()) {
         settings->setValue("exports/directory",QFileInfo(destination).absolutePath());
@@ -1349,6 +1364,29 @@ void Window::offerFiles(bool drag, bool cut) {
 }
 
 bool Window::eventFilter(QObject *watched, QEvent *event) {
+    if ((watched == userAreas || watched == table) && event->type() == QEvent::FocusIn) {
+        exportPane = static_cast<QWidget *>(watched);
+        updateExportAction();
+    }
+    if ((watched == userAreas || watched == table) &&
+        event->type() == QEvent::KeyPress && QApplication::focusWidget() == watched) {
+        const auto *key = static_cast<QKeyEvent *>(event);
+        if (key->key() == Qt::Key_X && key->modifiers() == Qt::NoModifier) {
+            exportAction->trigger();
+            return true;
+        }
+        const bool forward = key->key() == Qt::Key_Tab && key->modifiers() == Qt::NoModifier;
+        const bool backward = (key->key() == Qt::Key_Backtab ||
+                               (key->key() == Qt::Key_Tab && key->modifiers() == Qt::ShiftModifier)) &&
+                              !(key->modifiers() & ~Qt::ShiftModifier);
+        if (forward || backward) {
+            auto *other = watched == table ? static_cast<QWidget *>(userAreas) : table;
+            if (other->isEnabled() && other->isVisible()) {
+                other->setFocus(forward ? Qt::TabFocusReason : Qt::BacktabFocusReason);
+                return true;
+            }
+        }
+    }
     if (watched == table->viewport() || watched == userAreas->viewport()) {
         if (event->type() == QEvent::DragEnter || event->type() == QEvent::DragMove) {
             auto *drag = static_cast<QDropEvent *>(event);
@@ -1502,17 +1540,21 @@ void Window::exportFlat(const QJsonArray &entries, const QString &directory) {
 
 void Window::chooseBatch(bool wholeArea) {
     if(busy || session.isEmpty() || !userAreas->currentItem()) return;
-    const auto entries=exportEntries(wholeArea);
+    const bool allAreas = wholeArea && userAreas->currentRow() == 0;
+    const auto entries = allAreas ? directoryEntries : exportEntries(wholeArea);
     if(!wholeArea && entries.isEmpty()) return;
     QString previous=settings->value("exports/directory",QStandardPaths::writableLocation(QStandardPaths::DownloadLocation)).toString();
     if(!QDir(previous).exists()) previous=QDir::homePath();
+    const int area = wholeArea && !allAreas ? userAreas->currentItem()->data(Qt::UserRole).toInt() : -1;
+    const auto title = allAreas ? QString("Export all user areas") :
+        wholeArea ? QString("Export user area %1").arg(area) :
+        QString("Export %1 selected file(s)").arg(entries.size());
     while(true) {
-        const auto directory=QFileDialog::getExistingDirectory(this,wholeArea ? "Export user area" : "Export selected files",previous);
+        const auto directory = QFileDialog::getExistingDirectory(this, title, previous);
         if(directory.isEmpty()) return;
         previous=directory;
         if (!wholeArea && userAreas->currentRow() == 0) { exportFlat(entries, directory); return; }
-        const int area=wholeArea?userAreas->currentItem()->data(Qt::UserRole).toInt():-1;
-        auto plan=planExport(entries,directory,area,filenamePolicy);
+        auto plan = planExport(entries, directory, area, filenamePolicy, allAreas);
         if(!plan.error.isEmpty()) { QMessageBox::warning(this,"Cannot export",plan.error);return; }
         bool skip=false;
         if(!plan.conflicts.isEmpty()) {
@@ -1547,6 +1589,14 @@ void Window::startBatch(ExportPlan plan,bool skipExisting) {
     }
     if(!QDir(plan.directory).exists() && !QDir().mkdir(plan.directory)) {
         error="Cannot create the numbered user-area folder."; status->setText(error);emit completed(false);return;
+    }
+    for (const auto &folder : plan.areaDirectories) {
+        if (!QDir(folder).exists() && !QDir().mkdir(folder)) {
+            error = "Cannot create the numbered user-area folder.";
+            status->setText(error);
+            emit completed(false);
+            return;
+        }
     }
     error.clear();
     batch=plan; batchIndex=0; batchActive=true; batchInFlight=false; batchCancelRequested=false;

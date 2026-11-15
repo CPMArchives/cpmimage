@@ -528,12 +528,23 @@ private slots:
         Window window(root,qEnvironmentVariable("CPMIMAGE_PYTHON","python3"),qEnvironmentVariable("CPMIMAGE_HELPER"),30000,2000,{},config.filePath("settings.ini"));
         window.show();QSignalSpy done(&window,&Window::completed);
         window.openImage(root+"/fixtures/ibm3740-independent.raw","ibm-3740","raw");QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());
+        auto *areas = window.findChild<QListWidget *>("userAreas");
+        auto *files = window.findChild<QTableWidget *>("fileList");
+        auto *action = window.findChild<QAction *>("exportAction");
+        QVERIFY(areas && files && action);
+        window.activateWindow();
+        files->setFocus();
+        QTRY_VERIFY(files->hasFocus());
+        files->clearSelection();
+        QVERIFY(!action->isEnabled());
+        areas->setFocus();
+        QTRY_VERIFY(action->isEnabled());
         bool visited=false;
         QTimer poll;poll.setInterval(25);
         connect(&poll,&QTimer::timeout,&window,[&]{
             if(auto *dialog=fileDialog()) { visited=true;dialog->setDirectory(output.path());QMetaObject::invokeMethod(dialog,"accept"); }
         });poll.start();
-        window.findChild<QPushButton *>("exportUserArea")->click();QVERIFY(visited);
+        window.findChild<QPushButton *>("toolbarExport")->click();QVERIFY(visited);
         if(done.isEmpty()) QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());poll.stop();
         QVERIFY(QFile::exists(output.filePath("0/BINARY.BIN")));
         QSettings settings(config.filePath("settings.ini"),QSettings::IniFormat);
@@ -546,9 +557,48 @@ private slots:
                 for(auto *button:box->buttons()) if(button->text()=="Skip existing") { button->click();break; }
             }
         });poll.start();
-        window.findChild<QPushButton *>("exportUserArea")->click();
+        window.findChild<QPushButton *>("toolbarExport")->click();
         if(done.isEmpty()) QVERIFY(done.wait(15000));QVERIFY(done.takeFirst()[0].toBool());poll.stop();
         QVERIFY(conflict);QVERIFY(window.lastBatchReport().contains("1 skipped"));
+        QTemporaryDir all, selected;
+        auto destination = all.path();
+        QString title;
+        QTimer choose;
+        connect(&choose, &QTimer::timeout, &window, [&] {
+            if (auto *dialog = fileDialog()) {
+                title = dialog->windowTitle();
+                dialog->setDirectory(destination);
+                if (dialog->acceptMode() == QFileDialog::AcceptSave)
+                    dialog->selectFile(destination + "/BINARY.BIN");
+                QMetaObject::invokeMethod(dialog, "accept");
+            }
+        });
+        areas->setCurrentRow(0);
+        window.activateWindow();
+        areas->setFocus();
+        QTRY_VERIFY(areas->hasFocus());
+        choose.start(25);
+        QTest::keyClick(areas, Qt::Key_X);
+        choose.stop();
+        QCOMPARE(title, QString("Export all user areas"));
+        QTRY_VERIFY(!done.isEmpty());
+        QVERIFY(done.takeFirst()[0].toBool());
+        QVERIFY(QFile::exists(all.filePath("0/BINARY.BIN")));
+        QVERIFY(QDir(all.path()).entryList(QDir::Dirs | QDir::NoDotAndDotDot).size() > 1);
+
+        areas->setCurrentRow(1);
+        window.activateWindow();
+        files->setFocus();
+        QTRY_VERIFY(files->hasFocus());
+        window.selectEntry(0);
+        destination = selected.path();
+        choose.start(25);
+        action->trigger();
+        choose.stop();
+        QCOMPARE(title, QString("Export 1 selected file"));
+        QTRY_VERIFY(!done.isEmpty());
+        QVERIFY(done.takeFirst()[0].toBool());
+        QCOMPARE(QDir(selected.path()).entryList(QDir::Files), QStringList{"BINARY.BIN"});
         QApplication::setAttribute(Qt::AA_DontUseNativeDialogs,false);
     }
 
@@ -731,7 +781,7 @@ private slots:
         QCOMPARE(files->selectionModel()->selectedRows().size(),3);
         QVERIFY(status->text().contains("3 of 3 files selected · 1536 bytes"));
         QPushButton *exportButton=nullptr;
-        for(auto *button:window.findChildren<QPushButton *>()) if(button->accessibleName().startsWith("Export selected")) exportButton=button;
+        for(auto *button:window.findChildren<QPushButton *>()) if(button->objectName() == "toolbarExport") exportButton=button;
         QVERIFY(exportButton); QVERIFY(exportButton->isEnabled());
         window.exportFile(temp.filePath("must-not-export.bin"));
         QVERIFY(done.isEmpty()); QVERIFY(!QFile::exists(temp.filePath("must-not-export.bin")));
@@ -805,6 +855,10 @@ private slots:
         watchdog.stop();
         if (done.isEmpty()) QVERIFY(done.wait(30000));
         QVERIFY(done.takeFirst()[0].toBool()); QCOMPARE(window.entryCount(),1);
+        window.activateWindow();
+        auto *files = window.findChild<QTableWidget *>("fileList");
+        files->setFocus();
+        QTRY_VERIFY(files->hasFocus());
         const auto output = config.filePath("dialog export.bin");
         QString selectedOutput;
         visited = false;
@@ -906,6 +960,98 @@ private slots:
         if (done.isEmpty()) QVERIFY(done.wait(5000));
         QVERIFY(!done.takeFirst()[0].toBool());
         QVERIFY(window.lastError().contains("Cannot start"));
+    }
+
+    void browserPaneFocus() {
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        QTemporaryDir scratch;
+        QVERIFY(scratch.isValid());
+        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                      qEnvironmentVariable("CPMIMAGE_HELPER"), 30000, 2000, {},
+                      scratch.filePath("settings.ini"));
+        window.show();
+        window.activateWindow();
+        QSignalSpy done(&window, &Window::completed);
+        window.openImage(root + "/fixtures/ibm3740-independent.raw", "ibm-3740", "raw");
+        QTRY_COMPARE(done.size(), 1);
+        QVERIFY(done.first().first().toBool());
+        auto *areas = window.findChild<QListWidget *>("userAreas");
+        auto *files = window.findChild<QTableWidget *>("fileList");
+        QVERIFY(areas);
+        QVERIFY(files);
+        areas->setCurrentRow(0);
+        QCOMPARE(files->rowCount(), 3);
+        files->selectRow(0);
+        files->selectionModel()->select(files->model()->index(2, 0),
+                                       QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        areas->setFocus();
+        QTRY_VERIFY(areas->hasFocus());
+        const auto selected = files->selectionModel()->selectedRows();
+        const auto current = files->currentIndex();
+        const auto *area = areas->currentItem();
+        for (auto modifier : {Qt::NoModifier, Qt::ShiftModifier}) {
+            for (int step = 0; step < 8; ++step) {
+                QTest::keyClick(QApplication::focusWidget(), Qt::Key_Tab, modifier);
+                QCOMPARE(QApplication::focusWidget(), step % 2 == 0 ?
+                         static_cast<QWidget *>(files) : areas);
+                QCOMPARE(files->selectionModel()->selectedRows(), selected);
+                QCOMPARE(files->currentIndex(), current);
+                QCOMPARE(areas->currentItem(), area);
+            }
+        }
+        QTest::keyClick(areas, Qt::Key_Down);
+        QCOMPARE(areas->currentRow(), 1);
+        QTest::keyClick(areas, Qt::Key_Up);
+        QCOMPARE(areas->currentRow(), 0);
+        QTest::keyClick(areas, Qt::Key_Tab);
+        files->selectRow(0);
+        QTest::keyClick(files, Qt::Key_Down);
+        QCOMPARE(files->currentRow(), 1);
+        QTest::keyClick(files, Qt::Key_Up);
+        QCOMPARE(files->currentRow(), 0);
+    }
+
+    void openImageMenuShortcut() {
+        Workspace workspace({qEnvironmentVariable("CPMIMAGE_ROOT"),
+                             qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}});
+        workspace.addSession();
+        auto &page = workspace.addSession();
+        workspace.show();
+        workspace.activateWindow();
+        QTRY_VERIFY(workspace.isActiveWindow());
+        QAction *open = nullptr;
+        for (auto *menu : workspace.menuBar()->actions()) {
+            if (!menu->menu() || menu->menu()->title() != "File") continue;
+            for (auto *action : menu->menu()->actions())
+                if (action->text() == "Open Image…") open = action;
+        }
+        QVERIFY(open);
+        QCOMPARE(open->shortcut(), QKeySequence(QKeySequence::Open));
+        QPushButton *toolbar = nullptr;
+        for (auto *button : page.findChildren<QPushButton *>())
+            if (button->accessibleName() == open->text()) toolbar = button;
+        QVERIFY(toolbar);
+        QSignalSpy triggered(open, &QAction::triggered);
+        bool opened = false;
+        QTimer dismiss;
+        connect(&dismiss, &QTimer::timeout, &workspace, [&] {
+            if (auto *dialog = fileDialog()) {
+                opened = dialog->windowTitle() == "Open CP/M image";
+                dialog->reject();
+            }
+        });
+        dismiss.start(20);
+        const auto shortcut = open->shortcut()[0];
+        QTest::keyClick(&workspace, shortcut.key(), shortcut.keyboardModifiers());
+        QVERIFY(opened);
+        QCOMPARE(triggered.size(), 1);
+        opened = false;
+        open->trigger();
+        QVERIFY(opened);
+        opened = false;
+        toolbar->click();
+        QVERIFY(opened);
     }
 };
 QTEST_MAIN(GuiCheck)
