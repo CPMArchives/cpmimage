@@ -277,8 +277,9 @@ int main(int argc,char **argv) {
 #ifdef CPMIMAGE_READ_ONLY
   if(rename) return fail("read_only","this helper supports listing and export only");
 #endif
-  if(strcmp(op,"list") && strcmp(op,"export") && !rename && !editing) return fail("operation","unsupported operation");
-  if((!strcmp(op,"list") && argc!=5) || ((!strcmp(op,"export")||rename) && argc!=7)) return fail("arguments","wrong argument count");
+  const int preview = !strcmp(op,"preview");
+  if(strcmp(op,"list") && strcmp(op,"export") && !preview && !rename && !editing) return fail("operation","unsupported operation");
+  if((!strcmp(op,"list") && argc!=5) || ((!strcmp(op,"export")||preview||rename) && argc!=7)) return fail("arguments","wrong argument count");
   const char *device=argv[4];
 #ifdef CPMIMAGE_READ_ONLY
   if (!strcmp(device,"raw")) device="cpmimage-raw";
@@ -313,10 +314,22 @@ int main(int argc,char **argv) {
     if(cpmNamei(&root,argv[5],&ino)<0) {cpmUmount(&sb);return fail("not_found",boo);}
     if(cpmOpen(&ino,&file,O_RDONLY)<0) {cpmUmount(&sb);return fail("export",boo);}
     if(!(out=fopen(argv[6],"wb"))) {cpmClose(&file);cpmUmount(&sb);return fail("export","cannot create staging output");}
-    int bad=0;while((n=cpmRead(&file,buf,sizeof buf))>0)if(fwrite(buf,1,n,out)!=(size_t)n){bad=1;break;}
-    if(n<0)bad=1;if(fclose(out))bad=1;if(cpmClose(&file)<0)bad=1;
+    const size_t preview_limit = 1024 * 1024;
+    size_t remaining = (size_t)ino.size;
+    if (preview && remaining > preview_limit) remaining = preview_limit;
+    int bad = 0;
+    n = 0;
+    while (remaining && (n = cpmRead(&file, buf,
+           remaining < sizeof buf ? remaining : sizeof buf)) > 0) {
+      if (fwrite(buf, 1, n, out) != (size_t)n) { bad = 1; break; }
+      remaining -= n;
+    }
+    if(n<0 || remaining)bad=1;if(fclose(out))bad=1;if(cpmClose(&file)<0)bad=1;
     if(bad) {cpmUmount(&sb);return fail("export","read/write/close failed");}
   }
   if(cpmUmount(&sb)<0)return fail("sync",boo);
-  puts("{\"v\":1,\"ok\":true}");return 0;
+  if (preview) printf("{\"v\":1,\"ok\":true,\"truncated\":%s}\n",
+                      ino.size > 1024 * 1024 ? "true" : "false");
+  else puts("{\"v\":1,\"ok\":true}");
+  return 0;
 }

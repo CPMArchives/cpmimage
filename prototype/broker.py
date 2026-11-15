@@ -755,6 +755,24 @@ def main():
                     session.pop('saved_comment', None)
                     plan['source_sha256'] = session['sha']
                 reply = dict(v=1, id=rid, ok=True, result=plan)
+            elif op == 'preview':
+                if not session or request.get('session') != session['token']:
+                    raise backend.Failure('stale_session', 'Open the image again.')
+                name = backend.filename(request['name'], True)
+                destination = Path(request['destination'])
+                with tempfile.TemporaryDirectory(prefix='cpmimage-preview-') as temp:
+                    folder = Path(temp)
+                    staged = folder / 'preview'
+                    (folder / 'diskdefs').write_text(session['definitions'], encoding='utf-8')
+                    result = adapter().native(folder, 'preview', session['image'], session['format'],
+                                              'raw', name, staged)
+                    if type(result.get('truncated')) is not bool or staged.stat().st_size > 1024 * 1024:
+                        raise backend.Failure('protocol_invalid', 'Invalid text preview.')
+                    if stop.is_set():
+                        raise backend.Failure('cancelled')
+                    with destination.open('xb') as stream:
+                        stream.write(staged.read_bytes())
+                reply = dict(v=1, id=rid, ok=True, result=dict(truncated=result['truncated']))
             elif op == 'export':
                 if not session or request.get('session') != session['token']:
                     raise backend.Failure('stale_session', 'Open the image again.')

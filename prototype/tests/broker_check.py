@@ -49,6 +49,42 @@ class BrokerCheck(unittest.TestCase):
                          'e92de1c61e03ecf17afd276aa6bad358b8b2cad5fe4e607a42152df1befd5a6f')
         self.assertEqual(self.request('export',session=token,name='15tail.bin',destination=str(destination))['error'],'destination_exists')
         self.assertEqual(self.image.read_bytes(),self.before)
+    def test_preview_current_session_and_user_area(self):
+        token = self.opened()
+        payload = self.directory / 'preview-input'
+        for user, data in [(0, b'first'), (7, b'second')]:
+            payload.write_bytes(data)
+            imported = self.request('edit', session=token, confirmed=True, action='import',
+                                    name=f'{user:02d}NOTE.TXT', path=str(payload), text=True)
+            self.assertTrue(imported['ok'], imported)
+        for user, data in [(0, b'first'), (7, b'second')]:
+            target = self.directory / f'preview-{user}'
+            reply = self.request('preview', session=token, name=f'{user:02d}NOTE.TXT',
+                                 destination=str(target))
+            self.assertTrue(reply['ok'], reply)
+            self.assertFalse(reply['result']['truncated'])
+            self.assertTrue(target.read_bytes().startswith(data + b'\x1a'))
+        target = self.directory / 'missing'
+        missing = self.request('preview', session=token, name='00MISSING.TXT', destination=str(target))
+        self.assertEqual(missing['error'], 'not_found')
+        self.assertFalse(target.exists())
+        self.assertEqual(self.image.read_bytes(), self.before)
+
+    def test_preview_read_limit(self):
+        created = self.request('new_image', format='4mb-hd', confirmed=True)
+        self.assertTrue(created['ok'], created)
+        token = created['result']['session']
+        source = self.directory / 'large'
+        source.write_bytes(b'A' * (1024 * 1024 + 128))
+        imported = self.request('edit', session=token, confirmed=True, action='import',
+                                name='00LARGE.TXT', path=str(source))
+        self.assertTrue(imported['ok'], imported)
+        target = self.directory / 'preview'
+        reply = self.request('preview', session=token, name='00LARGE.TXT', destination=str(target))
+        self.assertTrue(reply['ok'], reply)
+        self.assertTrue(reply['result']['truncated'])
+        self.assertEqual(target.read_bytes(), b'A' * (1024 * 1024))
+
     def test_sequential_requests_never_report_busy(self):
         token = self.opened()
         for n in range(20):

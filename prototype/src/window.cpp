@@ -55,6 +55,9 @@
 #include <QProgressBar>
 #include <QMessageBox>
 #include <QTextEdit>
+#include <QPlainTextEdit>
+#include <QFontDatabase>
+#include <QStringDecoder>
 #ifdef Q_OS_WIN
 #include <windows.h>
 #else
@@ -351,8 +354,12 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         if(item && !item->isSelected()) table->selectRow(item->row());
         QMenu menu; auto *action=menu.addAction("Export…");
         action->setEnabled(!table->selectionModel()->selectedRows().isEmpty());
+        auto *preview = menu.addAction("View File…");
+        preview->setEnabled(viewFileAction->isEnabled());
         table->setFocus(Qt::MouseFocusReason);
-        if(menu.exec(table->viewport()->mapToGlobal(point))==action) exportAction->trigger();
+        auto *chosen = menu.exec(table->viewport()->mapToGlobal(point));
+        if (chosen == action) exportAction->trigger();
+        if (chosen == preview) viewFileAction->trigger();
     });
     userAreas->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(userAreas,&QListWidget::customContextMenuRequested,this,[this](const QPoint &point){
@@ -467,6 +474,10 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         setBusy(busy); updateSelectionStatus();
     });
     auto *view = menuBar()->addMenu("View");
+    viewFileAction = view->addAction("View File…");
+    viewFileAction->setObjectName("viewFileAction");
+    connect(viewFileAction, &QAction::triggered, this, &Window::viewFile);
+    connect(table, &QTableWidget::cellDoubleClicked, viewFileAction, &QAction::trigger);
     auto *showToolbar = view->addAction("Toolbar");
     showToolbar->setCheckable(true);
     showToolbar->setChecked(settings->value("toolbarVisible", true).toBool());
@@ -593,6 +604,8 @@ void Window::setBusy(bool value) {
     showAllAction->setEnabled(userAreas->isEnabled());
     showAllAction->setChecked(userAreas->currentRow() == 0);
     updateExportAction();
+    viewFileAction->setEnabled(!busy && !session.isEmpty() &&
+                               table->selectionModel()->selectedRows().size() == 1);
     cancelButton->setEnabled(busy);
     cancelButton->setVisible(busy);
     imageInfoButton->setEnabled(!busy && !session.isEmpty());
@@ -1212,6 +1225,86 @@ void Window::editFilenameSettings() {
     connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
     refresh();dialog.exec();
 }
+static constexpr qint64 previewLimit = 1024 * 1024;
+
+void Window::viewFile() {
+    const auto rows = table->selectionModel()->selectedRows();
+    if (busy || session.isEmpty() || rows.size() != 1) return;
+    const auto name = table->item(rows.first().row(), 0)->data(Qt::UserRole).toString();
+    auto directory = std::make_unique<QTemporaryDir>();
+    if (!directory->isValid()) {
+        status->setText("Cannot create private text preview.");
+        return;
+    }
+    previewName = name;
+    previewPane = exportPane == userAreas ? static_cast<QWidget *>(userAreas) : table;
+    previewDirectory = std::move(directory);
+    begin({{"op", "preview"}, {"session", session}, {"name", name},
+           {"destination", previewDirectory->filePath("preview")}});
+}
+
+void Window::showFilePreview(bool truncated) {
+    auto directory = std::move(previewDirectory);
+    if (!directory) { fail("Missing private text preview."); return; }
+    QFile file(directory->filePath("preview"));
+    if (!file.open(QIODevice::ReadOnly)) { fail("Cannot read the text preview."); return; }
+    auto bytes = file.read(previewLimit + 1);
+    if (file.error() != QFile::NoError || bytes.size() > previewLimit) {
+        fail("Invalid text preview size.");
+        return;
+    }
+    file.close();
+    const auto eof = bytes.indexOf('\x1a');
+    if (eof >= 0 && !truncated &&
+        std::all_of(bytes.cbegin() + eof, bytes.cend(), [](char value) {
+            return value == '\x1a' || value == '\0' || value == ' ';
+        })) bytes.truncate(eof);
+
+    QStringDecoder decode(QStringDecoder::Utf8, truncated ? QStringDecoder::Flag::Default :
+                                               QStringDecoder::Flag::Stateless);
+    QString text = decode(bytes);
+    const bool controls = std::any_of(text.cbegin(), text.cend(), [](QChar value) {
+        return value.category() == QChar::Other_Control &&
+               value != '\r' && value != '\n' && value != '\t';
+    });
+    const bool unsupported = controls || decode.hasError();
+    text.replace("\r\n", "\n").replace('\r', '\n');
+
+    auto *dialog = new QDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowTitle(QString("%1 · User area %2")
+        .arg(previewName.mid(2)).arg(previewName.left(2).toInt()));
+    dialog->resize(680, 480);
+    auto *layout = new QVBoxLayout(dialog);
+    if (truncated) layout->addWidget(new QLabel("Preview limited to the first 1 MiB."));
+    if (unsupported) {
+        layout->addWidget(new QLabel("This file contains binary data or unsupported text encoding."));
+    } else {
+        auto *viewer = new QPlainTextEdit;
+        viewer->setObjectName("filePreviewText");
+        viewer->setReadOnly(true);
+        viewer->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+        viewer->setPlainText(text);
+        layout->addWidget(viewer);
+        viewer->setFocus();
+    }
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close);
+    connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::close);
+    layout->addWidget(buttons);
+    auto *pane = previewPane;
+    pane->setFocus(Qt::OtherFocusReason);
+    connect(dialog, &QDialog::finished, this, [this, pane] {
+        QTimer::singleShot(0, this, [pane] {
+            if (!pane->isVisible() || !pane->isEnabled()) return;
+            pane->window()->activateWindow();
+            pane->setFocus(Qt::OtherFocusReason);
+        });
+    });
+    dialog->show();
+    updateSelectionStatus();
+    emit completed(true);
+}
+
 void Window::updateExportAction() {
     const bool available = !busy && !session.isEmpty() &&
         ((exportPane == userAreas && userAreas->currentItem()) ||
@@ -1371,6 +1464,12 @@ bool Window::eventFilter(QObject *watched, QEvent *event) {
     if ((watched == userAreas || watched == table) &&
         event->type() == QEvent::KeyPress && QApplication::focusWidget() == watched) {
         const auto *key = static_cast<QKeyEvent *>(event);
+        if (watched == table &&
+            (key->modifiers() & ~Qt::KeypadModifier) == Qt::NoModifier &&
+            (key->key() == Qt::Key_V || key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter)) {
+            viewFileAction->trigger();
+            return true;
+        }
         if (key->key() == Qt::Key_X && key->modifiers() == Qt::NoModifier) {
             exportAction->trigger();
             return true;
@@ -1682,6 +1781,7 @@ void Window::begin(QJsonObject request) {
     setBusy(true);
     status->setText(operation == "open" ? "Reading image…" : operation == "catalogue" ? "Loading disk definitions…" :
         operation == "inspect" ? "Checking image format…" :
+        operation == "preview" ? "Reading file preview…" :
         operation == "save_plan" ? "Preparing save…" : operation == "save" ? "Publishing save…" : batchActive ?
         QString("Exporting %1 of %2: %3").arg(batchIndex+1).arg(batch.items.size()).arg(batch.items[batchIndex].name.mid(2)) : "Exporting selected file…");
     deadline.start(deadlineMs);
@@ -1706,6 +1806,7 @@ void Window::cancel() {
     status->setText("Cancelling…");
 }
 void Window::fail(const QString &message) {
+    previewDirectory.reset();
     afterSave = {};
     newImagePicker = false;
     deadline.stop(); cancellationDeadline.stop(); error = message;
@@ -1755,6 +1856,14 @@ void Window::readReply() {
     const QRegularExpression hash("^[0-9a-f]{64}$");
     auto invalid = [this] { stopReader(); resetImage(); fail("Invalid response schema from the image reader."); };
     if (!reply["result"].isObject()) { invalid(); return; }
+    if (operation == "preview") {
+        if (!result["truncated"].isBool()) { fail("Invalid text preview response."); return; }
+        deadline.stop();
+        cancellationDeadline.stop();
+        setBusy(false);
+        showFilePreview(result["truncated"].toBool());
+        return;
+    }
     if (operation == "new_image" || operation == "format_image" || operation == "edit" || operation == "imd_comment" || operation == "discard" || operation.startsWith("systems_")) {
         deadline.stop();
         cancellationDeadline.stop();
