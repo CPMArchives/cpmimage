@@ -73,7 +73,7 @@ def directory(data, name):
 
 def inspect(data, name, mode='auto', index=None, truncated=False):
     """Return directory metadata and optional original and decoded streams."""
-    original = data
+    original = data if index is None else None
     decoded = None
     notice = ''
     if truncated:
@@ -139,6 +139,8 @@ def main():
     result, original, decoded = inspect(data, name, mode, None if index == '-' else int(index),
                                         truncated == '1')
     if index != '-':
+        if original is None:
+            raise ValueError('Could not read the selected archive member')
         (folder / 'original').write_bytes(original)
     if decoded is not None:
         (folder / 'decoded').write_bytes(decoded)

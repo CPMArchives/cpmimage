@@ -2,6 +2,7 @@
 #pragma once
 #include <QMainWindow>
 #include <QPointer>
+#include <QSet>
 #include <functional>
 #include <memory>
 #include "filename_policy.h"
@@ -70,7 +71,7 @@ private:
     void chooseEdit(const QString &action, QStringList paths = {}, const TransferFiles *transfer = nullptr);
     void offerFiles(bool drag, bool cut = false);
     quint64 imageRevision = 0;
-    void exportFlat(const QJsonArray &entries, const QString &directory);
+    void exportFlat(const QJsonArray &entries, const QString &directory, const QSet<QString> &textFiles = {});
     bool confirmWrite();
     bool dirty = false, writeConfirmed = false;
     bool resolveEdits(std::function<void()> next);

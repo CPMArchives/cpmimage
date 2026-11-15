@@ -6,6 +6,7 @@ struct ExportItem {
     QString name, destination, outcome = "Pending";
     qint64 size = 0;
     bool exists = false;
+    bool text = false;
 };
 struct ExportPlan {
     QString directory, error;
