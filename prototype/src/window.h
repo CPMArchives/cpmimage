@@ -86,7 +86,8 @@ private:
     void viewFile(QString mode = "auto");
     void inspectPreview(const QByteArray &bytes, const QString &name, const QString &title,
                         QWidget *pane, bool truncated, QString mode = "auto", int member = -1,
-                        QPointer<QWidget> directoryView = {});
+                        QPointer<QWidget> directoryView = {},
+                        std::function<void(bool, QByteArray, QByteArray)> extracted = {});
     void showPreview(QByteArray bytes, QByteArray decoded, const QJsonObject &result,
                      const QString &title, QWidget *pane, bool truncated, QPointer<QWidget> returnTo = {});
     void showArchive(QByteArray bytes, QByteArray decoded, const QJsonObject &result,

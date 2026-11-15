@@ -21,17 +21,23 @@ def crunched():
     return b'\x76\xfeB.TXT\0\x20\x20\0\0' + codes.to_bytes(3, 'big') + b'B\0'
 
 
-def library(name, content):
-    stem, suffix = name.split('.')
+def library(name, content, *additional):
     header = bytearray(128)
     header[1:12] = b' ' * 11
     header[14] = 1
-    header[33:44] = stem.encode().ljust(8) + suffix.encode().ljust(3)
-    sectors = (len(content) + 127) // 128
-    struct.pack_into('<HH', header, 44, 1, sectors)
-    header[58] = sectors * 128 - len(content)
-    header[64] = header[96] = 255
-    return bytes(header) + content.ljust(sectors * 128, b'\x1a')
+    data = bytearray()
+    members = ((name, content), *additional)
+    for slot, (filename, payload) in enumerate(members, 1):
+        stem, suffix = filename.split('.')
+        entry = 32 * slot
+        header[entry + 1:entry + 12] = stem.encode().ljust(8) + suffix.encode().ljust(3)
+        sectors = (len(payload) + 127) // 128
+        struct.pack_into('<HH', header, entry + 12, 1 + len(data) // 128, sectors)
+        header[entry + 26] = sectors * 128 - len(payload)
+        data.extend(payload.ljust(sectors * 128, b'\x1a'))
+    for slot in range(len(members) + 1, 4):
+        header[slot * 32] = 255
+    return bytes(header + data)
 
 
 def ark(name, content):
@@ -127,7 +133,8 @@ if __name__ == '__main__':
         folder = Path(sys.argv[1])
         (folder / 'sq').write_bytes(squeezed())
         (folder / 'cr').write_bytes(crunched())
-        (folder / 'ark').write_bytes(ark('INNER.LBR', library('HELLO.TQT', squeezed()))[:-2]
+        (folder / 'lbr').write_bytes(library('HELLO.TQT', squeezed(), ('OTHER.TXT', b'Other member')))
+        (folder / 'ark').write_bytes(ark('INNER.LBR', (folder / 'lbr').read_bytes())[:-2]
                                      + ark('SECOND.TXT', b'Second member'))
     else:
         unittest.main()
