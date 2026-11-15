@@ -2,9 +2,9 @@
 
 CP/M Image is a graphical file manager for CP/M disk images on macOS, Windows, and Linux. It bundles cpmtools for command-line use.
 
-## Download v1.0
+## Download v1.1
 
-Get the five platform packages, corresponding source, and SHA-256 checksums from the [v1.0 release](https://github.com/CPMArchives/cpmimage/releases/tag/v1.0). The release notes describe the validation performed and the remaining coverage gaps.
+Get the five platform packages, corresponding source, and SHA-256 checksums from the [v1.1 release downloads](https://github.com/CPMArchives/cpmimage/releases/tag/v1.1#assets). The release notes cover the changes and supported formats.
 
 - **macOS ARM64 (Apple silicon):** Open the DMG and drag **CPMImage.app** to **Applications**.
 - **Windows ARM64 and x86-64:** Download the executable for your architecture and run it.
@@ -17,6 +17,12 @@ Get the five platform packages, corresponding source, and SHA-256 checksums from
 - Import, rename, delete, and move files between user areas, edit supported attributes, and transfer files between open images.
 - Create or format images using a selected disk definition and manage reserved system tracks. Edits stay in a private working copy until Save or Save As.
 - Choose a disk definition from the bundled cpmtools catalogue or supply your own definitions. The format picker can suggest candidates and accepts manual selection.
+
+## File and archive viewer
+
+- Select a file and press **V** or **Enter**, or double-click it to open the read-only viewer. Press **T** to switch between text and hex. In text mode, press **7** to toggle stripping the high bit for WordStar-style text.
+- Preview supported Squeeze (SQ) and Crunch (CR) files. After successful decompression, switch between the original and decompressed bytes.
+- Browse LBR and ARK archives, including nested archives. Use **Up/Down** to select a member, **V** to view it, and **Esc** to return to the parent archive.
 
 See [CP/M Image Help](docs/HELP.md) for everyday workflows. The same guide is available offline from the application's **Help** menu.
 
