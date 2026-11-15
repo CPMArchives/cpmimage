@@ -10,7 +10,14 @@ info=app/'Contents/Info.plist'
 with info.open('rb') as stream: metadata=plistlib.load(stream)
 old_executable = app/'Contents/MacOS'/metadata['CFBundleExecutable']
 old_executable.rename(old_executable.with_name('cpmimage'))
-metadata.update(CFBundleExecutable='cpmimage', CFBundleIdentifier='org.cpmarchives.cpmimage.packagereview',CFBundleName='CPMImage Review',LSMinimumSystemVersion='14.4')
+icon = 'cpmimage.icns'
+if not (app/'Contents/Resources'/icon).is_file():
+ raise SystemExit(f'Missing macOS app icon: {icon}')
+metadata.update(CFBundleExecutable='cpmimage',
+                CFBundleIdentifier='org.cpmarchives.cpmimage.packagereview',
+                CFBundleName='CPMImage Review',
+                CFBundleIconFile=icon,
+                LSMinimumSystemVersion='14.4')
 with info.open('wb') as stream: plistlib.dump(metadata,stream)
 resources=app/'Contents/Resources';resources.mkdir(exist_ok=True)
 backend=resources/'cpmimage'
