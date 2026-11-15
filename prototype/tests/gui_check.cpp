@@ -1212,7 +1212,7 @@ private slots:
         auto *files = window.findChild<QTableWidget *>("fileList");
         QVERIFY(files);
         QStringList names{"DOCOMM.PAS", "DOTEXT.PAS", "CRCK.COM"};
-        for (const auto &name : names) {
+        for (const auto &name : names + QStringList{"ABSTRACT.062", "KFORMAT.SUB"}) {
             const auto matches = files->findItems(name, Qt::MatchExactly);
             QCOMPARE(matches.size(), 1);
             window.activateWindow();
@@ -1227,6 +1227,11 @@ private slots:
                 QVERIFY(!text.startsWith("00000000"));
                 QVERIFY(!text.contains(QChar(0x1a)));
                 QVERIFY(text.contains("KFORMAT", Qt::CaseInsensitive));
+            } else if (name == "ABSTRACT.062") {
+                QVERIFY(text.contains("first\n     group standard"));
+            } else if (name == "KFORMAT.SUB") {
+                QCOMPARE(text.count(QChar(0x2407)), 5);
+                QVERIFY(text.contains("pascal docomm.bbxB", Qt::CaseInsensitive));
             } else {
                 QTRY_VERIFY(view->toPlainText().startsWith("00000000"));
             }

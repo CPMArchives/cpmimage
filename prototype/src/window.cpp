@@ -1259,15 +1259,21 @@ static QString previewText(QByteArray bytes, bool truncated, bool highBit, bool 
     QStringDecoder decode(QStringDecoder::Utf8, truncated ? QStringDecoder::Flag::Default :
                                                QStringDecoder::Flag::Stateless);
     QString text = decode(bytes);
+    // Some CP/M text has the high bit set on the LF byte of a CRLF pair.
+    if (decode.hasError() && bytes.contains("\r\x8a")) {
+        bytes.replace("\r\x8a", "\r\n");
+        decode.resetState();
+        text = decode(bytes);
+    }
     const bool controls = std::any_of(text.cbegin(), text.cend(), [](QChar value) {
         return value.category() == QChar::Other_Control &&
-               value != '\r' && value != '\n' && value != '\t';
+               value != '\r' && value != '\n' && value != '\t' && value != '\a';
     });
     const bool unsupported = controls || decode.hasError();
     if (binary) *binary = unsupported;
     if (unsupported)
         return "This file contains binary data or unsupported text encoding.";
-    return text.replace("\r\n", "\n").replace('\r', '\n');
+    return text.replace("\r\n", "\n").replace('\r', '\n').replace(QChar(0x07), QChar(0x2407));
 }
 
 static QString hexRow(const QByteArray &bytes, qsizetype offset, int width) {
