@@ -76,7 +76,7 @@ with Ownership(image,root/'locks') as owner:
 """
         module = str(Path(__file__).resolve().parents[1])
         process = subprocess.run([sys.executable, '-B', '-c', worker, module, str(self.root), 'disk.FDF'], timeout=15)
-        self.assertEqual(process.returncode, -9)
+        self.assertEqual(process.returncode, 9 if os.name == "nt" else -9)
         with Ownership(self.image, self.root / 'locks') as owner:
             with self.assertRaisesRegex(PublicationError, 'previous interrupted save'):
                 publish(owner, fingerprint(self.image), self.stage)
@@ -133,7 +133,7 @@ with Ownership(image,root/'locks') as owner:
 """
         module = str(Path(__file__).resolve().parents[1])
         result = subprocess.run([sys.executable, '-B', '-c', worker, module, str(self.root)], timeout=15)
-        self.assertEqual(result.returncode, -9)
+        self.assertEqual(result.returncode, 9 if os.name == "nt" else -9)
         journal = recovery_directory(self.image)
         self.assertEqual((journal / 'previous-backup-0').read_bytes(), b'older')
         self.assertFalse((journal / 'committed').exists())

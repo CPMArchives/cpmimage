@@ -24,6 +24,7 @@ public:
     Window(QString root, QString python, QString helper, int deadlineMs = 30000, int graceMs = 2000, QString noticesPath = {}, QString settingsFile = {});
     ~Window() override;
     void openFromPicker();
+    void createImage();
     void importFiles(const QStringList &paths);
     void openImage(const QString &path, const QString &format, const QString &container);
     void setCataloguePath(const QString &path) { cataloguePath = path; }
@@ -40,6 +41,7 @@ public:
 signals:
     void completed(bool success);
     void sessionClosed();
+    void newImageRequested();
     void imageOpened(const QString &path);
     void imagePicked(const QString &path);
     void exportProgress(int completed, int total);
@@ -58,6 +60,7 @@ private:
     void sendPending();
     void showUserArea();
     void updateSelectionStatus();
+    void updateDiskSpace(const QJsonObject &result);
     void updateUserAreas();
     void chooseImage();
     void chooseSave(bool saveAs);
@@ -102,7 +105,7 @@ private:
     QString cataloguePath, requestedImage, requestedFormat, requestedContainer;
     QString inspectedHash, inspectedContainer, activeCatalogue;
     bool retainSource = false;
-    QLabel *source, *status;
+    QLabel *source, *status, *diskSpace;
     QPushButton *openButton, *exportButton, *cancelButton;
     QTableWidget *table;
     QListWidget *userAreas;

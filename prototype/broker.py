@@ -478,7 +478,7 @@ def main():
                         shutil.copyfile(candidate, staged)
                         os.replace(staged, working)
                         session.update(dirty=True, confirmed=True)
-                reply = dict(v=1,id=rid,ok=True,result=dict(entries=[], dirty=True, session=session['token'], geometry=geometry))
+                reply = dict(v=1,id=rid,ok=True,result=dict(checked['result'], dirty=True, session=session['token'], geometry=geometry))
             elif op == 'imd_comment':
                 if not session or request.get('session') != session['token'] or session['original_container'] != 'imd':
                     raise backend.Failure('stale_session', 'Open an IMD image.')
@@ -626,7 +626,7 @@ def main():
                         session.update(dirty=True, confirmed=True)
                 result = dict(dirty=session['dirty'], imd_comment=session['comment'].decode('utf-8', errors='replace'))
                 if op == 'discard' and 'checked' in locals():
-                    result['entries'] = checked['result']['entries']
+                    result.update(checked['result'])
                 reply = dict(v=1, id=rid, ok=True, result=result)
             elif op in ('save_plan', 'save'):
                 if not session or request.get('session') != session['token']:

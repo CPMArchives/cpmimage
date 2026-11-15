@@ -134,6 +134,12 @@ private slots:
         QVERIFY(secondDone.first().first().toBool());
         auto *tabs = workspace.findChild<QTabWidget *>();
         QCOMPARE(tabs->currentWidget(), &second);
+        auto *space = first.findChild<QLabel *>("diskSpace");
+        QVERIFY(space);
+        QCOMPARE(space->text(), QString("238/243 KiB free"));
+        auto *emptySpace = second.findChild<QLabel *>("diskSpace");
+        QVERIFY(emptySpace);
+        QCOMPARE(emptySpace->text(), QString("241/243 KiB free"));
         QCOMPARE(first.entryCount(), 1);
         QCOMPARE(second.entryCount(), 0);
         tabs->setCurrentWidget(&first);
@@ -170,15 +176,67 @@ private slots:
         remove->trigger();
         QTRY_COMPARE(firstDone.size(), 1);
         QVERIFY(firstDone.takeFirst().first().toBool());
+        QCOMPARE(space->text(), QString("239/243 KiB free"));
         QVERIFY(first.windowTitle().endsWith("*"));
+        respond.stop();
+        QString dialogTitle;
+        QTimer dismiss;
+        connect(&dismiss, &QTimer::timeout, &workspace, [&] {
+            if (auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget())) {
+                dialogTitle = dialog->windowTitle();
+                dialog->reject();
+            }
+        });
+        auto *create = first.findChild<QPushButton *>("toolbarNew");
+        QVERIFY(create);
+        dismiss.start(20);
+        create->click();
+        QTRY_VERIFY(!dialogTitle.isEmpty());
+        dismiss.stop();
+        QCOMPARE(dialogTitle, QString("Choose disk format"));
+        QCOMPARE(tabs->count(), 2);
+        QVERIFY(tabs->currentWidget() != &first);
+        QVERIFY(first.windowTitle().endsWith("*"));
+        QVERIFY(tabs->currentWidget()->close());
+        QCOMPARE(tabs->currentWidget(), &first);
+        QTimer initialize;
+        connect(&initialize, &QTimer::timeout, &workspace, [] {
+            auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            if (!dialog) return;
+            if (dialog->windowTitle() == "Choose disk format") {
+                dialog->findChild<QLineEdit *>()->setText("ibm-3740");
+                dialog->accept();
+            } else if (dialog->windowTitle() == "Filesystem initialization") {
+                dialog->accept();
+            } else {
+                dialog->reject();
+            }
+        });
+        initialize.start(20);
+        create->click();
+        QCOMPARE(tabs->count(), 2);
+        auto *created = tabs->currentWidget();
+        QVERIFY(created != &first);
+        QTRY_VERIFY(created->windowTitle().endsWith("*"));
+        initialize.stop();
+        QVERIFY(first.windowTitle().endsWith("*"));
+        QCOMPARE(tabs->tabText(0), QString("dirty.raw *"));
+        tabs->setCurrentWidget(&first);
+        respond.start(20);
+        choice = QMessageBox::Discard;
+        QVERIFY(!created->close());
+        QTRY_COMPARE(tabs->count(), 1);
         choice = QMessageBox::Cancel;
         QVERIFY(!first.close());
         QCOMPARE(tabs->count(), 1);
         QVERIFY(first.windowTitle().endsWith("*"));
         choice = saveOnClose ? QMessageBox::Save : QMessageBox::Discard;
         QVERIFY(!first.close());
-        QTRY_COMPARE(tabs->count(), 0);
+        QTRY_COMPARE(tabs->tabText(0), QString("Untitled"));
+        QCOMPARE(tabs->count(), 1);
+        QVERIFY(workspace.isVisible());
         QVERIFY(workspace.close());
+        QCOMPARE(tabs->count(), 0);
         QFile result(copy);
         QFile original(root + "/fixtures/ibm3740-independent.raw");
         QVERIFY(result.open(QIODevice::ReadOnly) && original.open(QIODevice::ReadOnly));

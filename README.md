@@ -1,47 +1,40 @@
-# cpmimage
+# CP/M Image
 
-A cross-platform CP/M disk-image GUI for macOS, Windows and Linux.
+CP/M Image is a graphical file manager for CP/M disk images on macOS, Windows, and Linux. It bundles cpmtools for command-line use.
 
-## Current status
+## Download v1.0
 
-The current development milestone is v0.3. The read-only application browses and exports files from CP/M images using bundled, external, and image-specific disk definitions. Published packages are available on the [releases page](https://github.com/CPMArchives/cpmimage/releases).
+Get the five platform packages, corresponding source, and SHA-256 checksums from the [v1.0 release](https://github.com/CPMArchives/cpmimage/releases/tag/v1.0). The release notes describe the validation performed and the remaining coverage gaps.
 
-The application uses Qt 6 Widgets/C++17, a separate Python broker, and a read-only C helper built from pinned cpmtools 2.23 and libdsk 1.4.2 sources.
+- **macOS ARM64 (Apple silicon):** Open the DMG and drag **CPMImage.app** to **Applications**.
+- **Windows ARM64 and x86-64:** Download the executable for your architecture and run it.
+- **Linux ARM64 and x86-64:** Download the executable for your architecture, mark it executable with `chmod +x`, and run it.
 
-- [v0.3 implementation and validation](docs/V0_3_DISKDEFS_REVIEW.md)
-- [Build and run](docs/BUILDING.md)
-- [Prototype behavior and limits](docs/READ_ONLY_PROTOTYPE.md)
-- [Batch and user-area export review](docs/V0_2_BATCH_EXPORT_REVIEW.md)
-- [Compact toolbar and image information review](docs/V0_2_TOOLBAR_REVIEW.md)
-- [Validation evidence](docs/VALIDATION.md)
-- [Owner testing notes and backlog](docs/USER_TESTING_BACKLOG.md)
-- [Complete SIG/M filename audit, including DOS](docs/CATALOG_FILENAME_AUDIT.md)
-- [Licensing and third-party notices](docs/LICENSING.md)
-- [Initial project proposal](docs/PROJECT_PROPOSAL.md) (historical goals, not implemented scope)
+## What you can do
 
-## Verified milestone
+- Open RAW, IMD, JV3, DMK, and supported standard CPCEMU DSK images. Some structured layouts and conversions require a physical mapping profile.
+- Browse user areas and export individual files, selections, or entire user areas. The file list shows record counts and the footer shows free filesystem space.
+- Import, rename, delete, and move files between user areas, edit supported attributes, and transfer files between open images.
+- Create or format images using a selected disk definition and manage reserved system tracks. Edits stay in a private working copy until Save or Save As.
+- Choose a disk definition from the bundled cpmtools catalogue or supply your own definitions. The format picker can suggest candidates and accepts manual selection.
 
-Native ARM64 macOS, Windows 11 and Debian 13 validation covers listing/export, cancellation and reader failures, source-image preservation, and portable runtime packaging. The cpmtools/libdsk geometry bridge is patched to preserve odd track counts: its old fallback silently reduced 77 tracks to 76. Final-track exports pass on all three platforms.
+See [CP/M Image Help](docs/HELP.md) for everyday workflows. The same guide is available offline from the application's **Help** menu.
 
-The committed fixtures are independently generated test data. SIG/M images, BetterCP/M system images, downloaded dependencies, private VM state, toolchain binaries and generated application packages are excluded from Git. Dependency downloads are pinned by SHA-256. Creating a redistributable binary package also requires its corresponding-source companion and third-party notices; source links alone are not the proposed distribution method.
+## Command line
 
-## License
-
-New project code is **GPL-3.0-or-later**, as approved by the owner. See [LICENSE](LICENSE). Third-party code and documentation retain their own licenses; see [licenses/third-party](licenses/third-party).
-
-### Headless cpmtools
-
-Use the package executable with a utility selector such as
-`cpmimage /cpmls -f ibm-3740 image.raw`. On macOS, open the DMG, drag **CPMImage.app** to **Applications**, and eject the disk image. From Terminal, run:
+Run the package executable with a utility selector. On macOS, use the executable inside the installed app:
 
 ```sh
 /Applications/CPMImage.app/Contents/MacOS/cpmimage /cpmls -f ibm-3740 disk.raw
 ```
 
-For the v0.8 macOS ZIP, the executable inside the app is named `cpmimage-review`. Selectors include
-`/cpmls`, `/cpmrm`, `/cpmcp`, `/cpmchmod`, `/cpmchattr`, `/mkfs.cpm`,
-`/fsck.cpm`, and `/fsed.cpm`. One selector may appear anywhere in the
-argument list. Use `/diskdefs=PATH` to override the bundled catalogue.
+On Windows or Linux, pass the same arguments to the downloaded executable. Selectors include `/cpmls`, `/cpmrm`, `/cpmcp`, `/cpmchmod`, `/cpmchattr`, `/mkfs.cpm`, `/fsck.cpm`, and `/fsed.cpm`. Use `/diskdefs=PATH` to override the bundled catalogue.
+
+## Build and packaging
+
+CP/M Image uses Qt 6 Widgets and C++17, a separate Python broker, and a native helper built from pinned cpmtools 2.23 and LibDsk 1.4.2 sources. See the [build instructions](docs/BUILDING.md), [engineering specification](docs/ENGINEERING_SPEC.md), and [roadmap](docs/ROADMAP.md).
+
+The committed fixtures are independently generated test data. Private VM state, downloaded dependencies, toolchain binaries, and generated application packages are excluded from Git. Redistributable binary packages include corresponding source and third-party notices.
 
 For packaging, apply `packaging/scripts/configure-utility-catalogue.py` to a
 pinned cpmtools 2.23 source tree before compiling the standalone utilities.
@@ -57,3 +50,7 @@ and set `CPMIMAGE_CPMTOOLS_BIN` to `SCRATCH/bin`. The Windows console editor
 links PDCurses statically and the utilities share the package's MSVC runtime.
 This recipe uses the upstream RAW file backend. It has no LibDsk container
 options. Upstream cpmtools 2.23 opens images read-only in `fsed.cpm`.
+
+## License
+
+Project code is **GPL-3.0-or-later**. See [LICENSE](LICENSE). Third-party components retain their own licenses. See [Licensing and third-party notices](docs/LICENSING.md).

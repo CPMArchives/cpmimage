@@ -167,7 +167,7 @@ class Adapter:
   if op=='delete':cli('cpmrm',str(int(args[0][:2]))+':'+args[0][2:]);return {}
   if op=='attrs':cli('cpmchattr',args[1],str(int(args[0][:2]))+':'+args[0][2:]);return {}
   raise Failure('unsupported_operation')
- def listing(self,image,fmt,container,cwd):
+ def listing(self,image,fmt,container,cwd,stats=None):
   r=self.invoke('list',image,fmt,container,cwd);entries={}
   if not isinstance(r.get('entries'),list):raise Failure('protocol_invalid')
   for e in r['entries']:
@@ -177,6 +177,11 @@ class Adapter:
    entries[n]={'name':n,'size':e['size'],'attr':e['attr']}
    if self.read_only:
     entries[n].update({key:e[key] for key in ('atime','mtime','ctime') if type(e.get(key)) is int})
+  if stats is not None and isinstance(r.get('stats'),dict):
+   values=r['stats']
+   blocks,free,blocksize=(values.get(key) for key in ('blocks','free','blocksize'))
+   if all(type(value) is int for value in (blocks,free,blocksize)) and 0<=free<=blocks and 0<blocksize and blocks*blocksize<=128*1024*1024:
+    stats.update(free_bytes=free*blocksize,total_bytes=blocks*blocksize)
   return entries
  def export(self,image,fmt,container,cwd,name,path,entry):
   self.invoke('export',image,fmt,container,cwd,name,path)
@@ -212,8 +217,9 @@ class Adapter:
    with tempfile.TemporaryDirectory(prefix='cpmimage-comparison-') as td:
     cwd=Path(td);(cwd/'diskdefs').write_text(DEFS if defs_override is None else defs_override, encoding='utf-8')
     stage=cwd/('image.'+container);stage.write_bytes(original)
-    entries=self.listing(stage,fmt,container,cwd)
-    if op=='list':result={'entries':sorted(entries.values(),key=lambda e:e['name'])}
+    stats={}
+    entries=self.listing(stage,fmt,container,cwd,stats if op=='list' else None)
+    if op=='list':result={'entries':sorted(entries.values(),key=lambda e:e['name']), **stats}
     else:
      if name not in entries:raise Failure('not_found')
      if op=='export':
