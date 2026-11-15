@@ -1327,11 +1327,14 @@ void Window::showFilePreview(bool truncated) {
 
 void Window::inspectPreview(const QByteArray &bytes, const QString &name, const QString &title,
                             QWidget *pane, bool truncated, QString mode, int member,
-                            QPointer<QWidget> directoryView) {
+                            QPointer<QWidget> directoryView,
+                            std::function<void(bool, QByteArray, QByteArray)> extracted) {
     auto work = std::make_shared<QTemporaryDir>();
-    const auto fallback = [this, bytes, title, pane, truncated, member, directoryView] {
+    const auto fallback = [this, bytes, title, pane, truncated, member, directoryView, extracted] {
         if (directoryView) directoryView->setEnabled(true);
-        if (member >= 0) {
+        if (extracted) {
+            extracted(false, {}, {});
+        } else if (member >= 0) {
             QMessageBox::warning(this, "Cannot open member", "The archive worker could not read this member.");
         } else if (!closing) {
             showPreview(bytes, {}, {{"notice", "Archive worker could not inspect the file. Showing original bytes."}},
@@ -1366,14 +1369,17 @@ void Window::inspectPreview(const QByteArray &bytes, const QString &name, const 
             QFile file(work->filePath("original"));
             if (!file.open(QIODevice::ReadOnly)) { fallback(); return; }
             original = file.read(previewLimit + 1);
+            if (file.error() != QFile::NoError) { fallback(); return; }
         }
         QFile file(work->filePath("decoded"));
         if (file.exists()) {
             if (!file.open(QIODevice::ReadOnly)) { fallback(); return; }
             decoded = file.read(previewLimit + 1);
+            if (file.error() != QFile::NoError) { fallback(); return; }
             if (decoded.isNull()) decoded = QByteArray("");
         }
         if (original.size() > previewLimit || decoded.size() > previewLimit) { fallback(); return; }
+        if (extracted) { extracted(true, original, decoded); return; }
         const auto displayTitle = member >= 0 ? result["name"].toString(title) : title;
         if (!result["kind"].toString().isEmpty())
             showArchive(original, decoded, result, displayTitle, pane, directoryView);
@@ -1399,7 +1405,7 @@ void Window::showArchive(QByteArray bytes, QByteArray decoded, const QJsonObject
     members->setHorizontalHeaderLabels({"Member", "Size (bytes)", "Stored (bytes)"});
     members->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
     members->setSelectionBehavior(QAbstractItemView::SelectRows);
-    members->setSelectionMode(QAbstractItemView::SingleSelection);
+    members->setSelectionMode(QAbstractItemView::ExtendedSelection);
     members->setEditTriggers(QAbstractItemView::NoEditTriggers);
     for (int row = 0; row < entries.size(); ++row) {
         const auto entry = entries[row].toObject();
@@ -1423,6 +1429,85 @@ void Window::showArchive(QByteArray bytes, QByteArray decoded, const QJsonObject
         if (members->currentRow() >= 0) openMember(members->currentRow(), 0);
     });
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close);
+    auto *stream = new QComboBox;
+    stream->setObjectName("archiveExportStream");
+    stream->setAccessibleName("Archive export byte stream");
+    stream->addItems({"Decompressed when available", "Original bytes"});
+    layout->addWidget(stream);
+    auto *exportStatus = new QLabel;
+    exportStatus->setObjectName("archiveExportStatus");
+    layout->addWidget(exportStatus);
+    auto *exportMembers = buttons->addButton("Export selected…", QDialogButtonBox::ActionRole);
+    exportMembers->setObjectName("exportArchiveSelection");
+    exportMembers->setAutoDefault(false);
+    const auto updateExport = [=] { exportMembers->setEnabled(!members->selectionModel()->selectedRows().isEmpty()); };
+    connect(members->selectionModel(), &QItemSelectionModel::selectionChanged, dialog, updateExport);
+    updateExport();
+    connect(exportMembers, &QPushButton::clicked, dialog, [=] {
+        auto selected = members->selectionModel()->selectedRows();
+        if (selected.isEmpty()) return;
+        std::sort(selected.begin(), selected.end(), [](const QModelIndex &a, const QModelIndex &b) {
+            return a.row() < b.row();
+        });
+        const auto previous = settings->value("exports/directory", QDir::homePath()).toString();
+        const auto path = QFileDialog::getExistingDirectory(dialog, "Export archive members", previous);
+        if (path.isEmpty()) return;
+        settings->setValue("exports/directory", path);
+        const QDir destination(path);
+        const bool preferDecoded = stream->currentIndex() == 0;
+        auto *next = new QTimer(dialog);
+        next->setSingleShot(true);
+        const QPointer<QTimer> pending(next);
+        members->setEnabled(false);
+        exportMembers->setEnabled(false);
+        stream->setEnabled(false);
+        exportStatus->setText("Exporting archive members…");
+        connect(next, &QTimer::timeout, dialog, [=, index = 0, written = 0, skipped = 0,
+                                               failures = QStringList{}]() mutable {
+            while (index < selected.size()) {
+                const int row = selected[index++].row();
+                const auto memberName = entries[row].toObject()["name"].toString();
+                const auto hostName = filenamePolicy.translate(memberName);
+                if (!FilenamePolicy::validateHostName(hostName).isEmpty()) {
+                    failures << memberName;
+                    continue;
+                }
+                const auto existing = destination.entryList(QDir::AllEntries | QDir::Hidden | QDir::System);
+                if (std::any_of(existing.begin(), existing.end(), [&](const QString &entry) {
+                    return entry.compare(hostName, Qt::CaseInsensitive) == 0;
+                })) {
+                    ++skipped;
+                    continue;
+                }
+                inspectPreview(data, name, memberName, pane, false, "auto", row, {},
+                    [&written, &failures, pending, dialog, target = destination.filePath(hostName), memberName, preferDecoded]
+                    (bool ok, QByteArray original, QByteArray decoded) {
+                        if (!pending || !dialog->isVisible()) return;
+                        QFile output(target);
+                        const auto &payload = preferDecoded && !decoded.isNull() ? decoded : original;
+                        if (!ok || !output.open(QIODevice::WriteOnly | QIODevice::NewOnly)) {
+                            failures << memberName;
+                        } else {
+                            const bool saved = output.write(payload) == payload.size() && output.flush();
+                            output.close();
+                            if (saved) ++written;
+                            else { output.remove(); failures << memberName; }
+                        }
+                        pending->start(0);
+                    });
+                return;
+            }
+            exportStatus->setText(QString("%1 exported · %2 skipped (already exist) · %3 failed")
+                                  .arg(written).arg(skipped).arg(failures.size()));
+            exportStatus->setToolTip(failures.join('\n'));
+            stream->setEnabled(true);
+            members->setEnabled(true);
+            members->setFocus();
+            updateExport();
+            next->deleteLater();
+        });
+        next->start(0);
+    });
     auto *raw = buttons->addButton("View archive bytes…", QDialogButtonBox::ActionRole);
     connect(raw, &QPushButton::clicked, dialog, [=] { showPreview(bytes, decoded, {{"memberExportName", result["memberExportName"]}},
                                                              title, pane, false, members); });

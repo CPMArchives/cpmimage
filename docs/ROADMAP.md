@@ -155,6 +155,7 @@ Use V, Return, double-click, or View → View File to inspect one selected file 
 - Recognize Ctrl-Z in the final CP/M record of valid text even when leftover bytes follow it. Preserve the complete stream in Hex.
 - Allow explicit per-file text conversion when exporting selections, one user area, or All user areas. Preserve stored bytes by default.
 - Export one viewed LBR or ARK member at any nesting level using the selected original or decompressed byte stream and the viewer's existing limits.
+- Export selected members from the current LBR or ARK to one folder, with a byte-stream choice and no overwrite of existing files.
 
 **Acceptance:** The SIG/M Pascal examples open as text, a binary fixture opens in Hex, mixed batches preserve unchecked file bytes, and exported archive members match their selected streams. Exports leave source images unchanged.
 
