@@ -159,6 +159,12 @@ Use V, Return, double-click, or View → View File to inspect one selected file 
 
 **Acceptance:** The SIG/M Pascal examples open as text, a binary fixture opens in Hex, mixed batches preserve unchecked file bytes, and exported archive members match their selected streams. Exports leave source images unchanged.
 
+## v1.3 — Disk Format Editor
+
+**Shipped November 16, 2026.** Create, duplicate, import, validate, save, and export standalone cpmtools disk definitions from the editor. Saved definitions appear in the format picker, and users can check a definition against an image and preview legacy mapping sidecar conversion before replacement.
+
+See the [published v1.3 release and downloads](https://github.com/CPMArchives/cpmimage/releases/tag/v1.3#assets), [Disk Format Editor help](HELP.md#edit-disk-format-definitions), and [package validation results](VALIDATION.md#v13-disk-format-editor-package-checks).
+
 ## Explicitly deferred beyond v1.0
 
 - Graphical `fsck.cpm`-style consistency checking and repair.
@@ -167,7 +173,7 @@ Use V, Return, double-click, or View → View File to inspect one selected file 
 - Advanced disk-image comparison, merging, and reconstruction.
 - Physical floppy-drive access.
 
-Editable Image Properties and a custom Disk Format Editor are exploratory post-v1.0 work with no implementation commitment. Future design shall distinguish reinterpreting existing image bytes, changing image contents or metadata through the working-image and Save workflow, and authoring new reusable disk definitions.
+Editable Image Properties remains exploratory work. Future design shall distinguish reinterpreting existing image bytes, changing image contents or metadata through the working-image and Save workflow, and authoring new reusable disk definitions.
 
 The existing cpmtools CLI executables, including `fsck.cpm` and `fsed.cpm`, remain accessible in v1.0 headless mode.
 
