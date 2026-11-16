@@ -25,7 +25,7 @@ class QTemporaryDir;
 class Window : public QMainWindow {
     Q_OBJECT
 public:
-    Window(QString root, QString python, QString helper, int deadlineMs = 30000, int graceMs = 2000, QString noticesPath = {}, QString settingsFile = {});
+    Window(QString root, QString python, QString helper, int deadlineMs = 30000, int graceMs = 2000, QString noticesPath = {}, QString settingsFile = {}, QString definitionStore = {});
     ~Window() override;
     void openFromPicker();
     void createImage();
@@ -54,6 +54,9 @@ protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 private:
     void begin(QJsonObject request);
+    void requestEditor(QJsonObject request, std::function<void(QJsonObject, QString)> reply);
+    bool showDiskFormatEditor(const QString &selectedFormat = {});
+    void acceptCatalogue(const QJsonObject &result);
     void readReply();
     void fail(const QString &message);
     void setBusy(bool value);
@@ -124,7 +127,9 @@ private:
     void *readerJob = nullptr;
     bool busy = false, closing = false;
     QPushButton *formats;
-    QAction *externalCatalogueAction, *bundledCatalogueAction;
+    QAction *externalCatalogueAction, *bundledCatalogueAction, *diskFormatEditorAction;
+    QString definitionStore;
+    std::function<void(QJsonObject, QString)> editorReply;
     QJsonArray catalogueRows;
     QString cataloguePath, requestedImage, requestedFormat, requestedContainer;
     QString inspectedHash, inspectedContainer, activeCatalogue;

@@ -2,6 +2,8 @@
 #include <QDateTime>
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "window.h"
+#include "disk_format_editor.h"
+#include <QEventLoop>
 #include <QMetaMethod>
 #include <QLocale>
 #include <QCryptographicHash>
@@ -78,8 +80,8 @@ public:
     QHash<QString, QString> names;
 };
 
-Window::Window(QString root, QString python, QString helper, int deadlineMs, int graceMs, QString noticesPath, QString settingsFile)
-    : root(root), python(python), helper(helper), deadlineMs(deadlineMs), graceMs(graceMs) {
+Window::Window(QString root, QString python, QString helper, int deadlineMs, int graceMs, QString noticesPath, QString settingsFile, QString definitionStore)
+    : root(root), python(python), helper(helper), deadlineMs(deadlineMs), graceMs(graceMs), definitionStore(definitionStore) {
 #ifndef Q_OS_WIN
     process.setUnixProcessParameters(QProcess::UnixProcessFlag::CreateNewSession);
 #endif
@@ -502,6 +504,9 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     });
     externalCatalogueAction = fileMenu->addAction("Load diskdefs catalogue…");
     bundledCatalogueAction = fileMenu->addAction("Use bundled diskdefs");
+    diskFormatEditorAction = fileMenu->addAction("Disk Format Editor…");
+    diskFormatEditorAction->setObjectName("diskFormatEditorAction");
+    connect(diskFormatEditorAction, &QAction::triggered, this, [this] { showDiskFormatEditor(); });
     connect(externalCatalogueAction, &QAction::triggered, this, [this] {
         const auto path = QFileDialog::getOpenFileName(this, "Load diskdefs catalogue", cataloguePath);
         if (!path.isEmpty()) loadCatalogue(path);
@@ -512,7 +517,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         inspectedContainer = container;
         chooseFormat({}, true);
     });
-    connect(&process, &QProcess::readyReadStandardOutput, this, &Window::readReply);
+    connect(&process, &QProcess::readyReadStandardOutput, this, &Window::readReply, Qt::QueuedConnection);
     // Discard diagnostics continuously; they never become unbounded retained UI state.
     connect(&process, &QProcess::readyReadStandardError, this, [this] { process.readAllStandardError(); });
     connect(&process, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e) {
@@ -602,6 +607,7 @@ void Window::setBusy(bool value) {
     formats->setEnabled(!busy && !image.isEmpty() && !catalogueRows.isEmpty());
     externalCatalogueAction->setEnabled(!busy);
     bundledCatalogueAction->setEnabled(!busy);
+    diskFormatEditorAction->setEnabled(!busy);
     table->setEnabled(!busy && !session.isEmpty());
     userAreas->setEnabled(!busy && !session.isEmpty());
     showAllAction->setEnabled(userAreas->isEnabled());
@@ -910,6 +916,56 @@ void Window::openFromPicker() {
     if (path.isEmpty()) return;
     inspectImage(path);
 }
+void Window::acceptCatalogue(const QJsonObject &result) {
+    catalogueRows = result["formats"].toArray();
+    activeCatalogue = result["catalogue"].toString();
+    cataloguePath = activeCatalogue;
+    setBusy(busy);
+}
+
+void Window::requestEditor(QJsonObject request, std::function<void(QJsonObject, QString)> reply) {
+    if (busy) {
+        reply({}, "Wait for the current image operation to finish.");
+        return;
+    }
+    editorReply = std::move(reply);
+    begin(std::move(request));
+}
+
+bool Window::showDiskFormatEditor(const QString &selectedFormat) {
+    if (busy) return false;
+    DiskFormatEditor editor([this](auto request, auto reply) {
+        requestEditor(std::move(request), std::move(reply));
+    }, catalogueRows, requestedImage.isEmpty() ? image : requestedImage, selectedFormat, this);
+    auto load = [&] {
+        if (catalogueRows.isEmpty() || process.state() == QProcess::NotRunning) {
+            requestEditor({{"op", "catalogue"}, {"path", cataloguePath}},
+                          [this, guard = QPointer<DiskFormatEditor>(&editor)](auto result, auto failure) {
+                if (failure.isEmpty()) acceptCatalogue(result);
+                if (!guard) return;
+                guard->setCatalogue(catalogueRows);
+                guard->refreshRecords();
+            });
+        } else editor.refreshRecords();
+    };
+    QTimer::singleShot(0, &editor, load);
+    editor.exec();
+    if (!editor.savedDefinition()) return false;
+    // Refresh inside a short nested event loop so an already-open picker can
+    // keep its original image selection and repopulate immediately.
+    QEventLoop loop;
+    bool refreshed = false;
+    requestEditor({{"op", "catalogue"}, {"path", cataloguePath}}, [&](auto result, auto failure) {
+        if (failure.isEmpty()) {
+            acceptCatalogue(result);
+            refreshed = true;
+        } else status->setText(failure);
+        QTimer::singleShot(0, &loop, &QEventLoop::quit);
+    });
+    loop.exec();
+    return refreshed;
+}
+
 void Window::loadCatalogue(const QString &path) {
     if (busy) return;
     begin({{"op", "catalogue"}, {"path", path}});
@@ -981,16 +1037,22 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
         }
     };
     auto *search = new FormatSearch;
+    search->setObjectName("formatPickerSearch");
     search->setPlaceholderText("Search disk definitions");
     layout->addWidget(search);
     auto *group = new QComboBox;
     group->addItems({"Plausible candidates", "All formats", "Manufacturer and model", "System family", "Favorites"});
     layout->addWidget(group);
     auto *list = new QListWidget;
+    list->setObjectName("formatPickerList");
     search->results = list;
     layout->addWidget(list);
     auto *favorite = new QPushButton("Toggle favorite");
     layout->addWidget(favorite);
+    auto *editFormats = new QPushButton("Disk Format Editor…");
+    editFormats->setObjectName("formatPickerEditor");
+    editFormats->setAutoDefault(false);
+    layout->addWidget(editFormats);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Open | QDialogButtonBox::Cancel);
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
@@ -1024,8 +1086,9 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
             const auto maker = row["manufacturer"].toString().isEmpty() ? QString("Unclassified") : row["manufacturer"].toString();
             const auto model = row["model"].toString();
             const auto family = row["family"].toString().isEmpty() ? QString("Unclassified") : row["family"].toString();
-            if (!(id + " " + maker + " " + model + " " + family).contains(search->text(), Qt::CaseInsensitive)) continue;
-            QString label = id;
+            const auto display = row["display_name"].toString(id);
+            if (!(id + " " + display + " " + maker + " " + model + " " + family).contains(search->text(), Qt::CaseInsensitive)) continue;
+            QString label = display == id ? id : display + " — " + id;
             if (mode == 2) label = maker + " / " + model + " — " + id;
             if (mode == 3) label = family + " — " + id;
             if (mode == 0 && row.contains("evidence")) label += " — " + row["evidence"].toString();
@@ -1047,6 +1110,13 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
         settings->setValue(favoritesKey, favorites);
         populate();
     });
+    connect(editFormats, &QPushButton::clicked, &dialog, [&] {
+        const auto selected = list->currentItem() ? list->currentItem()->data(Qt::UserRole).toJsonObject()["id"].toString() : QString();
+        if (showDiskFormatEditor(selected)) {
+            group->setCurrentIndex(1);
+            populate();
+        }
+    });
     populate();
     const bool creating = std::exchange(newImagePicker, false);
     if (dialog.exec() == QDialog::Accepted && list->currentItem()) {
@@ -1056,6 +1126,7 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
             if (options.isEmpty()) return;
             options["op"] = "new_image";
             options["format"] = newDefinition["id"];
+            options["definition_sha256"] = newDefinition["definition_sha256"];
             begin(options);
             return;
         }
@@ -2189,7 +2260,7 @@ void Window::begin(QJsonObject request) {
         fail("The image reader is restarting. Open the image again."); return;
     }
     setBusy(true);
-    status->setText(operation == "open" ? "Reading image…" : operation == "catalogue" ? "Loading disk definitions…" :
+    status->setText(editorReply ? "Checking disk definition…" : operation == "open" ? "Reading image…" : operation == "catalogue" ? "Loading disk definitions…" :
         operation == "inspect" ? "Checking image format…" :
         operation == "preview" ? "Reading file preview…" :
         operation == "save_plan" ? "Preparing save…" : operation == "save" ? "Publishing save…" : batchActive ?
@@ -2199,7 +2270,9 @@ void Window::begin(QJsonObject request) {
     if (process.state() == QProcess::NotRunning) {
         session.clear();
         process.setProgram(python);
-        process.setArguments({"-I", "-B", "-u", root + "/prototype/broker.py", "--root", root, "--helper", helper});
+        QStringList arguments{"-I", "-B", "-u", root + "/prototype/broker.py", "--root", root, "--helper", helper};
+        if (!definitionStore.isEmpty()) arguments << "--definition-store" << definitionStore;
+        process.setArguments(arguments);
         process.start();
     } else sendPending();
 }
@@ -2216,6 +2289,14 @@ void Window::cancel() {
     status->setText("Cancelling…");
 }
 void Window::fail(const QString &message) {
+    if (editorReply) {
+        deadline.stop(); cancellationDeadline.stop();
+        auto reply = std::exchange(editorReply, {});
+        setBusy(false);
+        status->setText(message);
+        reply({}, message);
+        return;
+    }
     previewDirectory.reset();
     afterSave = {};
     newImagePicker = false;
@@ -2236,7 +2317,7 @@ void Window::readReply() {
     // A killed reader can still deliver queued output after its request failed.
     if (!busy) { process.readAllStandardOutput(); return; }
     output += process.readAllStandardOutput();
-    if (output.size() > 262144) {
+    if (output.size() > (editorReply ? 8 * 1024 * 1024 : 262144)) {
         stopReader(); fail("The image reader exceeded its response limit."); return;
     }
     if (!output.endsWith('\n')) return;
@@ -2265,6 +2346,19 @@ void Window::readReply() {
     const auto result = reply["result"].toObject();
     const QRegularExpression hash("^[0-9a-f]{64}$");
     auto invalid = [this] { stopReader(); resetImage(); fail("Invalid response schema from the image reader."); };
+    if (editorReply) {
+        if (!reply["result"].isObject() || (operation == "catalogue" &&
+                (!result["formats"].isArray() || result["catalogue"].toString().isEmpty()))) {
+            fail("Invalid response from the disk format reader.");
+            return;
+        }
+        deadline.stop(); cancellationDeadline.stop();
+        auto handler = std::exchange(editorReply, {});
+        setBusy(false);
+        status->setText(dirty ? "Unsaved changes." : "Disk definitions ready.");
+        handler(result, {});
+        return;
+    }
     if (!reply["result"].isObject()) { invalid(); return; }
     if (operation == "preview") {
         if (!result["truncated"].isBool()) { fail("Invalid text preview response."); return; }
@@ -2343,9 +2437,7 @@ void Window::readReply() {
         setBusy(false);
         if (operation == "catalogue") {
             if (!result["formats"].isArray() || result["catalogue"].toString().isEmpty()) { invalid(); return; }
-            catalogueRows = result["formats"].toArray();
-            activeCatalogue = result["catalogue"].toString();
-            cataloguePath = activeCatalogue;
+            acceptCatalogue(result);
             if (newImagePicker) { chooseFormat({}, false); return; }
             if (!requestedImage.isEmpty()) {
                 begin({{"op","inspect"}, {"image",requestedImage}, {"explicit_format",requestedFormat}, {"container",requestedContainer}});
