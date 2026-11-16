@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CP/M Image saved disk definition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "identifier",
+    "definition"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "type": "integer"
+    },
+    "record_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "allOf": [
+        {
+          "not": {
+            "const": "amstrad"
+          }
+        },
+        {
+          "not": {
+            "pattern": "[^\\x21-\\x22\\x24-\\x3A\\x3C-\\x7E]"
+          }
+        }
+      ]
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "definition": {
+      "$ref": "#/$defs/definition"
+    },
+    "import_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "diskdefs_text"
+      ],
+      "properties": {
+        "diskdefs_text": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seclen",
+        "tracks",
+        "sectrk",
+        "blocksize",
+        "maxdir",
+        "boot",
+        "dirblks",
+        "skew",
+        "os",
+        "offset",
+        "logicalextents",
+        "libdsk_format"
+      ],
+      "properties": {
+        "seclen": {
+          "type": "integer",
+          "minimum": 128,
+          "maximum": 16384,
+          "multipleOf": 128
+        },
+        "tracks": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sectrk": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "blocksize": {
+          "type": "integer",
+          "minimum": 128,
+          "maximum": 16384,
+          "multipleOf": 128
+        },
+        "maxdir": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "boot": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "unit",
+            "count"
+          ],
+          "properties": {
+            "unit": {
+              "enum": [
+                "tracks",
+                "sectors"
+              ]
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            }
+          }
+        },
+        "dirblks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "skew": {
+          "$ref": "#/$defs/skew"
+        },
+        "os": {
+          "enum": [
+            null,
+            "2.2",
+            "3",
+            "isx",
+            "p2dos",
+            "zsys"
+          ]
+        },
+        "offset": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "unit"
+          ],
+          "properties": {
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "unit": {
+              "enum": [
+                "bytes",
+                "kib",
+                "mib",
+                "sectors",
+                "tracks"
+              ]
+            }
+          }
+        },
+        "logicalextents": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 32
+        },
+        "libdsk_format": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "not": {
+                "pattern": "[\\s\\x00-\\x1F\\x7F#;]"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "skew": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "const": "default"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "step"
+          ],
+          "properties": {
+            "mode": {
+              "const": "step"
+            },
+            "step": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483646
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "slots"
+          ],
+          "properties": {
+            "mode": {
+              "const": "table"
+            },
+            "slots": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1024,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
