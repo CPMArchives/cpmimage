@@ -5,6 +5,7 @@ Reuses the qualified experimental parent, not a new filesystem implementation.
 Only one operation runs at a time; cancellation is cooperative through the parent.
 """
 import argparse
+from dataclasses import asdict
 import hashlib
 import json
 import os
@@ -20,6 +21,11 @@ import uuid
 
 
 MAX_IMAGE_BYTES = 128 * 1024 * 1024
+EDITOR_OPERATIONS = frozenset({
+    'definition_list', 'definition_import', 'definition_validate', 'definition_check_image',
+    'definition_save', 'definition_export', 'mapping_preview', 'mapping_write',
+})
+MAX_EDITOR_REQUEST_BYTES = 2 * 1024 * 1024
 DSK_MAGIC = b'MV - CPCEMU Disk-File\r\nDisk-Info\r\n'
 
 
@@ -64,18 +70,25 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--helper', type=Path, required=True)
+    parser.add_argument('--definition-store', type=Path,
+                        default=Path.home() / '.cpmimage' / 'disk-formats')
     args = parser.parse_args()
     sys.path.insert(0, str(args.root / 'experiments/process-comparison'))
     sys.path.insert(0, str(args.root / 'prototype'))
     import catalogue
-    from container_mapping import MappingError, PhysicalMapping, inspect_imd, transfer_dmk, dmk_template, replace_imd_comment, verify_jv3, derive_mapping
+    from container_mapping import MappingError, PhysicalMapping, inspect_imd, transfer_dmk, dmk_template, replace_imd_comment, verify_jv3, derive_mapping, strict_profile
     from publication import fingerprint as file_hash, publish, recovery_directory, require_recovery_clear
-    from source_ownership import Ownership, OwnershipError, identity
+    from source_ownership import Ownership, OwnershipError, identity, native_lock
+    from disk_format_store import DefinitionStore, DefinitionStoreError, atomic_write, encode_record
+    store = DefinitionStore(args.definition_store)
     import adapters as backend
     backend.HELPER = args.helper.resolve()
     bundled_path = args.root / 'fixtures/diskdefs'
     definitions = catalogue.definitions(catalogue.read_text(bundled_path), bundled=True)
     definitions['amstrad'] = ''
+    bundled_identifiers = frozenset(definitions)
+    base_definitions = definitions.copy()
+    saved_loaded = False
     metadata = json.loads((args.root / 'fixtures/diskdefs-metadata.json').read_text(encoding='utf-8'))
     descriptions = {}
     # Only internal command construction can select this guard; never a request.
@@ -183,24 +196,25 @@ def main():
         extension = source.suffix.lower().lstrip('.')
         return extension if extension in structured else 'raw'
 
-    def mapped_image(container, source, data, geometry, directory, raw, writing=False):
+    def mapped_image(container, source, data, geometry, directory, raw, *, proposed_profile=None):
         profile = source.with_name(source.name + '.mapping.json')
         try:
-            try:
-                mapping = PhysicalMapping.from_profile(json.loads(catalogue.read_text(profile)), geometry)
-            except FileNotFoundError:
-                mapping = derive_mapping(container, data, geometry)
+            if proposed_profile is not None:
+                mapping = PhysicalMapping.from_profile(proposed_profile, geometry)
+            else:
+                try:
+                    mapping = PhysicalMapping.from_profile(json.loads(catalogue.read_text(profile)), geometry)
+                except FileNotFoundError:
+                    mapping = derive_mapping(container, data, geometry)
             if container == 'dmk':
-                if writing:
-                    raise MappingError('Use a verified DMK template; RAW-to-DMK creation is unavailable.')
                 raw.write_bytes(transfer_dmk(data, mapping))
                 return mapping
-            if not writing and container == 'imd':
+            if container == 'imd':
                 inventory, _ = inspect_imd(data)
                 mapping.verify_inventory(inventory)
-            if not writing and container == 'jv3':
+            if container == 'jv3':
                 verify_jv3(data, mapping)
-            transfer(container, mapping, directory, raw, data, writing)
+            transfer(container, mapping, directory, raw, data, False)
             return mapping
         except (MappingError, OSError, ValueError) as error:
             raise backend.Failure('physical_mapping', f'{profile.name}: {error}') from error
@@ -217,12 +231,157 @@ def main():
                          container, map_path, raw, encoded)
         return encoded
 
+    def stage_image(source, data, container, geometry, directory, *, proposed_profile=None):
+        if container not in ('raw', 'dsk', *structured):
+            raise backend.Failure('unsupported_container', 'Select RAW or standard CPCEMU DSK.')
+        if data.startswith(b'EXTENDED CPC DSK File'):
+            raise backend.Failure('unsupported_container', 'Extended CPCEMU DSK is outside the supported container scope.')
+        if data.startswith(DSK_MAGIC) != (container == 'dsk'):
+            raise backend.Failure('container_mismatch', 'The image header does not match the selected container.')
+        image = directory / 'image.raw'
+        mapping = None
+        if container in structured:
+            mapping = mapped_image(container, source, data, geometry, directory, image,
+                                   proposed_profile=proposed_profile)
+            end = image.stat().st_size
+        elif container == 'dsk':
+            check_standard_dsk(data, geometry, backend)
+            encoded = directory / 'source.dsk'
+            encoded.write_bytes(data)
+            adapter().native(directory, 'decode', encoded, image)
+            end = image.stat().st_size
+        else:
+            end = raw_extent(data, geometry, backend)
+            image.write_bytes(data)
+        return image, mapping, end
+
+    def render_record(record):
+        try:
+            from disk_format import DiskFormatError, render_definition
+        except ImportError as error:
+            raise backend.Failure('editor_unavailable', 'Disk format validation requires jsonschema.') from error
+        try:
+            return render_definition(record)
+        except DiskFormatError as error:
+            raise backend.Failure('invalid_definition', str(error)) from error
+
+    def merged_definitions(base, records):
+        combined = base.copy()
+        for record in records:
+            rendered = render_record(record)
+            if rendered.identifier in combined:
+                raise backend.Failure('definition_conflict', f'Duplicate format identifier {rendered.identifier}.')
+            combined[rendered.identifier] = rendered.text
+        return combined
+
+    def editor(request):
+        nonlocal definitions, saved_loaded
+        op = request['op']
+        if op == 'definition_list':
+            records, unsupported = store.records()
+            return dict(records=records, unsupported=unsupported)
+        if op == 'definition_import':
+            imported = catalogue.import_definition(request['text'])
+            return dict(record=imported.record, diagnostics=[asdict(item) for item in imported.diagnostics])
+
+        record = request['record']
+        rendered = render_record(record)
+        if op in ('definition_save', 'definition_export') and 'import_source' in record:
+            imported = catalogue.import_definition(record['import_source']['diskdefs_text'])
+            unresolved = any(item.code != 'noncanonical_offset' for item in imported.diagnostics)
+            if unresolved and request.get('resolved_import') is not True:
+                raise backend.Failure('unresolved_import', 'Resolve the imported directives before saving or exporting.')
+        fmt, definition = rendered.identifier, rendered.text
+        with tempfile.TemporaryDirectory(prefix='cpmimage-editor-') as temp:
+            directory = Path(temp)
+            geometry = describe(fmt, definition, directory)
+            result = dict(diskdefs=definition, definition_sha256=rendered.revision, geometry=geometry)
+            if op in ('definition_check_image', 'mapping_preview', 'mapping_write'):
+                source = Path(request['image']).absolute()
+                data = read_image(source)
+                container = request.get('container') or image_container(source, data)
+                profile = None
+                if op == 'mapping_write':
+                    if request.get('confirmed') is not True or container not in structured:
+                        raise backend.Failure('confirmation_required', 'Confirm writing a structured image mapping.')
+                    from disk_format import DiskFormatError, validate_mapping_sidecar
+                    profile = request['profile']
+                    try:
+                        validate_mapping_sidecar(profile)
+                    except DiskFormatError as error:
+                        raise backend.Failure('invalid_mapping', str(error)) from error
+                if op == 'mapping_preview':
+                    if container not in structured:
+                        raise backend.Failure('unsupported_container', 'Select an IMD, JV3, or DMK image.')
+                    path = source.with_name(source.name + '.mapping.json')
+                    original_data = mapping_bytes(path)
+                    original_hash = mapping_hash(original_data)
+                image, mapping, _ = stage_image(source, data, container, geometry, directory,
+                                                proposed_profile=profile)
+                if op == 'definition_check_image':
+                    checked = adapter().request(dict(v=1, id=request['id'], op='list', image=str(image),
+                                                     format=fmt, container='raw'), defs_override=definition)
+                    if not checked['ok']:
+                        raise backend.Failure(checked['error'], checked.get('message', ''))
+                    result.update(checked['result'], container=container)
+                    if mapping:
+                        result['mapping'] = strict_profile(mapping)
+                elif op == 'mapping_preview':
+                    if mapping_bytes(path) != original_data:
+                        raise backend.Failure('source_changed', 'The mapping changed. Preview it again.')
+                    result.update(profile=strict_profile(mapping), mapping_sha256=original_hash,
+                                  previous_profile=json.loads(original_data) if original_data is not None else None)
+                else:
+                    path = source.with_name(source.name + '.mapping.json')
+                    contents = (json.dumps(profile, indent=2) + '\n').encode('utf-8')
+                    if len(contents) > catalogue.MAX_CATALOGUE_BYTES:
+                        contents = (json.dumps(profile, separators=(',', ':')) + '\n').encode('utf-8')
+                    if len(contents) > catalogue.MAX_CATALOGUE_BYTES:
+                        raise backend.Failure('invalid_mapping', 'Mapping exceeds the 256 KiB sidecar limit.')
+                    store.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+                    with native_lock(store.directory / '.mapping-write.lock'):
+                        if mapping_hash(mapping_bytes(path)) != request['mapping_sha256']:
+                            raise backend.Failure('source_changed', 'The mapping changed. Preview it again.')
+                        if read_image(source) != data:
+                            raise backend.Failure('source_changed', 'The image changed. Check it again.')
+                        if stop.is_set():
+                            raise backend.Failure('cancelled')
+                        atomic_write(path, contents)
+                    result['mapping_sha256'] = mapping_hash(contents)
+            elif op == 'definition_save':
+                if stop.is_set():
+                    raise backend.Failure('cancelled')
+                records = store.save(record, bundled_identifiers | base_definitions.keys(),
+                                     lambda records: merged_definitions(base_definitions, records),
+                                     request.get('record_sha256'))
+                result['record_sha256'] = hashlib.sha256(encode_record(record)).hexdigest()
+                definitions = merged_definitions(base_definitions, records)
+                saved_loaded = True
+            return result
+
+    def mapping_bytes(path):
+        try:
+            data = read_image(path)
+        except FileNotFoundError:
+            return None
+        if len(data) > catalogue.MAX_CATALOGUE_BYTES:
+            raise backend.Failure('invalid_mapping', 'Mapping exceeds the 256 KiB sidecar limit.')
+        return data
+
+    def mapping_hash(data):
+        return hashlib.sha256(data).hexdigest() if data is not None else None
+
     def perform(request):
-        nonlocal snapshot, session, definitions
+        nonlocal snapshot, session, definitions, base_definitions, saved_loaded
         rid = request['id']
         try:
             op = request.get('op')
-            if op == 'catalogue':
+            if not saved_loaded and op in ('inspect', 'open', 'new_image'):
+                definitions = merged_definitions(base_definitions, store.records()[0])
+                saved_loaded = True
+            if isinstance(op, str) and op in EDITOR_OPERATIONS:
+                reply = dict(v=1, id=rid, ok=True, result=editor(request))
+            elif op == 'catalogue':
                 try:
                     path = Path(request['path']).resolve(strict=True) if request.get('path') else bundled_path
                     blocks = catalogue.definitions(catalogue.read_text(path), bundled=path == bundled_path)
@@ -230,8 +389,11 @@ def main():
                     raise backend.Failure('invalid_catalogue', str(error)) from error
                 if path == bundled_path:
                     blocks['amstrad'] = ''
-                rows = validate_catalogue(blocks)
-                definitions = blocks
+                combined = merged_definitions(blocks, store.records()[0])
+                rows = validate_catalogue(combined)
+                base_definitions = blocks
+                definitions = combined
+                saved_loaded = True
                 reply = dict(v=1, id=rid, ok=True, result=dict(formats=rows, catalogue=str(path)))
             elif op == 'inspect':
                 source = Path(request['image']).absolute()
@@ -357,26 +519,7 @@ def main():
                     geometry = describe(fmt, definition, directory)
                 if request.get('definition_sha256', catalogue.digest(definition)) != catalogue.digest(definition):
                     raise backend.Failure('definition_changed', 'The disk definition changed. Select it again.')
-                if container not in ('raw', 'dsk', *structured):
-                    raise backend.Failure('unsupported_container', 'Select RAW or standard CPCEMU DSK.')
-                if data.startswith(b'EXTENDED CPC DSK File'):
-                    raise backend.Failure('unsupported_container', 'Extended CPCEMU DSK is outside the supported container scope.')
-                if data.startswith(DSK_MAGIC) != (container == 'dsk'):
-                    raise backend.Failure('container_mismatch', 'The image header does not match the selected container.')
-                image = directory / 'image.raw'
-                mapping = None
-                if container in structured:
-                    mapping = mapped_image(container, source, data, geometry, directory, image)
-                    end = image.stat().st_size
-                elif container == 'dsk':
-                    check_standard_dsk(data, geometry, backend)
-                    encoded = directory / 'source.dsk'
-                    encoded.write_bytes(data)
-                    adapter().native(directory, 'decode', encoded, image)
-                    end = image.stat().st_size
-                else:
-                    end = raw_extent(data, geometry, backend)
-                    image.write_bytes(data)
+                image, mapping, end = stage_image(source, data, container, geometry, directory)
                 trimmed = image.stat().st_size < end
                 reply = adapter().request({
                     'v': 1, 'id': rid, 'op': 'list', 'image': str(image),
@@ -417,6 +560,9 @@ def main():
                 definition = definitions.get(fmt) if creating else session['definitions']
                 if definition is None:
                     raise backend.Failure('unknown_format', 'Select a catalogued disk definition.')
+                revision = catalogue.digest(definition)
+                if creating and request.get('definition_sha256', revision) != revision:
+                    raise backend.Failure('definition_changed', 'The disk definition changed. Select it again.')
                 label = request.get('label', '')
                 if not isinstance(label, str) or len(label) > 11 or any(not 32 <= ord(c) <= 126 for c in label):
                     raise backend.Failure('invalid_label', 'Use up to 11 printable ASCII characters.')
@@ -788,6 +934,8 @@ def main():
             respond(reply)
         except backend.Failure as error:
             respond(dict(v=1, id=rid, ok=False, error=error.code, message=error.message))
+        except DefinitionStoreError as error:
+            respond(dict(v=1, id=rid, ok=False, error='definition_store', message=str(error)))
         except OwnershipError as error:
             respond(dict(v=1, id=rid, ok=False, error='ownership', message=str(error)))
         except (OSError, KeyError, TypeError, ValueError) as error:
@@ -800,15 +948,17 @@ def main():
     signal.signal(signal.SIGTERM, interrupted)
     try:
         while True:
-            raw = sys.stdin.buffer.readline(65537)
+            raw = sys.stdin.buffer.readline(MAX_EDITOR_REQUEST_BYTES + 1)
             if not raw:
                 break
-            if len(raw) > 65536 or not raw.endswith(b'\n'):
+            if len(raw) > MAX_EDITOR_REQUEST_BYTES or not raw.endswith(b'\n'):
                 break  # Never parse an incomplete/oversized request.
             try:
                 request = json.loads(raw)
                 if not isinstance(request, dict) or request.get('v') != 1:
                     raise ValueError('Invalid protocol version')
+                if len(raw) > 65536 and request.get('op') not in tuple(EDITOR_OPERATIONS):
+                    break
                 rid = request.get('id')
                 if not isinstance(rid, str) or not 0 < len(rid) <= 128:
                     raise ValueError('Invalid request ID')
