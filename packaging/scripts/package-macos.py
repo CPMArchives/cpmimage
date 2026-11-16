@@ -3,6 +3,7 @@ from pathlib import Path
 import os,shutil,subprocess,plistlib,re,tempfile
 from notices import BASE,ROOT,create
 from utility_bundle import install_utilities
+from editor_bundle import install_validator, stage_editor
 app=BASE/'dist/CPMImage-macOS-arm64/CPMImage.app'
 if app.exists():shutil.rmtree(app)
 shutil.copytree(BASE/'app-macos/cpmimage-review.app',app,symlinks=True)
@@ -14,8 +15,10 @@ icon = 'cpmimage.icns'
 if not (app/'Contents/Resources'/icon).is_file():
  raise SystemExit(f'Missing macOS app icon: {icon}')
 metadata.update(CFBundleExecutable='cpmimage',
-                CFBundleIdentifier='org.cpmarchives.cpmimage.packagereview',
-                CFBundleName='CPMImage Review',
+                CFBundleIdentifier='org.cpmarchives.cpmimage.review',
+                CFBundleName='CPMImage',
+                CFBundleShortVersionString='1.3',
+                CFBundleVersion='1.3',
                 CFBundleIconFile=icon,
                 LSMinimumSystemVersion='14.4')
 with info.open('wb') as stream: plistlib.dump(metadata,stream)
@@ -24,9 +27,11 @@ backend=resources/'cpmimage'
 archive_codecs = sorted(str(path.relative_to(ROOT)) for path in (ROOT/'prototype/archive_codecs').iterdir() if path.is_file())
 for rel in ['prototype/archive_view.py', 'prototype/broker.py','prototype/catalogue.py','prototype/container_mapping.py','prototype/publication.py','prototype/source_ownership.py','prototype/helper_guard.py','experiments/process-comparison/adapters.py','experiments/process-comparison/windows_supervisor.py','fixtures/diskdefs','fixtures/diskdefs-metadata.json'] + archive_codecs:
  dst=backend/rel;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(ROOT/rel,dst)
+stage_editor(backend)
 helper=app/'Contents/Helpers/cpmimage-helper';helper.parent.mkdir(exist_ok=True)
 shutil.copy2(BASE/'cpmimage-helper-macos',helper)
 runtime=resources/'runtime';shutil.copytree(BASE/'python-macos',runtime,symlinks=True,ignore=shutil.ignore_patterns('__pycache__'))
+validator = install_validator(runtime, 'macos-arm64')
 for f in [runtime/'bin/idle3',runtime/'bin/idle3.13',runtime/'bin/pydoc3',runtime/'bin/pydoc3.13',runtime/'bin/python3-config',runtime/'bin/python3.13-config']:
  if f.exists() or f.is_symlink():f.unlink()
 # The interpreter discovers stdlib relative to itself; eliminate its build-prefix dylib reference.
@@ -47,7 +52,7 @@ platforms=app/'Contents/PlugIns/platforms'
 shutil.copy2(BASE/'qt-macos/install/plugins/platforms/libqoffscreen.dylib',platforms/'libqoffscreen.dylib')
 subprocess.run(['install_name_tool','-add_rpath','@loader_path/../../Frameworks',str(platforms/'libqoffscreen.dylib')],check=True)
 install_utilities(app/'Contents/MacOS/cpmtools', 'macos')
-create(resources/'notices','macos')
+create(resources/'notices','macos',validator)
 # Remove stale build-prefix fallback search paths, even when the relocated app
 # already works via its bundle-relative primary search path.
 for f in app.rglob('*'):

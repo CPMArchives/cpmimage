@@ -54,5 +54,77 @@
     "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20261104/llvm-mingw-20261104-ucrt-macos-universal.tar.xz",
     "sha256": "66cbd5178c4a71b0d473e68ede172f8eb7d15d023e67f39201d0a69e21f6bf3c",
     "bytes": 125261696
+  },
+  {
+    "group": "validator",
+    "target": "all",
+    "path": "packaging/downloads/jsonschema-4.26.0-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/69/90/f63fb5873511e014207a475e2bb4e8b2e570d655b00ac19a9a0ca0a385ee/jsonschema-4.26.0-py3-none-any.whl",
+    "sha256": "d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce",
+    "bytes": 90630
+  },
+  {
+    "group": "validator",
+    "target": "all",
+    "path": "packaging/downloads/attrs-26.1.0-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/64/b4/17d4b0b2a2dc85a6df63d1157e028ed19f90d4cd97c36717afef2bc2f395/attrs-26.1.0-py3-none-any.whl",
+    "sha256": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
+    "bytes": 67548
+  },
+  {
+    "group": "validator",
+    "target": "all",
+    "path": "packaging/downloads/referencing-0.37.0-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/2c/58/ca301544e1fa93ed4f80d724bf5b194f6e4b945841c5bfd555878eea9fcb/referencing-0.37.0-py3-none-any.whl",
+    "sha256": "381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231",
+    "bytes": 26766
+  },
+  {
+    "group": "validator",
+    "target": "all",
+    "path": "packaging/downloads/jsonschema_specifications-2025.9.1-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/41/45/1a4ed80516f02155c51f51e8cedb3c1902296743db0bbc66608a0db2814f/jsonschema_specifications-2025.9.1-py3-none-any.whl",
+    "sha256": "98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe",
+    "bytes": 18437
+  },
+  {
+    "group": "validator",
+    "target": "macos-arm64",
+    "path": "packaging/downloads/rpds_py-2026.6.3-cp313-cp313-macosx_11_0_arm64.whl",
+    "url": "https://files.pythonhosted.org/packages/f3/6b/686d9dc4359a8f163cfbbf89ee0b4e586431de22fe8248edb63a8cf50d49/rpds_py-2026.6.3-cp313-cp313-macosx_11_0_arm64.whl",
+    "sha256": "f4d78253f6996be4901669ad25319f842f740eccf4d58e3c7f3dd39e6dde1d8f",
+    "bytes": 338203
+  },
+  {
+    "group": "validator",
+    "target": "linux-arm64",
+    "path": "packaging/downloads/rpds_py-2026.6.3-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
+    "url": "https://files.pythonhosted.org/packages/9e/9b/069aa329940f8207615e091f5eedbbd40e1e15eac68a0790fd05ccdf796c/rpds_py-2026.6.3-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
+    "sha256": "54f45a148e28767bf343d33a684693c70e451c6f4c0e9904709a723fafbdfc1f",
+    "bytes": 367984
+  },
+  {
+    "group": "validator",
+    "target": "linux-x86-64",
+    "path": "packaging/downloads/rpds_py-2026.6.3-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+    "url": "https://files.pythonhosted.org/packages/57/d7/fe978efc2ae50abe48eb7464668ea99f53c010c60aeebb7b35ad27f23661/rpds_py-2026.6.3-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+    "sha256": "acac386b453c2516111b50985d60ce46e7fadb5ea71ae7b25f4c946935bf27cf",
+    "bytes": 365678
+  },
+  {
+    "group": "validator",
+    "target": "windows-arm64",
+    "path": "packaging/downloads/rpds_py-2026.6.3-cp313-cp313-win_arm64.whl",
+    "url": "https://files.pythonhosted.org/packages/27/17/b8642c12930b71bc2b25831f6708ccf0f75abcd11883932ec9ce54ba3a78/rpds_py-2026.6.3-cp313-cp313-win_arm64.whl",
+    "sha256": "900a67df3fd1660b035a4761c4ce73c382ea6b35f90f9863c36c6fd8bf8b09bb",
+    "bytes": 215063
+  },
+  {
+    "group": "validator",
+    "target": "windows-x86-64",
+    "path": "packaging/downloads/rpds_py-2026.6.3-cp313-cp313-win_amd64.whl",
+    "url": "https://files.pythonhosted.org/packages/7b/ed/a03b09668e74e5dabbf2e211f6468e1820c0552f7b0500082da31841bf7b/rpds_py-2026.6.3-cp313-cp313-win_amd64.whl",
+    "sha256": "9250a9a0a6fd4648b3f868da8d91a4c52b5811a62df58e753d50ae4454a36f80",
+    "bytes": 219454
   }
 ]

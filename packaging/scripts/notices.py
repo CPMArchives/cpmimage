@@ -11,7 +11,16 @@ if not PYTHON.exists(): PYTHON=BASE/'build-python-linux/Python-3.13.17'
 def copy(source,dest):
  dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(source,dest)
 
-def create(destination,platform):
+def add_validator_notices(destination, packages):
+ for metadata in sorted(packages.glob('*.dist-info')):
+  for notice in metadata.rglob('*'):
+   if notice.is_file() and (notice.name == 'METADATA' or
+                            any(part.lower() == 'licenses' for part in notice.relative_to(metadata).parts) or
+                            notice.name.lower().startswith(('license', 'copying', 'notice'))):
+    copy(notice, destination/'JSON-Schema-validator'/notice.relative_to(packages))
+
+
+def create(destination,platform,validator=None):
  destination=Path(destination);destination.mkdir(parents=True,exist_ok=True)
  copy(ROOT/'prototype/LICENSE',destination/'GPL-3.0.txt')
  copy(ROOT/'prototype/archive_codecs/NOTICE.md',destination/'80un-archive-codecs.md')
@@ -126,6 +135,14 @@ Linux glibc/graphics stack) are prerequisites supplied by the operating system,
 not relicensed or copied into the app by this notice. See README for the tested
 platform baseline. This review package is not a signed/notarized public release.
 '''
+ if validator is not None:
+  add_validator_notices(destination, validator)
+  summary += """
+Disk Format Editor JSON Schema validation uses jsonschema, attrs, referencing,
+jsonschema-specifications, and rpds-py. The locked wheel versions and hashes are
+in packaging/dependencies.json. See JSON-Schema-validator/ for package metadata
+and upstream license texts. Runtime wheel metadata is retained with the modules.
+"""
  (destination/'THIRD-PARTY-NOTICES.txt').write_text(summary)
  files={str(f.relative_to(destination)):hashlib.sha256(f.read_bytes()).hexdigest() for f in destination.rglob('*') if f.is_file() and f.name!='notice-sha256.json'}
  (destination/'notice-sha256.json').write_text(json.dumps(files,indent=2)+'\n')

@@ -47,3 +47,42 @@ ARM64 only. No x64/x86 or older-macOS execution qualification. The14.4 Mac targe
 ## v0.2 navigation and selection
 
 The subsequent v0.2 slice is documented in [V0_2_NAVIGATION_REVIEW.md](V0_2_NAVIGATION_REVIEW.md), with current logs under `docs/validation/v0.2-navigation`. Native ARM64 macOS, Windows/MSVC and Debian builds pass the GUI suite. Windows and Debian broker/final-track regressions also pass (two expected POSIX-only broker skips on Windows). This is application/build validation, not a repeat of the complete v0.1 relocatable-package qualification. Native macOS accessibility inspection required the recorded upstream Qt Cocoa backport.
+
+## v1.3 Disk Format Editor package checks
+
+The published v1.2 macOS ARM64 DMG is the compatibility baseline. Its SHA-256 matched the release manifest and GitHub asset digest. The native helper accepted both example definitions, and the broker opened and exported the same 128-byte IMD payload using the standard sidecar and both legacy variants. [v1.2 checksum manifest](https://github.com/CPMArchives/cpmimage/releases/download/v1.2/SHA256SUMS.txt), [Disk Format Editor spec](V1_3_DISK_FORMAT_EDITOR.md)
+
+```text
+191eb538e83f55946a3f5775310e4747aadd76fefed1baf51f16922f80ae8e13
+```
+
+Run the common package checker against the assembled application's executable. It resolves the private interpreter and native helper through the launcher diagnostics. It clears executable and library search overrides, poisons the inherited Python environment, and uses a temporary definition store. The checker validates both bundled Draft 2020-12 schemas and verifies that `jsonschema` and the platform's native `rpds` extension import from the private runtime. It also checks existing export oracles, overwrite refusal, 20 repeated exports, and the final-track cases when a manifest is supplied.
+
+```sh
+python3 packaging/scripts/check-package.py /path/to/assembled/executable \
+  --fixture fixtures/ibm3740-independent.raw \
+  --final-track-manifest fixtures/final-track-manifest.json \
+  --report packaging/results/v1.3-package.json
+```
+
+The editor checks import, render, validate, and save both example definitions through the packaged broker. The standard IMD mapping and both legacy sidecars open and export the exact marker from physical sector ID 2. All three IMD inputs and sidecars are compared byte-for-byte. Both legacy forms are rejected for strict writes and remain readable through the legacy path.
+
+| Negative case | Rejecting layer | Inputs checked after rejection |
+|---|---|---|
+| `seclen 384` with `blocksize 1024` | Native helper, `invalid_definition` | `diskdefs` |
+| IMD inventory differs on track `0/1` | Broker mapping verifier, `physical_mapping` | `diskdefs`, IMD, sidecar |
+| Malformed mapping JSON | Broker JSON decoder, `physical_mapping` | `diskdefs`, IMD, sidecar |
+
+The checker requires all listed inputs and the package contents to remain byte-for-byte intact. Its report records each rejection layer separately.
+
+### Local v1.3 candidate results
+
+| Target | Packaged regression | Qt checks |
+|---|---|---|
+| macOS ARM64 | Passed from the read-only DMG at a path containing spaces and Unicode. Code signatures verified and 70 Mach-O files audited. | 38 Qt checks passed with the bundled Python and helper, including the historical SIG/M fixture. |
+| Linux ARM64 | Passed in the Debian 13 ARM64 guest. | Both focused editor tests passed with the bundled Python and helper. |
+| Linux x86-64 | Passed in the Debian 13 x86-64 guest. | Both focused editor tests passed with the bundled Python and helper. |
+| Windows ARM64 | Passed using the extracted payload of the Windows 11 ARM64 single-file candidate. | Both focused editor tests passed with the bundled Python and helper. |
+| Windows x86-64 | Passed using the extracted payload of the Windows 11 x86-64 single-file candidate and its native Windows Qt plugin. | Built the GUI test target. Packaged runtime checks ran through the native broker and helper. |
+
+The macOS assembly used the v1.3 packaging script. The Linux and Windows guest runs rebuilt the application and restaged the editor and pinned wheels into the existing target runtime bundles. The candidates execute with `jsonschema` 4.26.0, `attrs` 26.1.0, `referencing` 0.37.0, `jsonschema-specifications` 2025.9.1, and the target-specific `rpds-py` 2026.6.3 wheel. Each verified target passed both legacy-sidecar cases and all three negative cases. These checks qualify the local candidates for review. Release publication remains pending.

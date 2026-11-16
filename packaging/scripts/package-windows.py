@@ -4,6 +4,7 @@ import argparse,shutil,zipfile
 from pathlib import Path
 from notices import BASE,ROOT,create
 from utility_bundle import install_utilities
+from editor_bundle import install_validator, stage_editor
 p=argparse.ArgumentParser();p.add_argument('executable',type=Path)
 p.add_argument('--arch', choices=('arm64', 'x86-64'), default='arm64')
 p.add_argument('--qt', type=Path)
@@ -34,11 +35,13 @@ py=a.python_runtime or ROOT/'windows-runtime/offline-media/CPMImageTests/python'
 for name in ['python.exe','python3.dll','python313.dll','python313.zip','python313._pth','LICENSE.txt','_ctypes.pyd','libffi-8.dll','select.pyd','unicodedata.pyd']:
  shutil.copy2(py/name,runtime/name)
 for f in crt.glob('vcruntime*.dll'):shutil.copy2(f,runtime)
+validator = install_validator(runtime, 'windows-' + a.arch)
 archive_codecs = sorted(str(path.relative_to(ROOT)) for path in (ROOT/'prototype/archive_codecs').iterdir() if path.is_file())
 for rel in ['prototype/archive_view.py', 'prototype/broker.py','prototype/catalogue.py','prototype/container_mapping.py','prototype/publication.py','prototype/source_ownership.py','prototype/helper_guard.py','experiments/process-comparison/adapters.py','experiments/process-comparison/windows_supervisor.py','fixtures/diskdefs','fixtures/diskdefs-metadata.json'] + archive_codecs:
  dst=out/'resources/cpmimage'/rel;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(ROOT/rel,dst)
+stage_editor(out/'resources/cpmimage')
 install_utilities(out/'cpmtools', 'windows')
-create(out/'notices','windows')
+create(out/'notices','windows',validator)
 with zipfile.ZipFile(BASE/'downloads'/f'windows-package-{a.arch}.zip','w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
  for f in out.rglob('*'):
   if f.is_file():z.write(f,f.relative_to(out.parent))

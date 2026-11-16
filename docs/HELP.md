@@ -4,6 +4,16 @@
 
 Choose **Open image** and select a disk image. If the format picker appears, compare the suggested definitions or search the catalogue. A plausible directory is evidence for an interpretation. Confirm the disk definition before making edits.
 
+## Edit disk format definitions
+
+Open **File → Disk Format Editor…**, or choose **Disk Format Editor…** from the format picker. Use **New** to enter a definition, **Duplicate** to copy a catalogue entry under a new identifier, or **Import diskdefs…** to review a standalone definition. Review any import diagnostics before saving or exporting.
+
+Enter the sector size, track groups, and sectors per track as cpmtools should see them. For a synthetic RAW layout, these groups can be logical. An IMD, JV3, or DMK may supply physical sector IDs and track information, while the definition still supplies the CP/M allocation, directory, and boot settings. **Use mapped sector layout** fills only the sector size, track count, and sectors per track from a verified mapping. CP/M skew applies to the resulting RAW slots.
+
+Use **Validate** to check the definition and **Check against image** to test it against a specific image. Use **Save definition** to add or update the entry in the picker, or **Export diskdefs…** to write a standalone file. To apply a changed definition to an open image, reopen it with the updated entry.
+
+The editor continues to read compatible existing mapping sidecars. Opening, checking, or exporting from an image preserves those sidecars. Use **Preview mapping conversion…** to compare an existing sidecar with the proposed strict form. Confirm the replacement only after reviewing supplied defaults and any metadata that would be removed.
+
 ## Browse and export files
 
 Select a numbered user area or choose **All** to browse across user areas. The **User** column identifies each file's area in that view. A CP/M record holds 128 bytes. The logical byte count can include padding from the original import.
