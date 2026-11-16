@@ -281,7 +281,12 @@ def main():
             records, unsupported = store.records()
             return dict(records=records, unsupported=unsupported)
         if op == 'definition_import':
-            imported = catalogue.import_definition(request['text'])
+            text = request.get('text')
+            if 'catalogue_identifier' in request:
+                text = base_definitions.get(request['catalogue_identifier'])
+                if not text:
+                    raise backend.Failure('unknown_format', 'Select a standalone catalogue definition.')
+            imported = catalogue.import_definition(text)
             return dict(record=imported.record, diagnostics=[asdict(item) for item in imported.diagnostics])
 
         record = request['record']
@@ -326,6 +331,8 @@ def main():
                     result.update(checked['result'], container=container)
                     if mapping:
                         result['mapping'] = strict_profile(mapping)
+                        adjacent = source.with_name(source.name + '.mapping.json')
+                        result['mapping_source'] = 'sidecar' if adjacent.is_file() else 'inferred'
                 elif op == 'mapping_preview':
                     if mapping_bytes(path) != original_data:
                         raise backend.Failure('source_changed', 'The mapping changed. Preview it again.')
@@ -389,8 +396,13 @@ def main():
                     raise backend.Failure('invalid_catalogue', str(error)) from error
                 if path == bundled_path:
                     blocks['amstrad'] = ''
-                combined = merged_definitions(blocks, store.records()[0])
+                records, _ = store.records()
+                combined = merged_definitions(blocks, records)
                 rows = validate_catalogue(combined)
+                names = {record['identifier']: record.get('display_name') for record in records}
+                for row in rows:
+                    if names.get(row['id']):
+                        row['display_name'] = names[row['id']]
                 base_definitions = blocks
                 definitions = combined
                 saved_loaded = True

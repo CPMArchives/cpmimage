@@ -3,6 +3,8 @@
 #include <QCryptographicHash>
 #include <QFile>
 #include <QSignalSpy>
+#include <QScopeGuard>
+#include <QSpinBox>
 #include <QTemporaryDir>
 #include <QDir>
 #include <QFileDialog>
@@ -36,6 +38,216 @@ static QFileDialog *fileDialog() {
 class GuiCheck : public QObject {
     Q_OBJECT
 private slots:
+    void diskFormatEditorRefreshesPickerAndPinsOpenImage() {
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                      qEnvironmentVariable("CPMIMAGE_HELPER"), 30000, 2000, {},
+                      temp.filePath("settings.ini"), temp.filePath("definitions"));
+        QSignalSpy done(&window, &Window::completed);
+        window.show();
+        window.loadCatalogue();
+        QVERIFY(done.wait(15000));
+        QVERIFY(done.takeFirst()[0].toBool());
+        window.openImage(root + "/fixtures/ibm3740-independent.raw", "ibm-3740", "raw");
+        QVERIFY(done.wait(15000));
+        QVERIFY(done.takeFirst()[0].toBool());
+        const auto original = window.entryCount();
+        auto *action = window.findChild<QAction *>("diskFormatEditorAction");
+        QVERIFY(action);
+        bool editorPassed = false;
+        QTimer::singleShot(0, &window, [&] {
+            auto *editor = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            QVERIFY(editor);
+            const auto close = qScopeGuard([editor] { editor->done(QDialog::Rejected); });
+            QCOMPARE(editor->objectName(), QString("diskFormatEditor"));
+            auto *identifier = editor->findChild<QLineEdit *>("diskFormatIdentifier");
+            auto *records = editor->findChild<QComboBox *>("diskFormatRecords");
+            auto *validation = editor->findChild<QLabel *>("diskFormatValidation");
+            auto *save = editor->findChild<QPushButton *>("diskFormatSave");
+            auto *sector = editor->findChild<QSpinBox *>("diskFormatSectorSize");
+            auto *boot = editor->findChild<QSpinBox *>("diskFormatBootCount");
+            QVERIFY(identifier && records && validation && save && sector && boot);
+            QCOMPARE(identifier->text(), QString());
+            QCOMPARE(sector->value(), 0);
+            QCOMPARE(boot->value(), 0);
+            QCOMPARE(editor->findChild<QComboBox *>("diskFormatOs")->currentIndex(), 0);
+            QTRY_VERIFY(records->findData("ibm-3740") >= 0);
+            editor->findChild<QPushButton *>("diskFormatValidate")->click();
+            QTRY_VERIFY(validation->text().contains("invalid_definition"));
+            const auto index = records->findData("ibm-3740");
+            records->setCurrentIndex(index);
+            emit records->activated(index);
+            QTRY_VERIFY(validation->text().contains("Catalogue entry"));
+            QVERIFY(!identifier->isEnabled());
+            editor->findChild<QPushButton *>("diskFormatDuplicate")->click();
+            QCOMPARE(identifier->text(), QString());
+            QVERIFY(identifier->isEnabled());
+            QCOMPARE(sector->value(), 128);
+            QVERIFY(editor->findChild<QLabel *>("diskFormatDerived")->text().contains("256256 bytes"));
+            identifier->setText("gui-editor-3740");
+            editor->findChild<QLineEdit *>("diskFormatDisplayName")->setText("GUI editor test format");
+            save->click();
+            QTRY_VERIFY(records->findData("gui-editor-3740") >= 0);
+            QTRY_VERIFY(save->isEnabled());
+            editorPassed = true;
+        });
+        action->trigger();
+        QVERIFY(editorPassed);
+        QCOMPARE(window.entryCount(), original);
+        auto *picker = window.findChild<QPushButton *>("chooseFormat");
+        QVERIFY(picker && picker->isEnabled());
+        bool found = false;
+        QTimer::singleShot(0, &window, [&] {
+            auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            QVERIFY(dialog);
+            const auto close = qScopeGuard([dialog, &found] {
+                if (found) dialog->accept();
+                else dialog->reject();
+            });
+            auto *search = dialog->findChild<QLineEdit *>("formatPickerSearch");
+            auto *list = dialog->findChild<QListWidget *>("formatPickerList");
+            QVERIFY(search && list);
+            search->setText("GUI editor test format");
+            QCOMPARE(list->count(), 1);
+            QCOMPARE(list->item(0)->data(Qt::UserRole).toJsonObject()["id"].toString(), QString("gui-editor-3740"));
+            QVERIFY(!list->item(0)->data(Qt::UserRole).toJsonObject()["definition_sha256"].toString().isEmpty());
+            found = true;
+        });
+        picker->click();
+        QVERIFY(found);
+        QVERIFY(done.wait(15000));
+        QVERIFY(done.takeFirst()[0].toBool());
+        auto *areas = window.findChild<QListWidget *>("userAreas");
+        auto *files = window.findChild<QTableWidget *>("fileList");
+        areas->setCurrentRow(1);
+        for (int i = 0; i < files->rowCount(); ++i)
+            if (files->item(i, 0)->data(Qt::UserRole).toString() == "00BINARY.BIN") window.selectEntry(i);
+        window.exportFile(temp.filePath("before.bin"));
+        QVERIFY(done.wait(15000));
+        QVERIFY(done.takeFirst()[0].toBool());
+
+        bool revisionSaved = false;
+        QTimer::singleShot(0, &window, [&] {
+            auto *editor = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            QVERIFY(editor);
+            const auto close = qScopeGuard([editor] { editor->done(QDialog::Rejected); });
+            auto *records = editor->findChild<QComboBox *>("diskFormatRecords");
+            QTRY_VERIFY(records->findData("gui-editor-3740") > 0);
+            const int index = records->findData("gui-editor-3740");
+            records->setCurrentIndex(index);
+            emit records->activated(index);
+            editor->findChild<QSpinBox *>("diskFormatBlockSize")->setValue(2048);
+            editor->findChild<QPushButton *>("diskFormatSave")->click();
+            auto *status = editor->findChild<QLabel *>("diskFormatValidation");
+            QTRY_COMPARE(status->text(), QString("Definition saved."));
+            QTRY_VERIFY(editor->findChild<QPushButton *>("diskFormatSave")->isEnabled());
+            revisionSaved = true;
+        });
+        action->trigger();
+        QVERIFY(revisionSaved);
+        window.exportFile(temp.filePath("after.bin"));
+        QVERIFY(done.wait(15000));
+        QVERIFY(done.takeFirst()[0].toBool());
+        QFile before(temp.filePath("before.bin")), after(temp.filePath("after.bin"));
+        QVERIFY(before.open(QIODevice::ReadOnly) && after.open(QIODevice::ReadOnly));
+        QCOMPARE(after.readAll(), before.readAll());
+    }
+
+    void diskFormatEditorChecksMappingAndCancelsConversion() {
+        const bool nativeDisabled = QApplication::testAttribute(Qt::AA_DontUseNativeDialogs);
+        QApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+        const auto restore = qScopeGuard([nativeDisabled] {
+            QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, nativeDisabled);
+        });
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        QByteArray imd("IMD 1.18: Qt regression\r\n\x1a");
+        for (char cylinder = 0; cylinder < 2; ++cylinder) {
+            for (char head = 0; head < 2; ++head) {
+                const char track[] = {5, cylinder, head, 4, 2, 1, 2, 3, 4};
+                imd.append(track, sizeof track);
+                for (int slot = 0; slot < 4; ++slot) {
+                    imd.append(char(2));
+                    imd.append(char(0xe5));
+                }
+            }
+        }
+        const QByteArray legacy = R"({"track_order":[[0,0],[0,1],[1,0],[1,1]],"default":{"mode":5,"size":512,"sectors":[1,3,2,4]},"note":"preserve"})";
+        const auto imagePath = temp.filePath("example.imd");
+        QFile image(imagePath), sidecar(imagePath + ".mapping.json");
+        QVERIFY(image.open(QIODevice::WriteOnly));
+        QCOMPARE(image.write(imd), imd.size());
+        image.close();
+        QVERIFY(sidecar.open(QIODevice::WriteOnly));
+        QCOMPARE(sidecar.write(legacy), legacy.size());
+        sidecar.close();
+        QFile definition(temp.filePath("legacy.FDF"));
+        QVERIFY(definition.open(QIODevice::WriteOnly));
+        definition.write("diskdef gui-imd\n seclen 20000\n tracks 4\n sectrk 4\n blocksize 1024\n"
+                         " maxdir 32\n boottrk 1\n mystery 7\nend\n");
+        definition.close();
+        Window window(qEnvironmentVariable("CPMIMAGE_ROOT"), qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                      qEnvironmentVariable("CPMIMAGE_HELPER"), 30000, 2000, {}, temp.filePath("settings.ini"),
+                      temp.filePath("definitions"));
+        window.show();
+        bool passed = false;
+        QTimer::singleShot(0, &window, [&] {
+            auto *editor = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            QVERIFY(editor);
+            const auto close = qScopeGuard([editor] { editor->done(QDialog::Rejected); });
+            auto *records = editor->findChild<QComboBox *>("diskFormatRecords");
+            QTRY_VERIFY(records->count() > 1);
+            editor->findChild<QPushButton *>("diskFormatImport")->click();
+            auto *chooser = editor->findChild<QFileDialog *>("diskFormatImportDialog");
+            QVERIFY(chooser);
+            // Deliver the selected path without relying on the platform file browser.
+            emit chooser->fileSelected(definition.fileName());
+            chooser->reject();
+            QTRY_VERIFY(editor->findChild<QLabel *>("diskFormatDiagnostics")->text().contains("mystery"));
+            QCOMPARE(editor->findChild<QSpinBox *>("diskFormatSectorSize")->value(), 20000);
+            editor->findChild<QLineEdit *>("diskFormatCheckPath")->setText(imagePath);
+            const QList<QPair<QString, int>> fields{{"SectorSize", 512}, {"Tracks", 4}, {"Sectors", 4},
+                {"BlockSize", 1024}, {"Entries", 32}, {"BootCount", 1}};
+            for (const auto &[field, value] : fields)
+                editor->findChild<QSpinBox *>("diskFormat" + field)->setValue(value);
+            auto *apply = editor->findChild<QPushButton *>("diskFormatUseMapping");
+            QVERIFY(!apply->isEnabled());
+            editor->findChild<QPushButton *>("diskFormatCheck")->click();
+            QTRY_VERIFY(apply->isEnabled());
+            QVERIFY(editor->findChild<QLabel *>("diskFormatCompatibility")->text().contains("sidecar RAW-slot mapping"));
+            editor->findChild<QSpinBox *>("diskFormatSectorSize")->setValue(128);
+            editor->findChild<QSpinBox *>("diskFormatTracks")->setValue(8);
+            editor->findChild<QSpinBox *>("diskFormatSectors")->setValue(2);
+            QVERIFY(apply->isEnabled());
+            apply->click();
+            for (const auto &[field, value] : fields)
+                QCOMPARE(editor->findChild<QSpinBox *>("diskFormat" + field)->value(), value);
+
+            bool previewed = false;
+            QTimer previewTimer;
+            connect(&previewTimer, &QTimer::timeout, editor, [&] {
+                auto *preview = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+                if (!preview) return;
+                previewed = preview->detailedText().contains("preserve");
+                preview->button(QMessageBox::Cancel)->click();
+            });
+            previewTimer.start(10);
+            editor->findChild<QPushButton *>("diskFormatPreviewMapping")->click();
+            QTRY_VERIFY(previewed);
+            passed = true;
+        });
+        auto *action = window.findChild<QAction *>("diskFormatEditorAction");
+        QVERIFY(action);
+        action->trigger();
+        QVERIFY(passed);
+        QVERIFY(sidecar.open(QIODevice::ReadOnly));
+        QCOMPARE(sidecar.readAll(), legacy);
+        QVERIFY(image.open(QIODevice::ReadOnly));
+        QCOMPARE(image.readAll(), imd);
+    }
+
     void compactToolbarAndImageInformation() {
         const auto root=qEnvironmentVariable("CPMIMAGE_ROOT");
         Window window(root,qEnvironmentVariable("CPMIMAGE_PYTHON","python3"),qEnvironmentVariable("CPMIMAGE_HELPER"));
