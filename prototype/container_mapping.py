@@ -316,3 +316,23 @@ def derive_mapping(container, data, geometry):
     mapping = PhysicalMapping(tuple(tracks))
     mapping.verify(geometry)
     return mapping
+
+
+def strict_profile(mapping):
+    """Represent an expanded mapping as strict defaults and changed fields."""
+    def fields(track):
+        return {'mode': int(track.mode), 'size': int(track.size),
+                'sectors': [int(sector) for sector in track.sectors]}
+
+    defaults = fields(mapping.tracks[0])
+    profile = {'track_order': [], 'default': defaults}
+    overrides = {}
+    for track in mapping.tracks:
+        address = [int(track.cylinder), int(track.head)]
+        profile['track_order'].append(address)
+        changes = {key: value for key, value in fields(track).items() if value != defaults[key]}
+        if changes:
+            overrides[f'{address[0]}/{address[1]}'] = changes
+    if overrides:
+        profile['tracks'] = overrides
+    return profile
