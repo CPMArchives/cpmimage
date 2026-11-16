@@ -1,0 +1,9 @@
+# CP/M Image v1.3 closeout
+
+**Published November 16, 2026.** The v1.3 tag points to `25f4a36`. The README and roadmap on `main` link to the published downloads, and the roadmap marks the Disk Format Editor as shipped. [Release and downloads](https://github.com/CPMArchives/cpmimage/releases/tag/v1.3#assets)
+
+**Merged into `main`.** The release work covered the [spec and plan (#53)](https://github.com/CPMArchives/cpmimage/pull/53), [schemas and definition rendering (#54)](https://github.com/CPMArchives/cpmimage/pull/54), [persistence and broker operations (#55)](https://github.com/CPMArchives/cpmimage/pull/55), [Qt editor and format picker (#56)](https://github.com/CPMArchives/cpmimage/pull/56), and [packaging and validation (#57)](https://github.com/CPMArchives/cpmimage/pull/57). The [README (#58)](https://github.com/CPMArchives/cpmimage/pull/58) and [roadmap (#59)](https://github.com/CPMArchives/cpmimage/pull/59) updates followed publication.
+
+**Verification.** Packaged regressions passed on macOS ARM64, Linux ARM64 and x86-64, and Windows ARM64 and x86-64. Both legacy sidecar cases exported the expected bytes, and all three negative cases were rejected at the expected layer with input files intact. All five public package downloads and the corresponding source archive independently matched the published SHA-256 manifest. [Validation results](https://github.com/CPMArchives/cpmimage/blob/main/docs/VALIDATION.md#v13-disk-format-editor-package-checks) · [Checksums](https://github.com/CPMArchives/cpmimage/releases/download/v1.3/SHA256SUMS.txt)
+
+**Deferred work.** No v1.3 release blockers were found at closeout. Editable Image Properties remains exploratory. Graphical filesystem checking and repair, low-level sector and flux editing, advanced image comparison and reconstruction, and physical floppy access remain deferred. [Roadmap](https://github.com/CPMArchives/cpmimage/blob/main/docs/ROADMAP.md)
