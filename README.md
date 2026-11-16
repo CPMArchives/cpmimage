@@ -2,9 +2,9 @@
 
 CP/M Image is a graphical file manager for CP/M disk images on macOS, Windows, and Linux. It bundles cpmtools for command-line use.
 
-## Download v1.2
+## Download v1.3
 
-Get the five platform packages, corresponding source, and SHA-256 checksums from the [v1.2 release downloads](https://github.com/CPMArchives/cpmimage/releases/tag/v1.2#assets). The release notes cover the changes and supported formats.
+Get the five platform packages, corresponding source, and SHA-256 checksums from the [v1.3 release downloads](https://github.com/CPMArchives/cpmimage/releases/tag/v1.3#assets). The release notes cover the changes and supported formats.
 
 - **macOS ARM64 (Apple silicon):** Open the DMG and drag **CPMImage.app** to **Applications**.
 - **Windows ARM64 and x86-64:** Download the executable for your architecture and run it.
@@ -17,6 +17,12 @@ Get the five platform packages, corresponding source, and SHA-256 checksums from
 - Import, rename, delete, and move files between user areas, edit supported attributes, and transfer files between open images.
 - Create or format images using a selected disk definition and manage reserved system tracks. Edits stay in a private working copy until Save or Save As.
 - Choose a disk definition from the bundled cpmtools catalogue or supply your own definitions. The format picker can suggest candidates and accepts manual selection.
+
+## Disk Format Editor
+
+Open **File → Disk Format Editor…** or launch it from the format picker. Create a definition, duplicate a catalogue entry, or import a standalone `diskdefs` file. Validate the definition, check it against an image, then save it to the picker or export it as a standalone definition. Reopen an image to apply an updated definition.
+
+For IMD, JV3, and DMK images, the editor can check the sector mapping. Existing compatible mapping sidecars retain their original bytes when you open, check, or export from an image. The editor previews changes before you explicitly replace a legacy sidecar. See [Disk Format Editor help](docs/HELP.md#edit-disk-format-definitions).
 
 ## File and archive viewer
 
