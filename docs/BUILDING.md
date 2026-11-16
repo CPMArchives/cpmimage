@@ -46,9 +46,12 @@ It builds the GUI under `prototype/build/qt`. For a previously configured backen
 
 ```sh
 python3 packaging/scripts/fetch-dependencies.py --group runtime
+python3 packaging/scripts/fetch-dependencies.py --group validator
 sh packaging/scripts/build-qt-unix.sh macos  # use linux on Debian
 sh packaging/scripts/build-python.sh macos  # use linux on Debian
 ```
+
+The validator group includes the pinned Draft 2020-12 implementation and its CPython 3.13 wheels for macOS ARM64, Linux ARM64 and x86-64, and Windows ARM64 and x86-64. Assemblers verify the hashes again and stage the wheels into the private interpreter. Unix stages the wheels in the private Python library directory so both upstream and Debian builds find them in isolated mode. Windows uses the embedded interpreter's explicit `python313._pth` search list. Package assembly requires no pip or network access after fetching the inputs. For source-tree editor tests, use Python 3.10 or later and install `prototype/requirements-disk-format.txt` into the interpreter used for `CPMIMAGE_PYTHON`. Use Python 3.13 to match the release runtime.
 
 Build the GUI against the private Qt installation:
 
