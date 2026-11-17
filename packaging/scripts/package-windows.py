@@ -18,7 +18,7 @@ if a.arch == 'x86-64' and not all((a.qt, a.crt, a.helper, a.python_runtime)):
 executable=a.executable.read_bytes()
 out=BASE/'dist'/f'CPMImage-windows-{a.arch}'
 if out.exists():shutil.rmtree(out)
-out.mkdir(parents=True);(out/'cpmimage.exe').write_bytes(executable)
+out.mkdir(parents=True);(out/'cpmwb.exe').write_bytes(executable)
 qt=a.qt or BASE/'qt-msvc'
 for name in ['Core','Gui','Widgets']:shutil.copy2(qt/'bin'/('Qt6'+name+'.dll'),out)
 for group,names in {'platforms':['qwindows.dll','qoffscreen.dll'],'styles':['qmodernwindowsstyle.dll']}.items():

@@ -100,7 +100,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         stopReader(); resetImage();
         if (busy) fail("The image reader did not respond to cancellation and was stopped. Open the image again.");
     });
-    setWindowTitle("cpmimage — Review prototype");
+    setWindowTitle("CP/M Image Workbench");
     settings = settingsFile.isEmpty() ? new QSettings("CPMArchives", "cpmimage", this) :
         new QSettings(settingsFile, QSettings::IniFormat, this);
     const bool validSettings = filenamePolicy.load(*settings);
@@ -136,11 +136,11 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
             entries.isEmpty() ? QString("No favorites saved.") : entries.join('\n'));
     });
     auto *help = menuBar()->addMenu("Help");
-    auto *guide = help->addAction("CP/M Image Help");
+    auto *guide = help->addAction("CP/M Image Workbench Help");
     guide->setShortcut(QKeySequence::HelpContents);
     connect(guide, &QAction::triggered, this, [this] {
         QDialog dialog(this);
-        dialog.setWindowTitle("CP/M Image Help");
+        dialog.setWindowTitle("CP/M Image Workbench Help");
         dialog.resize(650, 540);
         auto *layout = new QVBoxLayout(&dialog);
         auto *search = new QLineEdit(&dialog);
@@ -507,6 +507,14 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         if (item.second == "move") action->setShortcut(Qt::Key_F6);
         connect(action, &QAction::triggered, this, [this, item] { chooseEdit(item.second); });
     }
+    auto *viewSystem = editMenu->addAction("View Reserved System Tracks…");
+    viewSystem->setObjectName("viewReservedSystemTracks");
+    connect(editMenu, &QMenu::aboutToShow, this, [this, viewSystem] {
+        viewSystem->setEnabled(!busy && !session.isEmpty());
+    });
+    connect(viewSystem, &QAction::triggered, this, [this] {
+        showDiskHex({}, "Reserved System Tracks", this);
+    });
     auto *commentAction = editMenu->addAction("Edit IMD comment…");
     connect(editMenu, &QMenu::aboutToShow, this, [this, commentAction] {
         commentAction->setEnabled(!busy && !session.isEmpty() && container == "imd");
@@ -677,7 +685,7 @@ void Window::resetImage() {
     updateUserAreas();
     source->setText("No image open"); source->setToolTip({});
     formats->setText("Choose format…");
-    setWindowTitle("cpmimage — Review prototype"); setBusy(busy);
+    setWindowTitle("CP/M Image Workbench"); setBusy(busy);
 }
 void Window::setBusy(bool value) {
     busy = value;
@@ -1564,9 +1572,9 @@ static QString previewText(QByteArray bytes, bool truncated, bool highBit, bool 
     return text.replace("\r\n", "\n").replace('\r', '\n').replace(QChar(0x07), QChar(0x2407));
 }
 
-static QString hexRow(const QByteArray &bytes, qsizetype offset, int width) {
+static QString hexRow(const QByteArray &bytes, qsizetype offset, int width, qsizetype base = 0) {
     static constexpr char digits[] = "0123456789ABCDEF";
-    QString row = QString("%1  ").arg(offset, 8, 16, QChar('0')).toUpper();
+    QString row = QString("%1  ").arg(base + offset, 8, 16, QChar('0')).toUpper();
     QString ascii;
     ascii.reserve(width);
     for (int i = 0; i < width; ++i) {
@@ -2592,10 +2600,67 @@ void Window::showFilesystemCheck() {
     dialog->show();
 }
 
+void Window::showDiskHex(QJsonObject request, const QString &title, QWidget *parent) {
+    if (busy || session.isEmpty()) return;
+    request["op"] = "inspect_bytes";
+    request["session"] = session;
+    auto *dialog = new QDialog(parent);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowModality(Qt::ApplicationModal);
+    dialog->setWindowTitle(title);
+    dialog->setObjectName("diskHexViewer");
+    dialog->resize(740, 460);
+    auto *layout = new QVBoxLayout(dialog);
+    auto *range = new QLabel("Reading working image…", dialog);
+    layout->addWidget(range);
+    auto *viewer = new QPlainTextEdit(dialog);
+    viewer->setReadOnly(true);
+    viewer->setLineWrapMode(QPlainTextEdit::NoWrap);
+    viewer->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    layout->addWidget(viewer, 1);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, dialog);
+    auto *previous = buttons->addButton("Previous Page", QDialogButtonBox::ActionRole);
+    auto *next = buttons->addButton("Next Page", QDialogButtonBox::ActionRole);
+    layout->addWidget(buttons);
+    const auto load = [this, request, guard = QPointer<QDialog>(dialog), range, viewer, previous, next](int offset) {
+        if (busy || session != request["session"].toString()) return;
+        previous->setEnabled(false);
+        next->setEnabled(false);
+        auto pageRequest = request;
+        pageRequest["offset"] = offset;
+        requestBrokerResult(std::move(pageRequest), [guard, range, viewer, previous, next]
+                            (const QJsonObject &result, const QString &failure) {
+            if (!guard) return;
+            if (!failure.isEmpty()) {
+                range->setText(failure);
+                viewer->clear();
+                return;
+            }
+            const int offset = result["offset"].toInt();
+            const int size = result["size"].toInt();
+            const auto bytes = QByteArray::fromHex(result["bytes"].toString().toLatin1());
+            QStringList rows;
+            for (qsizetype index = 0; index < bytes.size(); index += 16)
+                rows.append(hexRow(bytes, index, 16, offset));
+            viewer->setPlainText(rows.join('\n'));
+            range->setText(QString("Working RAW image · Bytes %1–%2 of %3 · RAW offset %4")
+                           .arg(offset + 1).arg(offset + bytes.size()).arg(size).arg(result["image_offset"].toInt()));
+            viewer->setProperty("pageOffset", offset);
+            previous->setEnabled(offset > 0);
+            next->setEnabled(offset + bytes.size() < size);
+        });
+    };
+    connect(previous, &QPushButton::clicked, dialog, [load, viewer] { load(viewer->property("pageOffset").toInt() - 4096); });
+    connect(next, &QPushButton::clicked, dialog, [load, viewer] { load(viewer->property("pageOffset").toInt() + 4096); });
+    connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
+    dialog->show();
+    load(0);
+}
+
 void Window::showPhysicalDiskInspector(int block, QString revision) {
     if (busy || session.isEmpty()) return;
     const auto inspectedSession = session;
-    QJsonObject request{{"op", "source_metadata"}, {"session", inspectedSession}};
+    QJsonObject request{{"op", "source_metadata"}, {"session", inspectedSession}, {"include_raw", true}};
     if (block >= 0) {
         request["block"] = block;
         request["revision"] = revision;
@@ -2630,6 +2695,7 @@ void Window::showPhysicalDiskInspector(int block, QString revision) {
         }
         layout->addWidget(origin);
 
+        const bool rawSlots = result["raw_slots"].toBool();
         const auto tracks = result["tracks"].toArray();
         const auto blockSectors = result["block_sectors"].toArray();
         if (!blockSectors.isEmpty()) {
@@ -2658,9 +2724,14 @@ void Window::showPhysicalDiskInspector(int block, QString revision) {
 
             auto *trackPicker = new QComboBox(dialog);
             trackPicker->setObjectName("physicalDiskTrack");
-            trackPicker->setAccessibleName("Source track and head");
+            trackPicker->setAccessibleName(rawSlots ? "RAW track" : "Source track and head");
             for (const auto &value : tracks) {
                 const auto track = value.toObject();
+                if (rawSlots) {
+                    trackPicker->addItem(QString("RAW track %1 (%2 sector slots)")
+                                         .arg(track["cylinder"].toInt()).arg(track["sector_count"].toInt()));
+                    continue;
+                }
                 trackPicker->addItem(QString("Cylinder %1, head %2 (%3 sectors)")
                                      .arg(track["cylinder"].toInt()).arg(track["head"].toInt())
                                      .arg(track["sector_count"].toInt()));
@@ -2684,7 +2755,7 @@ void Window::showPhysicalDiskInspector(int block, QString revision) {
             auto *sectors = new QTableWidget(0, 5, dialog);
             sectors->setObjectName("physicalDiskSectors");
             sectors->setAccessibleName("Source sector details");
-            sectors->setHorizontalHeaderLabels({orderLabel, "Sector ID", "Size (bytes)", "Density", "Status"});
+            sectors->setHorizontalHeaderLabels({orderLabel, rawSlots ? "RAW slot" : "Sector ID", "Size (bytes)", "Density", "Status"});
             sectors->setEditTriggers(QAbstractItemView::NoEditTriggers);
             sectors->setSelectionBehavior(QAbstractItemView::SelectRows);
             sectors->setSelectionMode(QAbstractItemView::MultiSelection);
@@ -2699,7 +2770,7 @@ void Window::showPhysicalDiskInspector(int block, QString revision) {
                 trackPicker->setEnabled(false);
                 sectors->setRowCount(0);
                 trackStatus->setText("Reading track…");
-                requestBrokerResult({{"op", "source_metadata"}, {"session", inspectedSession}, {"track", address}},
+                requestBrokerResult({{"op", "source_metadata"}, {"session", inspectedSession}, {"include_raw", true}, {"track", address}},
                                     [guard = QPointer<QDialog>(dialog), address, count = track["sector_count"].toInt(),
                                      trackPicker, trackStatus, sectors, blockSectors]
                                     (const QJsonObject &details, const QString &error) {
@@ -2737,6 +2808,29 @@ void Window::showPhysicalDiskInspector(int block, QString revision) {
                     }
                 });
             };
+            auto *viewSector = new QPushButton("View Sector Hex…", dialog);
+            viewSector->setObjectName("viewSectorHex");
+            viewSector->setEnabled(false);
+            layout->addWidget(viewSector);
+            connect(sectors, &QTableWidget::itemSelectionChanged, dialog, [sectors, viewSector] {
+                viewSector->setEnabled(sectors->selectionModel()->selectedRows().size() == 1);
+            });
+            const auto openSector = [this, dialog, tracks, trackPicker, sectors, rawSlots](int row) {
+                if (row < 0 || trackPicker->currentIndex() < 0 || !sectors->item(row, 1)) return;
+                const auto track = tracks.at(trackPicker->currentIndex()).toObject();
+                const int id = sectors->item(row, 1)->text().toInt();
+                const auto title = rawSlots
+                    ? QString("RAW Track %1 · Slot %2").arg(track["cylinder"].toInt()).arg(id)
+                    : QString("Cylinder %1 · Head %2 · Sector %3").arg(track["cylinder"].toInt())
+                          .arg(track["head"].toInt()).arg(id);
+                showDiskHex({{"sector", QJsonArray{track["cylinder"], track["head"], id}}, {"raw_slots", rawSlots}},
+                            title, dialog);
+            };
+            connect(viewSector, &QPushButton::clicked, dialog, [sectors, openSector] {
+                const auto selected = sectors->selectionModel()->selectedRows();
+                if (selected.size() == 1) openSector(selected.first().row());
+            });
+            connect(sectors, &QTableWidget::cellDoubleClicked, dialog, [openSector](int row, int) { openSector(row); });
             connect(trackPicker, &QComboBox::currentIndexChanged, dialog, loadTrack);
             loadFirstTrack = [loadTrack, trackPicker] { loadTrack(trackPicker->currentIndex()); };
         }
@@ -2912,7 +3006,7 @@ void Window::readReply() {
             if (!userAreas->currentItem() && !session.isEmpty()) userAreas->setCurrentRow(1);
             showUserArea();
         }
-        setWindowTitle("cpmimage — " + QFileInfo(image).fileName() + (dirty ? " *" : ""));
+        setWindowTitle("CP/M Image Workbench — " + QFileInfo(image).fileName() + (dirty ? " *" : ""));
         setBusy(false);
         status->setText(dirty ? "Unsaved changes." : operation == "discard" ? "Changes discarded." : "System tracks exported.");
         if (operation == "discard" && afterSave) QTimer::singleShot(0, this, std::exchange(afterSave, {}));
@@ -2944,7 +3038,7 @@ void Window::readReply() {
             snapshotHash = result["source_sha256"].toString();
             source->setText(QFileInfo(image).fileName());
             source->setToolTip(image);
-            setWindowTitle("cpmimage — " + QFileInfo(image).fileName());
+            setWindowTitle("CP/M Image Workbench — " + QFileInfo(image).fileName());
             status->setText("Save completed.");
             if (afterSave) QTimer::singleShot(0, this, std::exchange(afterSave, {}));
             emit completed(true);
@@ -3037,7 +3131,7 @@ void Window::readReply() {
                                QStringList{snapshotHash, format, definitionHash, container});
         }
         source->setText(QFileInfo(image).fileName()); source->setToolTip(image);
-        setWindowTitle("cpmimage — " + QFileInfo(image).fileName() + (dirty ? " *" : ""));
+        setWindowTitle("CP/M Image Workbench — " + QFileInfo(image).fileName() + (dirty ? " *" : ""));
         updateUserAreas();
         { QSignalBlocker block(userAreas); userAreas->setCurrentItem(userAreas->item(1)); }
         showUserArea();

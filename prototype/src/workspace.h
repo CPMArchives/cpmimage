@@ -91,7 +91,7 @@ public:
             tabs->widget(index)->close();
         });
         resize(620, 640);
-        setWindowTitle("cpmimage");
+        setWindowTitle("CP/M Image Workbench");
     }
 
     ~Workspace() override {

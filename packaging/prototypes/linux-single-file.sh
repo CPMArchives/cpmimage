@@ -20,5 +20,5 @@ if [ ! -d "$target" ]; then
         [ -d "$target" ] || exit 1
     fi
 fi
-exec "$target/CPMImage" "$@"
+exec "$target/cpmwb" "$@"
 __CPMIMAGE_PAYLOAD__

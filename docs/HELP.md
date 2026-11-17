@@ -1,4 +1,4 @@
-# CP/M Image Help
+# CP/M Image Workbench Help
 
 ## Open an image
 
@@ -43,3 +43,10 @@ Use **New Image** to select a disk definition and initialize a filesystem. **For
 Use `/img=PATH` to open an image and `/f=FORMAT` to select the definition for subsequent startup images. Use `/diskdefs=PATH` to select the catalogue for the invocation.
 
 For headless operation, use a utility selector such as `/cpmls -f ibm-3740 disk.raw`.
+
+
+## Inspect sector and system-track bytes
+
+Open **Workbench → Physical Disk Inspector**, choose a track, then select one sector and choose **View Sector Hex…**. The viewer reads the current working RAW image. Structured images use the verified mapping from the original container. RAW images show track and slot indices from the selected disk definition.
+
+Choose **Edit → View Reserved System Tracks…** to inspect the reserved region defined by the current disk definition. Use **Previous Page** and **Next Page** to browse the bytes. The viewer includes private edits and never writes to the image.

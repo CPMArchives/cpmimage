@@ -125,6 +125,7 @@ private:
     void finishBatch();
     void showExportReport();
     void showImageInformation();
+    void showDiskHex(QJsonObject request, const QString &title, QWidget *parent);
     void showPhysicalDiskInspector(int block = -1, QString revision = {});
     void showFilesystemInspector(int slot = -1, QString revision = {}, int allocationBlock = -1);
     void showFilesystemCheck();

@@ -92,7 +92,7 @@ int wmain(int argc, wchar_t **argv) {
                 wchar_t system[MAX_PATH];
                 if (!GetSystemDirectoryW(system, MAX_PATH)) throw std::runtime_error("cannot locate Windows system directory");
                 if (run(fs::path(system) / L"tar.exe", {L"-xzf", payload.wstring(), L"-C", files.wstring()}) != 0 ||
-                    !fs::is_regular_file(files / L"cpmimage.exe"))
+                    !fs::is_regular_file(files / L"cpmwb.exe"))
                     throw std::runtime_error("cannot extract bundled application");
                 std::error_code error;
                 fs::rename(files, target, error);
@@ -104,7 +104,7 @@ int wmain(int argc, wchar_t **argv) {
                 throw;
             }
         }
-        return run(target / L"cpmimage.exe", {argv + 1, argv + argc});
+        return run(target / L"cpmwb.exe", {argv + 1, argv + argc});
     } catch (const std::exception &error) {
         std::cerr << "cpmimage: " << error.what() << '\n';
         return 126;

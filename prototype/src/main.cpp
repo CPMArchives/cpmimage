@@ -25,7 +25,8 @@ int main(int argc, char **argv) {
 #else
     QApplication::setWindowIcon(QIcon(":/icons/cpmimage.png"));
 #endif
-    QApplication::setApplicationName("cpmimage Review");
+    QApplication::setApplicationName("cpmwb");
+    QApplication::setApplicationDisplayName("CP/M Image Workbench");
     QCommandLineParser parser;
     parser.setApplicationDescription("Browse and edit CP/M disk images");
     parser.addHelpOption();

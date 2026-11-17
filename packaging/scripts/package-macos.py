@@ -4,21 +4,22 @@ import os,shutil,subprocess,plistlib,re,tempfile
 from notices import BASE,ROOT,create
 from utility_bundle import install_utilities
 from editor_bundle import install_validator, stage_editor
-app=BASE/'dist/CPMImage-macOS-arm64/CPMImage.app'
+app=BASE/'dist/CPMImage-macOS-arm64/CPMImageWorkbench.app'
 if app.exists():shutil.rmtree(app)
 shutil.copytree(BASE/'app-macos/cpmimage-review.app',app,symlinks=True)
 info=app/'Contents/Info.plist'
 with info.open('rb') as stream: metadata=plistlib.load(stream)
 old_executable = app/'Contents/MacOS'/metadata['CFBundleExecutable']
-old_executable.rename(old_executable.with_name('cpmimage'))
+old_executable.rename(old_executable.with_name('cpmwb'))
 icon = 'cpmimage.icns'
 if not (app/'Contents/Resources'/icon).is_file():
  raise SystemExit(f'Missing macOS app icon: {icon}')
-metadata.update(CFBundleExecutable='cpmimage',
+metadata.update(CFBundleExecutable='cpmwb',
                 CFBundleIdentifier='org.cpmarchives.cpmimage.review',
-                CFBundleName='CPMImage',
-                CFBundleShortVersionString='1.3',
-                CFBundleVersion='1.3',
+                CFBundleName='CPMImage Workbench',
+                CFBundleDisplayName='CP/M Image Workbench',
+                CFBundleShortVersionString='2.0',
+                CFBundleVersion='2.0',
                 CFBundleIconFile=icon,
                 LSMinimumSystemVersion='14.4')
 with info.open('wb') as stream: plistlib.dump(metadata,stream)

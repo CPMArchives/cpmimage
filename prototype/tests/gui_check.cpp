@@ -369,6 +369,18 @@ private slots:
         track->setCurrentIndex(39);
         QVERIFY(track->currentText().contains("Cylinder 39, head 0"));
         QTRY_COMPARE(sectors->rowCount(), 10);
+        sectors->selectRow(0);
+        auto *viewSector = dialog->findChild<QPushButton *>("viewSectorHex");
+        QVERIFY(viewSector && viewSector->isEnabled());
+        viewSector->click();
+        auto *hexDialog = dialog->findChild<QDialog *>("diskHexViewer");
+        QVERIFY(hexDialog);
+        auto *hex = hexDialog->findChild<QPlainTextEdit *>();
+        QVERIFY(hex && hex->isReadOnly());
+        QTRY_VERIFY(!hex->toPlainText().isEmpty());
+        QVERIFY(hexDialog->windowTitle().contains("Cylinder 39"));
+        QCOMPARE(hex->toPlainText().split('\n').size(), 32);
+        hexDialog->reject();
         QVERIFY(!first.windowTitle().endsWith(" *"));
         dialog->reject();
         QTRY_VERIFY(!first.findChild<QDialog *>("physicalDiskInspector"));
@@ -411,7 +423,10 @@ private slots:
         QVERIFY(rawOrigin);
         QVERIFY(rawOrigin->text().contains("ibm3740-empty.raw"));
         QVERIFY(rawOrigin->text().contains("Container: RAW"));
-        QVERIFY(!raw->findChild<QTableWidget *>("physicalDiskSectors"));
+        auto *rawSectors = raw->findChild<QTableWidget *>("physicalDiskSectors");
+        QVERIFY(rawSectors);
+        QTRY_COMPARE(rawSectors->rowCount(), 26);
+        QCOMPARE(rawSectors->horizontalHeaderItem(1)->text(), QString("RAW slot"));
         QVERIFY(!first.findChild<QDialog *>("physicalDiskInspector"));
         raw->reject();
 

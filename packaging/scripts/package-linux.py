@@ -10,7 +10,7 @@ if architecture is None:
 out=BASE/'dist'/f'CPMImage-linux-{architecture}'
 if out.exists():shutil.rmtree(out)
 for sub in ['bin','lib','libexec','share/cpmimage','plugins']: (out/sub).mkdir(parents=True,exist_ok=True)
-shutil.copy2(BASE/'app-linux/cpmimage-review',out/'bin/cpmimage')
+shutil.copy2(BASE/'app-linux/cpmimage-review',out/'bin/cpmwb')
 qt=BASE/'qt-linux/install'
 for stem in ['Core','Gui','Widgets','XcbQpa','OpenGL']:
  for f in (qt/'lib').glob('libQt6'+stem+'.so*'):
@@ -38,12 +38,12 @@ for rel in ['prototype/archive_view.py', 'prototype/broker.py','prototype/catalo
 stage_editor(out/'share/cpmimage')
 install_utilities(out/'bin/cpmtools', 'linux')
 (out/'bin/qt.conf').write_text('[Paths]\nPrefix=..\nLibraries=lib\nPlugins=plugins\n')
-launcher=out/'CPMImage';launcher.write_text('''#!/bin/sh
+launcher=out/'cpmwb';launcher.write_text('''#!/bin/sh
 HERE=$(CDPATH= cd -- "${0%/*}" && pwd)
 export QT_PLUGIN_PATH="$HERE/plugins"
 export QT_QPA_PLATFORM_PLUGIN_PATH="$HERE/plugins/platforms"
 unset QT_QPA_PLATFORMTHEME QT_STYLE_OVERRIDE
-exec "$HERE/bin/cpmimage" "$@"
+exec "$HERE/bin/cpmwb" "$@"
 ''');launcher.chmod(0o755)
 for f in out.rglob('*'):
  if not f.is_file() or f.is_symlink():continue
@@ -51,7 +51,7 @@ for f in out.rglob('*'):
  if magic!=b'\x7fELF':continue
  # The locked manylinux extension is already relocatable. Preserve its wheel bytes.
  if validator/'rpds' in f.parents:continue
- if f==out/'bin/cpmimage' or f==out/'libexec/cpmimage-helper':rpath='$ORIGIN/../lib'
+ if f==out/'bin/cpmwb' or f==out/'libexec/cpmimage-helper':rpath='$ORIGIN/../lib'
  elif out/'bin/cpmtools' in f.parents:rpath='$ORIGIN/../../lib'
  elif f==runtime/'bin/python3.13':rpath='$ORIGIN/../lib'
  elif out/'plugins' in f.parents:rpath='$ORIGIN/../../lib'

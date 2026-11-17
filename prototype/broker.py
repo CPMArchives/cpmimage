@@ -1078,6 +1078,48 @@ def main():
                 if view == 'blocks':
                     result['physical_links'] = bool(session.get('source_mapping'))
                 reply = dict(v=1, id=rid, ok=True, result=result)
+            elif op == 'inspect_bytes':
+                if not session or request.get('session') != session['token']:
+                    raise backend.Failure('stale_session', 'Open an image first.')
+                geo = session['geometry']
+                sector_size = geo['sector_size']
+                start = geo.get('offset', 0)
+                size = geo.get('boot_sectors', 0) * sector_size
+                relative = request.get('offset', 0)
+                if 'sector' in request:
+                    address = request['sector']
+                    mapping = session.get('source_mapping', [])
+                    source_metadata = session.get('source_metadata')
+                    if (not isinstance(address, list) or len(address) != 3
+                            or any(type(value) is not int for value in address)):
+                        raise backend.Failure('invalid_request', 'Select a sector.')
+                    if request.get('raw_slots') is True:
+                        track, head, slot = address
+                        if ((source_metadata and source_metadata[0]['container'] != 'raw')
+                                or head != 0 or not 0 <= track < geo['tracks']
+                                or not 0 <= slot < geo['sectors_per_track']):
+                            raise backend.Failure('physical_mapping', 'This RAW sector slot is unavailable.')
+                    else:
+                        cylinder, head, sector = address
+                        matches = [(track, ids.index(sector)) for track, (c, h, ids) in enumerate(mapping)
+                                   if (c, h) == (cylinder, head) and ids.count(sector) == 1]
+                        if len(matches) != 1:
+                            raise backend.Failure('physical_mapping', 'No verified working-image mapping for this sector.')
+                        track, slot = matches[0]
+                    start += (track * geo['sectors_per_track'] + slot) * sector_size
+                    size = sector_size
+                if not size or start + size > session['image'].stat().st_size:
+                    raise backend.Failure('unsupported_backend', 'The requested bytes are unavailable.')
+                if type(relative) is not int or not 0 <= relative < size or relative % 4096:
+                    raise backend.Failure('invalid_request', 'Invalid hex view page.')
+                length = min(4096, size - relative)
+                with session['image'].open('rb') as stream:
+                    stream.seek(start + relative)
+                    data = stream.read(length)
+                if len(data) != length:
+                    raise backend.Failure('unsupported_backend', 'The requested bytes could not be read.')
+                reply = dict(v=1, id=rid, ok=True, result=dict(
+                    bytes=data.hex(), size=size, offset=relative, image_offset=start + relative))
             elif op == 'source_metadata':
                 # Omit track for the summary, or pass [cylinder, head] for ordered sectors.
                 if not session or request.get('session') != session['token']:
@@ -1105,7 +1147,23 @@ def main():
                         links.append(dict(cylinder=cylinder, head=head, id=ids[slot]))
                     result.update(block=block, block_sectors=links)
 
-                if source_snapshot is not None:
+                if request.get('include_raw') is True and (source_snapshot is None or source_snapshot[0]['container'] == 'raw'):
+                    geo = session['geometry']
+                    result['raw_slots'] = True
+                    result['source'] = source_snapshot[0] if source_snapshot else None
+                    if 'track' in request:
+                        address = request['track']
+                        if (not isinstance(address, list) or len(address) != 2
+                                or any(type(value) is not int for value in address)
+                                or address[1] != 0 or not 0 <= address[0] < geo['tracks']):
+                            raise backend.Failure('unknown_track', 'No working RAW track at that index.')
+                        result.update(track=address, sectors=[
+                            dict(id=slot, size=geo['sector_size'])
+                            for slot in range(geo['sectors_per_track'])])
+                    else:
+                        result['tracks'] = [dict(cylinder=track, head=0, sector_count=geo['sectors_per_track'])
+                                            for track in range(geo['tracks'])]
+                elif source_snapshot is not None:
                     provenance, tracks = source_snapshot
                     result['source'] = provenance
                     if 'track' in request:

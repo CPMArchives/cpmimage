@@ -54,6 +54,14 @@ class ContainerSaveCheck(unittest.TestCase):
                 self.assertTrue(track['ok'], track)
                 self.assertEqual(sorted(row['id'] for row in track['result']['sectors']),
                                  list(range(1, 27)))
+                sector = broker.request('inspect_bytes', session=token, sector=[1, 0, 4])
+                self.assertTrue(sector['ok'], sector)
+                offset = (26 + 3) * 128
+                self.assertEqual(sector['result']['image_offset'], offset)
+                self.assertEqual(bytes.fromhex(sector['result']['bytes']),
+                                 broker.image.read_bytes()[offset:offset + 128])
+                ambiguous = broker.request('inspect_bytes', session=token, sector=[1, 0, 99])
+                self.assertEqual(ambiguous.get('error'), 'physical_mapping', ambiguous)
                 payload = broker.directory / 'known.bin'
                 payload.write_bytes(bytes(range(128)))
                 edit = broker.request('edit', action='import', session=token, name='00KNOWN.BIN',
