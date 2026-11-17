@@ -62,6 +62,72 @@ class TeleDiskCheck(unittest.TestCase):
                 else:
                     self.assertFalse(output.exists())
 
+    def test_source_metadata_lifetime(self):
+        first, second = (catalogue_check.CatalogueCheck() for _ in range(2))
+        for tab in (first, second):
+            tab.setUp()
+            self.addCleanup(tab.doCleanups)
+            self.addCleanup(tab.tearDown)
+
+        def result(tab, op, **args):
+            reply = tab.request(op, **args)
+            self.assertTrue(reply['ok'], reply)
+            return reply['result']
+
+        original = first.image.read_bytes()
+        archive = first.directory / 'Archive.TD0'
+        header = b'TD' + bytes([0, 0, 21, 0, 1, 0, 0, 1])
+        encoded = bytearray(header + struct.pack('<H', td0_crc(header)))
+        for cylinder in range(77):
+            track = bytes([26, cylinder, 0])
+            encoded.extend(track + bytes([td0_crc(track) & 255]))
+            for sector in range(26, 0, -1):
+                start = (cylinder * 26 + sector - 1) * 128
+                payload = original[start:start + 128]
+                encoded.extend(bytes([cylinder, 0, sector, 0, 0, td0_crc(payload) & 255]))
+                encoded.extend(b'\x81\0\0' + payload)
+        encoded.extend(b'\xff\0\0\0')
+        archive.write_bytes(encoded)
+
+        token = result(first, 'open', image=str(archive), format='ibm-3740', container='td0')['session']
+        summary = result(first, 'source_metadata', session=token)
+        self.assertEqual(summary['source'], dict(name=archive.name, container='td0',
+                                                sha256=sha256(encoded).hexdigest(), sector_order='scan'))
+        self.assertEqual(len(summary['tracks']), 77)
+        track = result(first, 'source_metadata', session=token, track=[0, 0])
+        self.assertEqual([(row['id'], row['size']) for row in track['sectors']],
+                         [(sector, 128) for sector in range(26, 0, -1)])
+
+        other = result(second, 'open', image=str(second.image), format='ibm-3740', container='raw')['session']
+        self.assertEqual(second.request('source_metadata', session=token)['error'], 'stale_session')
+        self.assertEqual(result(second, 'source_metadata', session=other)['tracks'], [])
+
+        output = first.directory / 'converted.raw'
+        args = dict(session=token, destination=str(output), container='raw', sidecar=False)
+        plan = result(first, 'save_plan', **args)
+        result(first, 'save', plan=plan, **args)
+        self.assertEqual(output.read_bytes(), original)
+        self.assertEqual(archive.read_bytes(), encoded)
+        self.assertEqual(result(first, 'source_metadata', session=token), summary)
+
+        catalogue = first.directory / 'alternate.diskdefs'
+        catalogue.write_text(catalogue_check.CUSTOM)
+        result(first, 'catalogue', path=str(catalogue))
+        options = dict(image=str(output), format='custom-3740', container='raw')
+        switched = result(first, 'open', continue_session=token, **options)['session']
+        self.assertEqual(first.request('source_metadata', session=token)['error'], 'stale_session')
+        self.assertEqual(result(first, 'source_metadata', session=switched), summary)
+        self.assertEqual(result(first, 'source_metadata', session=switched, track=[0, 0]), track)
+        alias = first.directory / 'archive-alias.raw'
+        os.link(archive, alias)
+        forbidden = first.request('save_plan', session=switched, destination=str(alias))
+        self.assertEqual(forbidden['error'], 'invalid_destination')
+
+        reopened = result(first, 'open', **options)['session']
+        metadata = result(first, 'source_metadata', session=reopened)
+        self.assertEqual(metadata['source']['container'], 'raw')
+        self.assertEqual(metadata['tracks'], [])
+
     @unittest.skipUnless(os.environ.get('CPMIMAGE_MASLIN'), 'external Maslin corpus')
     def test_import_save_reopen_and_extract(self):
         cases = (

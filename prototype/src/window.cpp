@@ -479,6 +479,9 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         setBusy(busy); updateSelectionStatus();
     });
     auto *view = menuBar()->addMenu("View");
+    physicalDiskAction = view->addAction("Physical Disk Inspector…");
+    physicalDiskAction->setObjectName("physicalDiskInspectorAction");
+    connect(physicalDiskAction, &QAction::triggered, this, &Window::showPhysicalDiskInspector);
     viewFileAction = view->addAction("View File…");
     viewFileAction->setObjectName("viewFileAction");
     connect(viewFileAction, &QAction::triggered, this, [this] { viewFile(); });
@@ -619,6 +622,7 @@ void Window::setBusy(bool value) {
     cancelButton->setVisible(busy);
     imageInfoButton->setEnabled(!busy && !session.isEmpty());
     imageInfoAction->setEnabled(!busy && !session.isEmpty());
+    physicalDiskAction->setEnabled(!busy && !session.isEmpty());
     progress->setVisible(busy && batchActive);
 }
 bool Window::confirmWrite() {
@@ -926,23 +930,23 @@ void Window::acceptCatalogue(const QJsonObject &result) {
     setBusy(busy);
 }
 
-void Window::requestEditor(QJsonObject request, std::function<void(QJsonObject, QString)> reply) {
+void Window::requestBrokerResult(QJsonObject request, std::function<void(QJsonObject, QString)> reply) {
     if (busy) {
         reply({}, "Wait for the current image operation to finish.");
         return;
     }
-    editorReply = std::move(reply);
+    brokerResultHandler = std::move(reply);
     begin(std::move(request));
 }
 
 bool Window::showDiskFormatEditor(const QString &selectedFormat) {
     if (busy) return false;
     DiskFormatEditor editor([this](auto request, auto reply) {
-        requestEditor(std::move(request), std::move(reply));
+        requestBrokerResult(std::move(request), std::move(reply));
     }, catalogueRows, requestedImage.isEmpty() ? image : requestedImage, selectedFormat, this);
     auto load = [&] {
         if (catalogueRows.isEmpty() || process.state() == QProcess::NotRunning) {
-            requestEditor({{"op", "catalogue"}, {"path", cataloguePath}},
+            requestBrokerResult({{"op", "catalogue"}, {"path", cataloguePath}},
                           [this, guard = QPointer<DiskFormatEditor>(&editor)](auto result, auto failure) {
                 if (failure.isEmpty()) acceptCatalogue(result);
                 if (!guard) return;
@@ -958,7 +962,7 @@ bool Window::showDiskFormatEditor(const QString &selectedFormat) {
     // keep its original image selection and repopulate immediately.
     QEventLoop loop;
     bool refreshed = false;
-    requestEditor({{"op", "catalogue"}, {"path", cataloguePath}}, [&](auto result, auto failure) {
+    requestBrokerResult({{"op", "catalogue"}, {"path", cataloguePath}}, [&](auto result, auto failure) {
         if (failure.isEmpty()) {
             acceptCatalogue(result);
             refreshed = true;
@@ -1005,6 +1009,7 @@ void Window::openDefinition(const QJsonObject &definition, bool sidecar, bool sw
     const QString path = switching ? image : requestedImage;
     requestedImage.clear();
     const auto fingerprint = inspectedHash;
+    const auto previousSession = session;
     resetImage();
     image = path;
     format = definition["id"].toString();
@@ -1015,6 +1020,7 @@ void Window::openDefinition(const QJsonObject &definition, bool sidecar, bool sw
     retainSource = switching;
     QJsonObject request{{"op","open"}, {"image",image}, {"format",format}, {"container",container},
                         {"sidecar",sidecar}};
+    if (switching && !previousSession.isEmpty()) request["continue_session"] = previousSession;
     if (!fingerprint.isEmpty()) request["source_sha256"] = fingerprint;
     if (definition.contains("definition_sha256")) request["definition_sha256"] = definition["definition_sha256"];
     begin(request);
@@ -2246,6 +2252,124 @@ void Window::showImageInformation() {
     dialog.exec();
 }
 
+void Window::showPhysicalDiskInspector() {
+    if (busy || session.isEmpty()) return;
+    const auto inspectedSession = session;
+    requestBrokerResult({{"op", "source_metadata"}, {"session", inspectedSession}},
+                        [this, inspectedSession](const QJsonObject &result, const QString &failure) {
+        if (session != inspectedSession || !isVisible()) return;
+        if (!failure.isEmpty()) {
+            QMessageBox::warning(this, "Physical Disk Inspector", failure);
+            return;
+        }
+
+        auto *dialog = new QDialog(this);
+        dialog->setAttribute(Qt::WA_DeleteOnClose);
+        dialog->setWindowModality(Qt::ApplicationModal);
+        dialog->setObjectName("physicalDiskInspector");
+        dialog->setWindowTitle("Physical Disk Inspector");
+        dialog->resize(620, 460);
+        auto *layout = new QVBoxLayout(dialog);
+        const auto provenance = result["source"].toObject();
+        auto *origin = new QLabel(dialog);
+        origin->setObjectName("physicalDiskSource");
+        origin->setTextFormat(Qt::PlainText);
+        origin->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        origin->setWordWrap(true);
+        if (provenance.isEmpty()) {
+            origin->setText("This image session has no original source.");
+        } else {
+            origin->setText(QString("Original source: %1\nContainer: %2\nSHA-256: %3")
+                            .arg(provenance["name"].toString(), provenance["container"].toString().toUpper(),
+                                 provenance["sha256"].toString()));
+        }
+        layout->addWidget(origin);
+
+        const auto tracks = result["tracks"].toArray();
+        std::function<void()> loadFirstTrack;
+        if (tracks.isEmpty()) {
+            layout->addWidget(new QLabel("No physical track or sector data is available for this source.", dialog));
+            layout->addStretch();
+        } else {
+            const auto order = provenance["sector_order"].toString();
+            QString orderLabel = "Reported order";
+            if (order == "scan") orderLabel = "Scan order";
+            else if (order == "sector_map") orderLabel = "Sector map order";
+            else if (order == "track_offset") orderLabel = "Track offset order";
+            else if (order == "descriptor") orderLabel = "Descriptor order";
+
+            auto *trackPicker = new QComboBox(dialog);
+            trackPicker->setObjectName("physicalDiskTrack");
+            trackPicker->setAccessibleName("Source track and head");
+            for (const auto &value : tracks) {
+                const auto track = value.toObject();
+                trackPicker->addItem(QString("Cylinder %1, head %2 (%3 sectors)")
+                                     .arg(track["cylinder"].toInt()).arg(track["head"].toInt())
+                                     .arg(track["sector_count"].toInt()));
+            }
+            layout->addWidget(trackPicker);
+            auto *trackStatus = new QLabel(dialog);
+            trackStatus->setObjectName("physicalDiskTrackStatus");
+            trackStatus->setTextFormat(Qt::PlainText);
+            trackStatus->setWordWrap(true);
+            layout->addWidget(trackStatus);
+            auto *sectors = new QTableWidget(0, 5, dialog);
+            sectors->setObjectName("physicalDiskSectors");
+            sectors->setAccessibleName("Source sector details");
+            sectors->setHorizontalHeaderLabels({orderLabel, "Sector ID", "Size (bytes)", "Density", "Status"});
+            sectors->setEditTriggers(QAbstractItemView::NoEditTriggers);
+            sectors->verticalHeader()->hide();
+            sectors->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+            layout->addWidget(sectors, 1);
+
+            auto loadTrack = [this, inspectedSession, dialog, tracks, trackPicker, trackStatus, sectors](int index) {
+                if (index < 0 || index >= tracks.size() || session != inspectedSession) return;
+                const auto track = tracks.at(index).toObject();
+                const QJsonArray address{track["cylinder"], track["head"]};
+                trackPicker->setEnabled(false);
+                sectors->setRowCount(0);
+                trackStatus->setText("Reading track…");
+                requestBrokerResult({{"op", "source_metadata"}, {"session", inspectedSession}, {"track", address}},
+                                    [guard = QPointer<QDialog>(dialog), address, count = track["sector_count"].toInt(),
+                                     trackPicker, trackStatus, sectors]
+                                    (const QJsonObject &details, const QString &error) {
+                    if (!guard || !guard->isVisible()) return;
+                    trackPicker->setEnabled(true);
+                    if (!error.isEmpty()) {
+                        trackStatus->setText(error);
+                        return;
+                    }
+                    const auto rows = details["sectors"].toArray();
+                    if (details["track"].toArray() != address || rows.size() != count) {
+                        trackStatus->setText("The image reader returned incomplete sector details.");
+                        return;
+                    }
+                    const auto mode = details["mode"];
+                    trackStatus->setText(mode.isDouble() ? QString("IMD mode: %1").arg(mode.toInt()) : QString());
+                    sectors->setRowCount(rows.size());
+                    for (int i = 0; i < rows.size(); ++i) {
+                        const auto sector = rows.at(i).toObject();
+                        const QStringList columns{QString::number(i + 1), QString::number(sector["id"].toInt()),
+                                                  QString::number(sector["size"].toInt()),
+                                                  sector["density"].toString("Unavailable"),
+                                                  sector["status"].toString("Unavailable")};
+                        for (int column = 0; column < columns.size(); ++column)
+                            sectors->setItem(i, column, new QTableWidgetItem(columns.at(column)));
+                    }
+                });
+            };
+            connect(trackPicker, &QComboBox::currentIndexChanged, dialog, loadTrack);
+            loadFirstTrack = [loadTrack, trackPicker] { loadTrack(trackPicker->currentIndex()); };
+        }
+
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, dialog);
+        layout->addWidget(buttons);
+        connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
+        dialog->show();
+        if (loadFirstTrack) loadFirstTrack();
+    });
+}
+
 void Window::showExportReport() {
     QDialog dialog(this);dialog.setWindowTitle("Export report");dialog.resize(750,450);
     auto *layout=new QVBoxLayout(&dialog);
@@ -2263,7 +2387,8 @@ void Window::begin(QJsonObject request) {
         fail("The image reader is restarting. Open the image again."); return;
     }
     setBusy(true);
-    status->setText(editorReply ? "Checking disk definition…" : operation == "open" ? "Reading image…" : operation == "catalogue" ? "Loading disk definitions…" :
+    status->setText(operation == "source_metadata" ? "Reading source metadata…" :
+        brokerResultHandler ? "Checking disk definition…" : operation == "open" ? "Reading image…" : operation == "catalogue" ? "Loading disk definitions…" :
         operation == "inspect" ? "Checking image format…" :
         operation == "preview" ? "Reading file preview…" :
         operation == "save_plan" ? "Preparing save…" : operation == "save" ? "Publishing save…" : batchActive ?
@@ -2292,9 +2417,9 @@ void Window::cancel() {
     status->setText("Cancelling…");
 }
 void Window::fail(const QString &message) {
-    if (editorReply) {
+    if (brokerResultHandler) {
         deadline.stop(); cancellationDeadline.stop();
-        auto reply = std::exchange(editorReply, {});
+        auto reply = std::exchange(brokerResultHandler, {});
         setBusy(false);
         status->setText(message);
         reply({}, message);
@@ -2320,7 +2445,7 @@ void Window::readReply() {
     // A killed reader can still deliver queued output after its request failed.
     if (!busy) { process.readAllStandardOutput(); return; }
     output += process.readAllStandardOutput();
-    if (output.size() > (editorReply ? 8 * 1024 * 1024 : 262144)) {
+    if (output.size() > (brokerResultHandler ? 8 * 1024 * 1024 : 262144)) {
         stopReader(); fail("The image reader exceeded its response limit."); return;
     }
     if (!output.endsWith('\n')) return;
@@ -2349,16 +2474,17 @@ void Window::readReply() {
     const auto result = reply["result"].toObject();
     const QRegularExpression hash("^[0-9a-f]{64}$");
     auto invalid = [this] { stopReader(); resetImage(); fail("Invalid response schema from the image reader."); };
-    if (editorReply) {
+    if (brokerResultHandler) {
         if (!reply["result"].isObject() || (operation == "catalogue" &&
                 (!result["formats"].isArray() || result["catalogue"].toString().isEmpty()))) {
-            fail("Invalid response from the disk format reader.");
+            fail("Invalid response from the image reader.");
             return;
         }
         deadline.stop(); cancellationDeadline.stop();
-        auto handler = std::exchange(editorReply, {});
+        auto handler = std::exchange(brokerResultHandler, {});
         setBusy(false);
-        status->setText(dirty ? "Unsaved changes." : "Disk definitions ready.");
+        status->setText(dirty ? "Unsaved changes." :
+                        operation == "source_metadata" ? "Image ready." : "Disk definitions ready.");
         handler(result, {});
         return;
     }

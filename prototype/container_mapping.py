@@ -76,7 +76,7 @@ class PhysicalMapping:
                 raise MappingError('Physical sectors do not match the selected RAW geometry.')
 
 
-def inspect_imd(data):
+def inspect_imd(data, *, statuses=None):
     """Check the inventory before handing payload reads to LibDsk."""
     end = data.find(b'\x1a', 0, 65536)
     if not data.startswith(b'IMD ') or end < 0:
@@ -107,6 +107,8 @@ def inspect_imd(data):
             status = data[position]
             if status not in (1, 2):
                 raise MappingError(f'IMD sector {cylinder}/{head}/{sector} is missing, damaged, or uses a deleted data mark.')
+            if statuses is not None:
+                statuses[cylinder, head, sector] = 'normal' if status == 1 else 'compressed'
             position += 1 + (size if status == 1 else 1)
             if position > len(data):
                 raise MappingError('Truncated IMD sector data.')
@@ -116,7 +118,7 @@ def inspect_imd(data):
     return tracks, comment if separator else b''
 
 
-def transfer_dmk(data, mapping, raw=None):
+def transfer_dmk(data, mapping, raw=None, *, observe=None):
     """Read or update ordinary MFM DMK sectors using a verified track mapping.
 
     Writes retain the source track representation and update only payload CRCs.
@@ -170,6 +172,8 @@ def transfer_dmk(data, mapping, raw=None):
             slots[sector] = (start, finish)
         if set(slots) != set(track.sectors):
             raise MappingError('DMK sector IDs differ from the mapping.')
+        if observe is not None:
+            observe(track.cylinder, track.head, tuple((sector, track.size) for sector in slots))
         for sector in track.sectors:
             start, finish = slots[sector]
             if raw is None:
@@ -273,6 +277,7 @@ def verify_jv3(data, mapping):
             raise MappingError(f'JV3 sector {address} differs from the physical mapping.')
     if observed.keys() != expected.keys():
         raise MappingError('JV3 inventory is missing mapped sectors.')
+    return observed
 
 
 def derive_mapping(container, data, geometry):

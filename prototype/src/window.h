@@ -55,7 +55,7 @@ protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 private:
     void begin(QJsonObject request);
-    void requestEditor(QJsonObject request, std::function<void(QJsonObject, QString)> reply);
+    void requestBrokerResult(QJsonObject request, std::function<void(QJsonObject, QString)> reply);
     bool showDiskFormatEditor(const QString &selectedFormat = {});
     void acceptCatalogue(const QJsonObject &result);
     void readReply();
@@ -116,6 +116,7 @@ private:
     void finishBatch();
     void showExportReport();
     void showImageInformation();
+    void showPhysicalDiskInspector();
     void chooseFormat(const QJsonObject &inspection, bool switching);
     void openDefinition(const QJsonObject &definition, bool sidecar, bool switching);
     QString selectedExportName(QString *problem) const;
@@ -131,7 +132,7 @@ private:
     QPushButton *formats;
     QAction *externalCatalogueAction, *bundledCatalogueAction, *diskFormatEditorAction;
     QString definitionStore;
-    std::function<void(QJsonObject, QString)> editorReply;
+    std::function<void(QJsonObject, QString)> brokerResultHandler;
     QJsonArray catalogueRows;
     QString cataloguePath, requestedImage, requestedFormat, requestedContainer;
     QString inspectedHash, inspectedContainer, activeCatalogue;
@@ -145,7 +146,7 @@ private:
     FilenamePolicy filenamePolicy;
     QSettings *settings;
     QPushButton *reportButton, *imageInfoButton;
-    QAction *openAction, *imageInfoAction;
+    QAction *openAction, *imageInfoAction, *physicalDiskAction;
     QString snapshotHash, exportDiagnostics;
     QProgressBar *progress;
     ExportPlan batch;

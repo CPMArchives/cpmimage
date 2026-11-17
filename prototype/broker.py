@@ -29,7 +29,7 @@ MAX_EDITOR_REQUEST_BYTES = 2 * 1024 * 1024
 DSK_MAGIC = b'MV - CPCEMU Disk-File\r\nDisk-Info\r\n'
 
 
-def check_standard_dsk(data, geometry, backend):
+def check_standard_dsk(data, geometry, backend, *, observations=None):
     # The existing container scope is the qualified uniform, single-sided
     # 40-track map. Match properties of the definition, not its identifier.
     if (geometry.get('sector_size'), geometry.get('tracks'),
@@ -51,6 +51,8 @@ def check_standard_dsk(data, geometry, backend):
             sector = 24 + index * 8
             if header[sector:sector + 6] != bytes([track, 0, index + 1, 2, 0, 0]):
                 raise backend.Failure('unsupported_container', 'The DSK contains a different sector order or sector error flags.')
+        if observations is not None:
+            observations[track, 0] = tuple((header[26 + index * 8], 512) for index in range(10))
 
 
 def raw_extent(data, geometry, backend):
@@ -64,6 +66,17 @@ def raw_extent(data, geometry, backend):
     if len(data) <= offset or (len(data) - offset) % sector or (not offset and len(data) > end):
         raise backend.Failure('image_size', 'The RAW image size is incompatible with the selected geometry.')
     return end
+
+
+class SourceTracks(dict):
+    """Source track addresses and sector descriptors collected during staging."""
+
+    def __init__(self):
+        super().__init__()
+        self.imd_comment = b''
+        self.modes = {}
+        self.densities = {}
+        self.statuses = {}
 
 
 def main():
@@ -196,7 +209,7 @@ def main():
         extension = source.suffix.lower().lstrip('.')
         return extension if extension in structured else 'raw'
 
-    def mapped_image(container, source, data, geometry, directory, raw, *, proposed_profile=None):
+    def mapped_image(container, source, data, geometry, directory, raw, *, proposed_profile=None, observations=None):
         profile = source.with_name(source.name + '.mapping.json')
         try:
             if proposed_profile is not None:
@@ -207,13 +220,27 @@ def main():
                 except FileNotFoundError:
                     mapping = derive_mapping(container, data, geometry)
             if container == 'dmk':
-                raw.write_bytes(transfer_dmk(data, mapping))
+                def observe(cylinder, head, sectors):
+                    observations[cylinder, head] = sectors
+                raw.write_bytes(transfer_dmk(data, mapping, observe=observe if observations is not None else None))
                 return mapping
             if container == 'imd':
-                inventory, _ = inspect_imd(data)
+                inventory, comment = inspect_imd(
+                    data, statuses=observations.statuses if observations is not None else None)
                 mapping.verify_inventory(inventory)
+                if observations is not None:
+                    for key, track in inventory.items():
+                        observations[key] = tuple((sector, track.size) for sector in track.sectors)
+                    observations.imd_comment = comment
+                    observations.modes = {key: track.mode for key, track in inventory.items()}
             if container == 'jv3':
-                verify_jv3(data, mapping)
+                inventory = verify_jv3(data, mapping)
+                if observations is not None:
+                    tracks = {}
+                    for (cylinder, head, sector), (size, mfm) in inventory.items():
+                        tracks.setdefault((cylinder, head), []).append((sector, size))
+                        observations.densities[cylinder, head, sector] = 'mfm' if mfm else 'fm'
+                    observations.update((key, tuple(sectors)) for key, sectors in tracks.items())
             transfer(container, mapping, directory, raw, data, False)
             return mapping
         except (MappingError, OSError, ValueError) as error:
@@ -286,7 +313,7 @@ def main():
                          container, map_path, raw, encoded)
         return encoded
 
-    def stage_image(source, data, container, geometry, directory, *, proposed_profile=None):
+    def stage_image(source, data, container, geometry, directory, *, proposed_profile=None, observations=None):
         if container not in ('raw', 'dsk', *structured):
             raise backend.Failure('unsupported_container', 'Select RAW or standard CPCEMU DSK.')
         if data.startswith(b'EXTENDED CPC DSK File'):
@@ -297,10 +324,10 @@ def main():
         mapping = None
         if container in structured:
             mapping = mapped_image(container, source, data, geometry, directory, image,
-                                   proposed_profile=proposed_profile)
+                                   proposed_profile=proposed_profile, observations=observations)
             end = image.stat().st_size
         elif container == 'dsk':
-            check_standard_dsk(data, geometry, backend)
+            check_standard_dsk(data, geometry, backend, observations=observations)
             encoded = directory / 'source.dsk'
             encoded.write_bytes(data)
             adapter().native(directory, 'decode', encoded, image)
@@ -561,18 +588,48 @@ def main():
                     fmt, definition, _ = selected
                     result['sidecar'] = dict(id=fmt, definition_sha256=catalogue.digest(definition))
                 reply = dict(v=1, id=rid, ok=True, result=result)
+            elif op == 'source_metadata':
+                # Omit track for the summary, or pass [cylinder, head] for ordered sectors.
+                if not session or request.get('session') != session['token']:
+                    raise backend.Failure('stale_session', 'Open an image first.')
+                source_snapshot = session.get('source_metadata')
+                result = dict(source=None, tracks=[])
+                if source_snapshot is not None:
+                    provenance, tracks = source_snapshot
+                    result['source'] = provenance
+                    if 'track' in request:
+                        address = request['track']
+                        if (not isinstance(address, list) or len(address) != 2
+                                or any(type(value) is not int for value in address)):
+                            raise backend.Failure('invalid_request', 'Specify a cylinder and head.')
+                        key = tuple(address)
+                        if key not in tracks:
+                            raise backend.Failure('unknown_track', 'No source observations for that track.')
+                        result.pop('tracks')
+                        result.update(track=address, sectors=[
+                            dict(id=sector, size=size, density=tracks.densities.get((*key, sector)),
+                                 status=tracks.statuses.get((*key, sector)))
+                            for sector, size in tracks[key]], mode=tracks.modes.get(key))
+                    else:
+                        result['tracks'] = [dict(cylinder=c, head=h, sector_count=len(sectors))
+                                            for (c, h), sectors in sorted(tracks.items())]
+                reply = dict(v=1, id=rid, ok=True, result=result)
             elif op == 'open':
-                if session and session['owner']:
-                    session['owner'].close()
-                session = None
-                if snapshot:
-                    snapshot.cleanup()
-                    snapshot = None
+                continuation = request.get('continue_session')
+                previous = None
+                if continuation is not None:
+                    if not session or continuation != session['token']:
+                        raise backend.Failure('stale_session', 'Open the image again.')
+                    previous = session
+                    if (previous['source'] is None
+                            or previous['source'].resolve() != Path(request['image']).resolve()):
+                        raise backend.Failure('source_changed', 'The image differs from the active session.')
                 source = Path(request['image']).absolute()
                 source_identity = identity(source.stat())
                 data = read_image(source)
                 fingerprint = hashlib.sha256(data).hexdigest()
-                if request.get('source_sha256', fingerprint) != fingerprint:
+                if ((previous and (previous['sha'] != fingerprint or previous['identity'] != source_identity))
+                        or request.get('source_sha256', fingerprint) != fingerprint):
                     raise backend.Failure('source_changed', 'The image changed after format selection. Open it again.')
                 fmt, container = request['format'], request['container']
                 if source.suffix.lower() == '.td0':
@@ -580,6 +637,12 @@ def main():
                 importing_td0 = container == 'td0'
                 if not isinstance(fmt, str) or not fmt or len(fmt) > 200 or '\0' in fmt:
                     raise backend.Failure('unknown_format', 'Invalid disk-definition identifier.')
+                if session and session['owner']:
+                    session['owner'].close()
+                session = None
+                if snapshot:
+                    snapshot.cleanup()
+                    snapshot = None
                 snapshot = tempfile.TemporaryDirectory(prefix='cpmimage-open-')
                 directory = Path(snapshot.name)
                 sidecar_selection = resolve_sidecar(source, directory) if request.get('sidecar') else None
@@ -594,12 +657,17 @@ def main():
                     geometry = describe(fmt, definition, directory)
                 if request.get('definition_sha256', catalogue.digest(definition)) != catalogue.digest(definition):
                     raise backend.Failure('definition_changed', 'The disk definition changed. Select it again.')
+                observations = SourceTracks()
                 if importing_td0:
                     image = directory / 'image.raw'
-                    teledisk_raw(source, teledisk_inventory(data, directory), geometry, image)
+                    inventory = teledisk_inventory(data, directory)
+                    teledisk_raw(source, inventory, geometry, image)
+                    observations.update((key, tuple((sector, len(payload)) for sector, payload in sectors.items()))
+                                        for key, sectors in inventory.items())
                     mapping, end = None, image.stat().st_size
                 else:
-                    image, mapping, end = stage_image(source, data, container, geometry, directory)
+                    image, mapping, end = stage_image(source, data, container, geometry, directory,
+                                                      observations=observations)
                 trimmed = image.stat().st_size < end
                 reply = adapter().request({
                     'v': 1, 'id': rid, 'op': 'list', 'image': str(image),
@@ -624,7 +692,19 @@ def main():
                                original_container=container, owner=None, identity=source_identity,
                                geometry=geometry, dirty=False, confirmed=False, mapping=mapping,
                                template=data if container == 'dmk' else None,
-                               comment=inspect_imd(data)[1] if container == 'imd' else b'')
+                               comment=observations.imd_comment)
+                order = dict(td0='scan', imd='sector_map', dmk='track_offset',
+                             jv3='descriptor', dsk='descriptor')
+                provenance = dict(name=source.name, container=container, sha256=fingerprint,
+                                  sector_order=order.get(container))
+                if container == 'imd':
+                    provenance['comment'] = observations.imd_comment.decode('utf-8', errors='replace')
+                session['source_metadata'] = (provenance, observations)
+                if previous:
+                    session['source_metadata'] = previous.get('source_metadata')
+                    if 'archive_source' in previous:
+                        session.update(archive_source=previous['archive_source'],
+                                       archive_identity=previous['archive_identity'])
                 if importing_td0:
                     session.update(source=None, identity=None, original_container='raw', dirty=True,
                                    archive_source=source, archive_identity=source_identity)
