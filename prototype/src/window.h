@@ -59,7 +59,7 @@ private:
     bool showDiskFormatEditor(const QString &selectedFormat = {});
     void acceptCatalogue(const QJsonObject &result);
     void readReply();
-    void fail(const QString &message);
+    void fail(const QString &message, const QJsonObject &details = {});
     void setBusy(bool value);
     void cancel();
     void resetImage();

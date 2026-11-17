@@ -4,12 +4,14 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import struct
 import subprocess
 import sys
 import tempfile
 import unittest
 
 from disk_format_check import IMD, RAW
+from teledisk_check import td0_crc
 
 ROOT = Path(os.environ['CPMIMAGE_ROOT']).resolve()
 HELPER = Path(os.environ['CPMIMAGE_HELPER']).resolve()
@@ -107,6 +109,68 @@ class DiskFormatBrokerCheck(unittest.TestCase):
                 self.assertEqual(output.read_bytes(), MARKER)
                 self.assert_intact(inputs)
 
+    def test_shared_candidate_evaluation_for_short_raw(self):
+        catalogue = RAW + RAW.replace('synthetic-256k', 'aaa-equivalent')
+        self.defs.write_text(catalogue)
+        self.success('catalogue', path=str(self.defs))
+        record = self.success('definition_import', text=RAW)['record']
+        raw = self.directory / 'short.raw'
+        contents = b'\xe5' * (262144 - 128)
+        raw.write_bytes(contents)
+        inspected = self.success('inspect', image=str(raw))
+        candidates = inspected['candidates']
+        self.assertEqual([row['id'] for row in candidates], ['aaa-equivalent', 'synthetic-256k'])
+        checked = self.success('definition_check_image', image=str(raw), record=record)
+        self.assertEqual(checked['source_sha256'], inspected['source_sha256'])
+        self.assertEqual(checked['evaluation'], candidates[1]['evaluation'])
+        self.assertEqual(checked['evaluation']['rank'], [1, True, 128])
+        self.assertEqual(checked['evaluation']['directory'], dict(status='passed', entries=0))
+        self.assertEqual(checked['evaluation']['layout']['observed'], dict(bytes=len(contents)))
+        self.assertFalse(raw.with_suffix('.FDF').exists())
+        self.assertEqual(raw.read_bytes(), contents)
+        self.assertEqual(self.success('definition_list')['records'], [])
+
+    def test_shared_td0_candidate_evaluation_and_profile_failure(self):
+        self.success('catalogue', path=str(self.defs))
+        record = self.success('definition_import', text=IMD)['record']
+        archive = self.directory / 'example.TD0'
+        profile = archive.with_name(archive.name + '.mapping.json')
+        header = b'TD' + bytes([0, 0, 21, 0, 1, 0, 0, 2])
+        contents = bytearray(header + struct.pack('<H', td0_crc(header)))
+        payload = b'\xe5' * 512
+        for cylinder, head in TRACKS:
+            track = bytes([4, cylinder, head])
+            contents.extend(track + bytes([td0_crc(track) & 255]))
+            for sector in (1, 3, 2, 4):
+                contents.extend(bytes([cylinder, head, sector, 2, 0, td0_crc(payload) & 255]))
+                contents.extend(struct.pack('<H', len(payload) + 1) + b'\0' + payload)
+        contents.extend(b'\xff\0\0\0')
+        archive.write_bytes(contents)
+        fields = dict(image=str(archive))
+
+        inspected = self.success('inspect', **fields)
+        self.assertEqual(inspected['candidates'], [])
+        self.assertEqual(len(inspected['rejected']), 1)
+        self.assertEqual(inspected['rejected'][0]['code'], 'mapping_profile_required')
+        self.assertIn(profile.name, inspected['rejected'][0]['detail'])
+        checked = self.request('definition_check_image', record=record, **fields)
+        self.assertEqual(checked['error'], 'physical_mapping')
+        self.assertEqual(checked['evaluation']['layout']['code'], 'mapping_profile_required')
+        self.assertEqual(checked['evaluation']['directory']['status'], 'unavailable')
+        self.assertFalse(profile.exists())
+
+        profile_bytes = json.dumps(dict(track_order=TRACKS, default=FIELDS)).encode()
+        profile.write_bytes(profile_bytes)
+        inspected = self.success('inspect', **fields)
+        checked = self.success('definition_check_image', record=record, **fields)
+        self.assertEqual(checked['container'], 'td0')
+        self.assertEqual(checked['entries'], [])
+        self.assertEqual(checked['evaluation'], inspected['candidates'][0]['evaluation'])
+        self.assertEqual(checked['evaluation']['layout']['mapping_source'], 'sidecar')
+        self.assertEqual(checked['source_sha256'], hashlib.sha256(contents).hexdigest())
+        self.assertFalse(archive.with_suffix('.FDF').exists())
+        self.assert_intact({archive: contents, profile: profile_bytes})
+
     def test_native_divisibility_rejection(self):
         invalid = IMD.replace('seclen 512', 'seclen 384').encode()
         self.defs.write_bytes(invalid)
@@ -125,6 +189,7 @@ class DiskFormatBrokerCheck(unittest.TestCase):
         profile = json.dumps(dict(track_order=TRACKS, default=FIELDS)).encode()
         self.write_fixture(profile)
         self.assertTrue(self.mount()['ok'])
+        record = self.success('definition_import', text=IMD)['record']
         cases = (
             (profile, True, 'Container sectors differ on track 0/1'),
             (b'{"track_order": [', False, 'Expecting value'),
@@ -135,6 +200,13 @@ class DiskFormatBrokerCheck(unittest.TestCase):
                 reply = self.mount()
                 self.assertEqual(reply['error'], 'physical_mapping')
                 self.assertIn(diagnostic, reply['message'])
+                inspected = self.success('inspect', image=str(self.image))
+                self.assertEqual(len(inspected['rejected']), 1)
+                self.assertEqual(inspected['rejected'][0]['code'], 'physical_mapping')
+                self.assertIn(diagnostic, inspected['rejected'][0]['detail'])
+                checked = self.request('definition_check_image', image=str(self.image), record=record)
+                self.assertEqual(checked['error'], 'physical_mapping')
+                self.assertIn(diagnostic, checked['evaluation']['layout']['message'])
                 self.assert_intact(inputs)
 
     def test_persistence_collision_revision_and_session_isolation(self):

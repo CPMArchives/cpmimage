@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "disk_format_editor.h"
+#include "format_diagnostics.h"
 
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -452,10 +453,13 @@ void DiskFormatEditor::runDefinition(const QString &operation) {
         message["resolved_import"] = true;
     }
     send(message, [this, operation, message, checking](auto result, auto error) {
+        if (checking && (message["image"].toString() != image->text() ||
+                         message["record"].toObject() != record())) return;
         if (!error.isEmpty()) {
             if (checking && !error.contains("(invalid_definition)")) {
                 invalidateImageCheck();
-                imageStatus->setText(error);
+                const auto findings = FormatDiagnostics::describe(result["evaluation"].toObject());
+                imageStatus->setText(findings.isEmpty() ? error : findings);
             }
             else showError(error);
             return;
@@ -485,12 +489,13 @@ void DiskFormatEditor::runDefinition(const QString &operation) {
             checkedMapping = result["mapping"].toObject();
             checkedGeometry = checkedMapping.isEmpty() ? QJsonObject{} : geometry;
             applyMapping->setEnabled(!checkedGeometry.isEmpty() && !bundledSelection);
-            imageStatus->setText(QString("%1 image readable. Mounted free space %2 bytes.%3")
-                .arg(result["container"].toString().toUpper()).arg(result["free_bytes"].toInteger())
-                .arg(checkedMapping.isEmpty() ? QString() :
-                    QString("\nObserved image inventory matches the %1 RAW-slot mapping.\n%2")
-                    .arg(result["mapping_source"].toString() == "sidecar" ? "sidecar" : "inferred")
-                    .arg(QString::fromUtf8(QJsonDocument(checkedMapping).toJson(QJsonDocument::Compact)))));
+            const auto findings = FormatDiagnostics::describe(result["evaluation"].toObject());
+            QString report = QString("%1 image readable. Mounted free space %2 bytes.")
+                             .arg(result["container"].toString().toUpper()).arg(result["free_bytes"].toInteger());
+            if (!findings.isEmpty()) report += '\n' + findings;
+            if (!checkedMapping.isEmpty())
+                report += '\n' + QString::fromUtf8(QJsonDocument(checkedMapping).toJson(QJsonDocument::Compact));
+            imageStatus->setText(report);
         } else if (operation == "mapping_preview") {
             QMessageBox preview(QMessageBox::Question, "Replace mapping sidecar",
                                 "Write the proposed strict mapping sidecar?", QMessageBox::Yes | QMessageBox::Cancel, this);
