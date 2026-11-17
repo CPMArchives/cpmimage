@@ -75,3 +75,9 @@ Opening TD0 creates a dirty private RAW session using the original basename and 
 Windows 11 ARM64 and Debian 13.7 ARM64 passed the focused broker and Qt checks with rebuilt native helpers. On each platform, all four Maslin samples matched the reference RAW and extracted-file SHA-256 hashes after Save and reopen. The tests also verified a private rename and unchanged source bytes. Synthetic CRC, missing-sector and duplicate-ID checks passed. The Qt test verified the Xerox unsaved-tab indicator, proposed `XEROX.raw` filename and successful first Save.
 
 The initial Windows run exposed LibDsk's POSIX `/tmp` fallback for advanced compression in the cross-built helper. The TD0 helper subprocess now points `TMPDIR` at its own private working directory. All three advanced-compression samples passed on rerun. The Windows and Debian GUI checks used Qt's offscreen platform plugin. No x86-64 or release-package qualification was performed.
+
+## Native macOS window close in 1.4 Beta 1
+
+On macOS ARM64, the maintainer tested the published Beta 1 from Applications with the four Maslin imports open in one window. With the red window close button, **Don't Save** prompted once per tab and closed the window after the fourth tab. In a separate single-instance run, **Save** opened the native macOS Save dialogs, wrote all four RAW images, and closed the window after the final Save. Neither completed run left an Untitled tab.
+
+The focused Qt regression also saves four unsaved TD0 tabs through the workspace close path, verifies the four RAW outputs, and asserts that the window closes with zero tabs. It uses Qt's non-native dialogs so it can run unattended.

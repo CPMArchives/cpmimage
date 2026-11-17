@@ -497,6 +497,54 @@ private slots:
         QCOMPARE(tabs->count(), 0);
     }
 
+    void workspaceCloseSavingUnsavedTabs() {
+        const auto maslin = qEnvironmentVariable("CPMIMAGE_MASLIN");
+        if (maslin.isEmpty()) QSKIP("External Maslin corpus unavailable");
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        Workspace workspace({qEnvironmentVariable("CPMIMAGE_ROOT"),
+                             qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}});
+        workspace.show();
+        auto *tabs = workspace.findChild<QTabWidget *>();
+        QVERIFY(tabs);
+        for (int i = 0; i < 4; ++i) {
+            const auto source = temp.filePath(QString("XEROX-%1.TD0").arg(i));
+            QVERIFY(QFile::copy(maslin + "/1995/sydex/xerox/820sys8s.td0", source));
+            workspace.addSession().inspectImage(source, "ibm-3740");
+            QTRY_COMPARE_WITH_TIMEOUT(tabs->tabText(i), QString("XEROX-%1.raw *").arg(i), 15000);
+        }
+        const bool nativeDisabled = QApplication::testAttribute(Qt::AA_DontUseNativeDialogs);
+        QApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+        const auto restore = qScopeGuard([nativeDisabled] {
+            QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, nativeDisabled);
+        });
+        int savePrompts = 0;
+        QTimer respond;
+        connect(&respond, &QTimer::timeout, &workspace, [&] {
+            if (auto *chooser = fileDialog()) {
+                if (auto *filename = chooser->findChild<QLineEdit *>("fileNameEdit")) {
+                    filename->setText(temp.filePath(QFileInfo(filename->text()).fileName()));
+                    QMetaObject::invokeMethod(chooser, "accept");
+                }
+            } else if (auto *prompt = qobject_cast<QMessageBox *>(QApplication::activeModalWidget())) {
+                if (auto *save = prompt->button(QMessageBox::Save)) {
+                    ++savePrompts;
+                    save->click();
+                } else if (auto *yes = prompt->button(QMessageBox::Yes)) {
+                    yes->click();
+                }
+            }
+        });
+        respond.start(20);
+        QVERIFY(!workspace.close());
+        QTRY_VERIFY_WITH_TIMEOUT(!workspace.isVisible(), 15000);
+        QCOMPARE(savePrompts, 4);
+        QCOMPARE(tabs->count(), 0);
+        for (int i = 0; i < 4; ++i)
+            QCOMPARE(QFileInfo(temp.filePath(QString("XEROX-%1.raw").arg(i))).size(), qint64(256256));
+    }
+
     void teleDiskImportSave() {
         const auto maslin = qEnvironmentVariable("CPMIMAGE_MASLIN");
         if (maslin.isEmpty()) QSKIP("External Maslin corpus unavailable");
