@@ -16,10 +16,10 @@ class FilesystemCheckDialog : public QDialog {
 public:
     using Reply = std::function<void(QJsonObject, QString)>;
     using Request = std::function<void(QJsonObject, Reply)>;
-    using OpenSlot = std::function<void(int, QString)>;
+    using OpenLocation = std::function<void(int, QString)>;
 
     FilesystemCheckDialog(QString activeImage, QString activeFormat, Request request,
-                          OpenSlot openSlot, QWidget *parent);
+                          OpenLocation openSlot, OpenLocation openBlock, QWidget *parent);
 
 private:
     void updateSource();
@@ -29,7 +29,8 @@ private:
     void showReport(const QJsonObject &report);
 
     Request request;
-    OpenSlot openSlot;
+    OpenLocation openSlot, openBlock;
+    int checkedBlockCount = 0;
     bool busy = false;
     bool catalogueLoaded = false;
     QString checkedRevision;
@@ -38,6 +39,6 @@ private:
     QWidget *external;
     QLineEdit *path;
     QLabel *status, *identity;
-    QPushButton *run, *goToSlot;
+    QPushButton *run, *goToSlot, *goToBlock;
     QTableWidget *table;
 };

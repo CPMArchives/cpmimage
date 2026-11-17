@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "workspace.h"
+#include "filesystem_check.h"
+#include "filesystem_inspector.h"
 #include <QCryptographicHash>
 #include <QFile>
 #include <QSignalSpy>
@@ -371,6 +373,31 @@ private slots:
         dialog->reject();
         QTRY_VERIFY(!first.findChild<QDialog *>("physicalDiskInspector"));
 
+        first.findChild<QPushButton *>("workbench-filesystem")->click();
+        auto *filesystem = first.findChild<QDialog *>("filesystemStructureInspector");
+        QVERIFY(filesystem);
+        auto *allocation = filesystem->findChild<QTableWidget *>("filesystemStructureRows");
+        QTRY_VERIFY(allocation->rowCount() > 0);
+        filesystem->findChild<QPushButton *>("filesystemBlocks")->click();
+        QTRY_COMPARE(allocation->horizontalHeaderItem(0)->text(), QString("Block"));
+        allocation->selectRow(2);
+        auto *physical = filesystem->findChild<QPushButton *>("filesystemGoToPhysicalSectors");
+        QVERIFY(physical && physical->isVisible());
+        physical->click();
+        QTRY_VERIFY(first.findChild<QDialog *>("physicalDiskInspector"));
+        auto *linked = first.findChild<QDialog *>("physicalDiskInspector");
+        auto *linkedTrack = linked->findChild<QComboBox *>("physicalDiskTrack");
+        auto *linkedSectors = linked->findChild<QTableWidget *>("physicalDiskSectors");
+        QVERIFY(linkedTrack && linkedSectors);
+        QCOMPARE(linkedTrack->currentIndex(), 2);
+        QTRY_COMPARE(linkedSectors->selectionModel()->selectedRows().size(), 2);
+        QVERIFY(linkedSectors->item(8, 1)->isSelected() && linkedSectors->item(9, 1)->isSelected());
+        linkedTrack->setCurrentIndex(3);
+        QTRY_COMPARE(linkedSectors->selectionModel()->selectedRows().size(), 2);
+        QVERIFY(linkedSectors->item(0, 1)->isSelected() && linkedSectors->item(1, 1)->isSelected());
+        linked->reject();
+        filesystem->reject();
+
         auto &second = workspace.addSession();
         QSignalSpy secondDone(&second, &Window::completed);
         second.openImage(root + "/fixtures/ibm3740-empty.raw", "ibm-3740", "raw");
@@ -655,6 +682,50 @@ private slots:
         QVERIFY(!QFile::exists(temp.filePath("right.FDF")));
         right.close();
         QTRY_VERIFY(!action->isEnabled());
+    }
+
+    void filesystemFindingLinksToAllocationBlock() {
+        QWidget parent;
+        int block = -1;
+        QString revision;
+        auto *dialog = new FilesystemCheckDialog("active.raw", "ibm-3740",
+            [](QJsonObject, FilesystemCheckDialog::Reply reply) {
+                reply({{"status", "findings"}, {"mode", "working"}, {"revision", "checked-revision"},
+                       {"block_count", 16}, {"finding_count", 2},
+                       {"findings", QJsonArray{
+                           QJsonObject{{"code", "reserved_block"}, {"slot", 2}, {"block", 1}},
+                           QJsonObject{{"code", "block_out_of_range"}, {"slot", 3}, {"block", 20}}
+                       }}}, {});
+            }, [](int, QString) {}, [&](int selected, QString token) {
+                block = selected;
+                revision = token;
+            }, &parent);
+        dialog->show();
+        dialog->findChild<QPushButton *>("filesystemCheckRun")->click();
+        auto *go = dialog->findChild<QPushButton *>("filesystemCheckGoToBlock");
+        auto *findings = dialog->findChild<QTableWidget *>("filesystemCheckFindings");
+        QVERIFY(go && findings);
+        QVERIFY(go->isEnabled());
+        go->click();
+        QCOMPARE(block, 1);
+        QCOMPARE(revision, QString("checked-revision"));
+        findings->selectRow(1);
+        QVERIFY(!go->isEnabled());
+        dialog->reject();
+
+        QJsonObject request;
+        auto *inspector = new FilesystemInspector(
+            [&](QJsonObject fields, FilesystemInspector::Reply reply) {
+                request = fields;
+                reply({}, "The working image changed. Reload the results.");
+            }, "active.raw", &parent, -1, revision, block);
+        inspector->show();
+        QTRY_COMPARE(request["view"].toString(), QString("blocks"));
+        QCOMPARE(request["revision"].toString(), revision);
+        auto *status = inspector->findChild<QLabel *>("filesystemStructurePage");
+        QVERIFY(status && status->text().contains("working image changed"));
+        QCOMPARE(inspector->findChild<QTableWidget *>("filesystemStructureRows")->rowCount(), 0);
+        inspector->reject();
     }
 
     void filesystemCheckActiveFindingLinksToSlot() {

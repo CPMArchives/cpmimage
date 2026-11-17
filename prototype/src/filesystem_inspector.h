@@ -16,7 +16,8 @@ public:
     using Reply = std::function<void(QJsonObject, QString)>;
     using Request = std::function<void(QJsonObject, Reply)>;
     FilesystemInspector(Request request, const QString &imageName, QWidget *parent,
-                        int slot = -1, QString revision = {});
+                        int slot = -1, QString revision = {}, int allocationBlock = -1,
+                        std::function<void(int, QString)> openSectors = {});
 
 private:
     enum class View { Directory, Extents, Blocks, References };
@@ -32,10 +33,11 @@ private:
     int next = -1;
     int block = -1;
     int blockCount = 0;
+    bool physicalLinks = false;
     QJsonArray rows;
     QWidget *controls;
     QLabel *summary, *page;
     QTableWidget *table;
     QComboBox *pointers;
-    QPushButton *previous, *following, *openBlock, *openSlot, *openExtent, *references;
+    QPushButton *previous, *following, *openBlock, *openSlot, *openExtent, *references, *physicalSectors;
 };
