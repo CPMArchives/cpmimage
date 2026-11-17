@@ -32,7 +32,8 @@ QString entryType(const QString &kind) {
 }
 
 FilesystemInspector::FilesystemInspector(Request request, const QString &imageName, QWidget *parent,
-                                         int slot, QString initialRevision)
+                                         int slot, QString initialRevision, int allocationBlock,
+                                         std::function<void(int, QString)> openSectors)
     : QDialog(parent), request(std::move(request)), revision(std::move(initialRevision)) {
     setAttribute(Qt::WA_DeleteOnClose);
     setWindowModality(Qt::ApplicationModal);
@@ -109,6 +110,10 @@ FilesystemInspector::FilesystemInspector(Request request, const QString &imageNa
     references = addButton(links, "Show References", "filesystemShowReferences", [this] {
         load(View::References, 0, selectedRow()["block"].toInt());
     });
+    physicalSectors = addButton(links, "Go to Physical Sectors", "filesystemGoToPhysicalSectors",
+        [this, openSectors = std::move(openSectors)] {
+            if (openSectors) openSectors(selectedRow()["block"].toInt(), revision);
+        });
     body->addLayout(links);
     connect(table, &QTableWidget::itemSelectionChanged, this, &FilesystemInspector::updateLinks);
     connect(pointers, &QComboBox::currentIndexChanged, this, [this] {
@@ -126,8 +131,12 @@ FilesystemInspector::FilesystemInspector(Request request, const QString &imageNa
     layout->addWidget(close);
     connect(close, &QDialogButtonBox::rejected, this, &QDialog::reject);
     updateLinks();
-    QTimer::singleShot(0, this, [this, slot] {
-        if (isVisible()) load(View::Directory, std::max(0, slot) / pageSize * pageSize, -1, slot);
+    QTimer::singleShot(0, this, [this, slot, allocationBlock] {
+        if (!isVisible()) return;
+        if (allocationBlock >= 0)
+            load(View::Blocks, allocationBlock / pageSize * pageSize, -1, allocationBlock);
+        else
+            load(View::Directory, std::max(0, slot) / pageSize * pageSize, -1, slot);
     });
 }
 
@@ -160,6 +169,7 @@ void FilesystemInspector::load(View target, int offset, int targetBlock, int sel
 
 void FilesystemInspector::render(const QJsonObject &result, int selected) {
     revision = result["revision"].toString();
+    physicalLinks = result["physical_links"].toBool();
     next = result["next_start"].toInt(-1);
     rows = result["rows"].toArray();
     blockCount = result["block_count"].toInt();
@@ -255,4 +265,5 @@ void FilesystemInspector::updateLinks() {
     openExtent->setVisible(view == View::Directory && row["extent_index"].isDouble());
     openSlot->setVisible(!row.isEmpty() && (view == View::Extents || view == View::References));
     references->setVisible(!row.isEmpty() && view == View::Blocks);
+    physicalSectors->setVisible(!row.isEmpty() && view == View::Blocks && physicalLinks);
 }

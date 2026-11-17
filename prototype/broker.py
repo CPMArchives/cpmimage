@@ -425,7 +425,7 @@ def main():
                 track[sector] = payload
         return inventory
 
-    def teledisk_raw(source, inventory, geometry, raw):
+    def teledisk_raw(source, inventory, geometry, raw, *, verified_order=None):
         profile = source.with_name(source.name + '.mapping.json')
         try:
             count = geometry['sectors_per_track']
@@ -452,6 +452,8 @@ def main():
                 for cylinder, head, ids in order:
                     for sector in ids:
                         stream.write(inventory[cylinder, head][sector])
+            if verified_order is not None:
+                verified_order.extend(order)
             return mapping_source
         except (OSError, ValueError, MappingError) as error:
             raise backend.Failure('physical_mapping', str(error)) from error
@@ -944,6 +946,8 @@ def main():
                               next_start=start + limit if start + limit < total else None)
                 if view == 'references':
                     result['block'] = block
+                if view == 'blocks':
+                    result['physical_links'] = bool(session.get('source_mapping'))
                 reply = dict(v=1, id=rid, ok=True, result=result)
             elif op == 'source_metadata':
                 # Omit track for the summary, or pass [cylinder, head] for ordered sectors.
@@ -951,6 +955,27 @@ def main():
                     raise backend.Failure('stale_session', 'Open an image first.')
                 source_snapshot = session.get('source_metadata')
                 result = dict(source=None, tracks=[])
+                if 'block' in request:
+                    working_revision(request)
+                    block = request['block']
+                    mapping = session.get('source_mapping')
+                    if not mapping or source_snapshot is None:
+                        raise backend.Failure('physical_mapping', 'No verified mapping to the original source is available.')
+                    if type(block) is not int or not 0 <= block <= 0x7fffffff:
+                        raise backend.Failure('invalid_request', 'Select an allocation block.')
+                    with tempfile.TemporaryDirectory(prefix='cpmimage-sector-links-') as temp:
+                        directory = Path(temp)
+                        (directory / 'diskdefs').write_text(session['definitions'], encoding='utf-8')
+                        slots = adapter().native(directory, 'filesystem-structure', session['image'],
+                                                 session['format'], 'raw', 'sector_slots', 0, 1, block)['slots']
+                    links = []
+                    for track, slot in slots:
+                        if not (0 <= track < len(mapping) and 0 <= slot < len(mapping[track][2])):
+                            raise backend.Failure('physical_mapping', 'The block falls outside the verified source mapping.')
+                        cylinder, head, ids = mapping[track]
+                        links.append(dict(cylinder=cylinder, head=head, id=ids[slot]))
+                    result.update(block=block, block_sectors=links)
+
                 if source_snapshot is not None:
                     provenance, tracks = source_snapshot
                     result['source'] = provenance
@@ -1015,10 +1040,11 @@ def main():
                 if request.get('definition_sha256', catalogue.digest(definition)) != catalogue.digest(definition):
                     raise backend.Failure('definition_changed', 'The disk definition changed. Select it again.')
                 observations = SourceTracks()
+                source_mapping = []
                 if importing_td0:
                     image = directory / 'image.raw'
                     inventory = teledisk_inventory(data, directory)
-                    teledisk_raw(source, inventory, geometry, image)
+                    teledisk_raw(source, inventory, geometry, image, verified_order=source_mapping)
                     observations.update((key, tuple((sector, len(payload)) for sector, payload in sectors.items()))
                                         for key, sectors in inventory.items())
                     mapping, end = None, image.stat().st_size
@@ -1056,9 +1082,17 @@ def main():
                                   sector_order=order.get(container))
                 if container == 'imd':
                     provenance['comment'] = observations.imd_comment.decode('utf-8', errors='replace')
+                if mapping is not None:
+                    source_mapping = [(track.cylinder, track.head, track.sectors) for track in mapping.tracks]
+                elif container == 'dsk':
+                    source_mapping = [(c, h, tuple(sector for sector, _ in observations[c, h]))
+                                      for c, h in sorted(observations)]
+                session['source_mapping'] = source_mapping
                 session['source_metadata'] = (provenance, observations)
                 if previous:
                     session['source_metadata'] = previous.get('source_metadata')
+                    if not session['source_metadata'] or session['source_metadata'][0]['sha256'] != fingerprint:
+                        session['source_mapping'] = []
                     if 'archive_source' in previous:
                         session.update(archive_source=previous['archive_source'],
                                        archive_identity=previous['archive_identity'])

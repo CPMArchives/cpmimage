@@ -541,7 +541,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     connect(diskAnalysisAction, &QAction::triggered, this, &Window::showDiskAnalysis);
     physicalDiskAction = workbenchMenu->addAction("Physical Disk Inspector…");
     physicalDiskAction->setObjectName("physicalDiskInspectorAction");
-    connect(physicalDiskAction, &QAction::triggered, this, &Window::showPhysicalDiskInspector);
+    connect(physicalDiskAction, &QAction::triggered, this, [this] { showPhysicalDiskInspector(); });
     filesystemInspectorAction = workbenchMenu->addAction("Filesystem Structure Inspector…");
     filesystemInspectorAction->setObjectName("filesystemStructureInspectorAction");
     connect(filesystemInspectorAction, &QAction::triggered, this, [this] { showFilesystemInspector(); });
@@ -2461,7 +2461,7 @@ void Window::showDiskAnalysis() {
     });
 }
 
-void Window::showFilesystemInspector(int slot, QString revision) {
+void Window::showFilesystemInspector(int slot, QString revision, int allocationBlock) {
     if (busy || session.isEmpty()) return;
     const auto inspectedSession = session;
     auto *dialog = new FilesystemInspector([this, inspectedSession](QJsonObject fields, auto reply) {
@@ -2472,7 +2472,14 @@ void Window::showFilesystemInspector(int slot, QString revision) {
         fields["op"] = "filesystem_structure";
         fields["session"] = inspectedSession;
         requestBrokerResult(std::move(fields), std::move(reply));
-    }, QFileInfo(image).fileName(), this, slot, std::move(revision));
+    }, QFileInfo(image).fileName(), this, slot, std::move(revision), allocationBlock,
+        [this, inspectedSession](int block, QString token) {
+            if (session != inspectedSession) {
+                QMessageBox::warning(this, "Physical Disk Inspector", "The image session changed. Reopen the inspector.");
+                return;
+            }
+            showPhysicalDiskInspector(block, std::move(token));
+        });
     dialog->show();
 }
 
@@ -2495,14 +2502,23 @@ void Window::showFilesystemCheck() {
         [this, checkedSession](int slot, QString revision) {
             if (session != checkedSession) return;
             showFilesystemInspector(slot, std::move(revision));
+        },
+        [this, checkedSession](int block, QString revision) {
+            if (session != checkedSession) return;
+            showFilesystemInspector(-1, std::move(revision), block);
         }, this);
     dialog->show();
 }
 
-void Window::showPhysicalDiskInspector() {
+void Window::showPhysicalDiskInspector(int block, QString revision) {
     if (busy || session.isEmpty()) return;
     const auto inspectedSession = session;
-    requestBrokerResult({{"op", "source_metadata"}, {"session", inspectedSession}},
+    QJsonObject request{{"op", "source_metadata"}, {"session", inspectedSession}};
+    if (block >= 0) {
+        request["block"] = block;
+        request["revision"] = revision;
+    }
+    requestBrokerResult(std::move(request),
                         [this, inspectedSession](const QJsonObject &result, const QString &failure) {
         if (session != inspectedSession || !isVisible()) return;
         if (!failure.isEmpty()) {
@@ -2533,6 +2549,19 @@ void Window::showPhysicalDiskInspector() {
         layout->addWidget(origin);
 
         const auto tracks = result["tracks"].toArray();
+        const auto blockSectors = result["block_sectors"].toArray();
+        if (!blockSectors.isEmpty()) {
+            QStringList addresses;
+            for (const auto &entry : blockSectors) {
+                const auto sector = entry.toObject();
+                addresses.append(QString("%1/%2/%3").arg(sector["cylinder"].toInt())
+                                 .arg(sector["head"].toInt()).arg(sector["id"].toInt()));
+            }
+            auto *summary = new QLabel(QString("Block %1 · original source sectors (cylinder/head/ID): %2")
+                                       .arg(result["block"].toInt()).arg(addresses.join(", ")), dialog);
+            summary->setWordWrap(true);
+            layout->addWidget(summary);
+        }
         std::function<void()> loadFirstTrack;
         if (tracks.isEmpty()) {
             layout->addWidget(new QLabel("No physical track or sector data is available for this source.", dialog));
@@ -2554,6 +2583,16 @@ void Window::showPhysicalDiskInspector() {
                                      .arg(track["cylinder"].toInt()).arg(track["head"].toInt())
                                      .arg(track["sector_count"].toInt()));
             }
+            if (!blockSectors.isEmpty()) {
+                const auto first = blockSectors.first().toObject();
+                for (int i = 0; i < tracks.size(); ++i) {
+                    const auto track = tracks[i].toObject();
+                    if (track["cylinder"] == first["cylinder"] && track["head"] == first["head"]) {
+                        trackPicker->setCurrentIndex(i);
+                        break;
+                    }
+                }
+            }
             layout->addWidget(trackPicker);
             auto *trackStatus = new QLabel(dialog);
             trackStatus->setObjectName("physicalDiskTrackStatus");
@@ -2565,11 +2604,13 @@ void Window::showPhysicalDiskInspector() {
             sectors->setAccessibleName("Source sector details");
             sectors->setHorizontalHeaderLabels({orderLabel, "Sector ID", "Size (bytes)", "Density", "Status"});
             sectors->setEditTriggers(QAbstractItemView::NoEditTriggers);
+            sectors->setSelectionBehavior(QAbstractItemView::SelectRows);
+            sectors->setSelectionMode(QAbstractItemView::MultiSelection);
             sectors->verticalHeader()->hide();
             sectors->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
             layout->addWidget(sectors, 1);
 
-            auto loadTrack = [this, inspectedSession, dialog, tracks, trackPicker, trackStatus, sectors](int index) {
+            auto loadTrack = [this, inspectedSession, dialog, tracks, blockSectors, trackPicker, trackStatus, sectors](int index) {
                 if (index < 0 || index >= tracks.size() || session != inspectedSession) return;
                 const auto track = tracks.at(index).toObject();
                 const QJsonArray address{track["cylinder"], track["head"]};
@@ -2578,7 +2619,7 @@ void Window::showPhysicalDiskInspector() {
                 trackStatus->setText("Reading track…");
                 requestBrokerResult({{"op", "source_metadata"}, {"session", inspectedSession}, {"track", address}},
                                     [guard = QPointer<QDialog>(dialog), address, count = track["sector_count"].toInt(),
-                                     trackPicker, trackStatus, sectors]
+                                     trackPicker, trackStatus, sectors, blockSectors]
                                     (const QJsonObject &details, const QString &error) {
                     if (!guard || !guard->isVisible()) return;
                     trackPicker->setEnabled(true);
@@ -2602,6 +2643,15 @@ void Window::showPhysicalDiskInspector() {
                                                   sector["status"].toString("Unavailable")};
                         for (int column = 0; column < columns.size(); ++column)
                             sectors->setItem(i, column, new QTableWidgetItem(columns.at(column)));
+                        for (const auto &entry : blockSectors) {
+                            const auto linked = entry.toObject();
+                            if (linked["cylinder"] == address[0] && linked["head"] == address[1] &&
+                                linked["id"] == sector["id"]) {
+                                sectors->selectionModel()->select(sectors->model()->index(i, 0),
+                                    QItemSelectionModel::Select | QItemSelectionModel::Rows);
+                                break;
+                            }
+                        }
                     }
                 });
             };

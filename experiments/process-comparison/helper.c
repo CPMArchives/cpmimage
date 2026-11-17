@@ -347,6 +347,27 @@ static void structure_slot(const struct cpmSuperBlock *sb, int slot, int width, 
 
 static int filesystem_structure(struct cpmSuperBlock *sb, const char *view, int start, int limit, int block)
 {
+  if (!strcmp(view, "sector_slots"))
+  {
+    if (block >= sb->size || sb->offset)
+    {
+      Device_close(&sb->dev);
+      return fail("unknown_block", "The block has no supported RAW sector address.");
+    }
+    const int count = sb->blksiz / sb->secLength;
+    const long long reserved = sb->bootsec >= 0 ? sb->bootsec : (long long)sb->boottrk * sb->sectrk;
+    const long long first = reserved + (long long)block * count;
+    printf("{\"v\":1,\"ok\":true,\"slots\":[");
+    for (int i = 0; i < count; ++i)
+    {
+      const long long sector = first + i;
+      printf("%s[%lld,%d]", i ? "," : "", sector / sb->sectrk,
+             sb->skewtab[sector % sb->sectrk]);
+    }
+    puts("]}");
+    Device_close(&sb->dev);
+    return 0;
+  }
   const int blocks = !strcmp(view, "blocks");
   const int references = !strcmp(view, "references");
   const int extents = !strcmp(view, "extents");
@@ -633,7 +654,7 @@ int main(int argc,char **argv) {
   {
     if (argc != 9 || strcmp(argv[4], "raw") ||
         (strcmp(argv[5], "directory") && strcmp(argv[5], "extents") &&
-         strcmp(argv[5], "blocks") && strcmp(argv[5], "references")))
+         strcmp(argv[5], "blocks") && strcmp(argv[5], "references") && strcmp(argv[5], "sector_slots")))
       return fail("arguments", "Expected a RAW image and a filesystem structure view.");
     start = structure_number(argv[6], INT_MAX);
     limit = structure_number(argv[7], 128);

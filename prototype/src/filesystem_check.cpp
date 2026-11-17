@@ -54,8 +54,9 @@ QString number(const QJsonValue &value, int base = 0) {
 }
 
 FilesystemCheckDialog::FilesystemCheckDialog(QString activeImage, QString activeFormat, Request request,
-                                             OpenSlot openFindingSlot, QWidget *parent)
-    : QDialog(parent), request(std::move(request)), openSlot(std::move(openFindingSlot)) {
+                                             OpenLocation openFindingSlot, OpenLocation openFindingBlock, QWidget *parent)
+    : QDialog(parent), request(std::move(request)), openSlot(std::move(openFindingSlot)),
+      openBlock(std::move(openFindingBlock)) {
     setAttribute(Qt::WA_DeleteOnClose);
     setWindowModality(Qt::ApplicationModal);
     setWindowTitle("Filesystem Check");
@@ -127,6 +128,13 @@ FilesystemCheckDialog::FilesystemCheckDialog(QString activeImage, QString active
     goToSlot = buttons->addButton("Go to Directory Slot", QDialogButtonBox::ActionRole);
     goToSlot->setObjectName("filesystemCheckGoToSlot");
     goToSlot->setAutoDefault(false);
+    goToBlock = buttons->addButton("Go to Allocation Block", QDialogButtonBox::ActionRole);
+    goToBlock->setObjectName("filesystemCheckGoToBlock");
+    goToBlock->setAutoDefault(false);
+    connect(goToBlock, &QPushButton::clicked, this, [this] {
+        if (goToBlock->isEnabled())
+            openBlock(findings.at(table->currentRow()).toObject()["block"].toInt(), checkedRevision);
+    });
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     connect(run, &QPushButton::clicked, this, &FilesystemCheckDialog::check);
@@ -151,11 +159,17 @@ void FilesystemCheckDialog::updateControls() {
     run->setEnabled(!busy && (!fileMode || (catalogueLoaded && !path->text().trimmed().isEmpty()
                                            && formats->currentData().isValid())));
     goToSlot->setVisible(!checkedRevision.isEmpty());
-    goToSlot->setEnabled(!busy && table->currentRow() >= 0);
+    const auto row = table->currentRow();
+    const auto finding = row >= 0 && row < findings.size() ? findings.at(row).toObject() : QJsonObject{};
+    const int block = finding["block"].toInt(-1);
+    goToSlot->setEnabled(!busy && finding["slot"].toInt(-1) >= 0);
+    goToBlock->setVisible(!checkedRevision.isEmpty());
+    goToBlock->setEnabled(!busy && block >= 0 && block < checkedBlockCount);
 }
 
 void FilesystemCheckDialog::clearReport() {
     checkedRevision.clear();
+    checkedBlockCount = 0;
     findings = {};
     table->setRowCount(0);
     identity->clear();
@@ -245,6 +259,7 @@ void FilesystemCheckDialog::showReport(const QJsonObject &report) {
     status->setText(omitted ? QString("%1 findings · %2 omitted from this report").arg(count).arg(omitted) :
                     QString(count == 1 ? "%1 finding" : "%1 findings").arg(count));
     if (working) checkedRevision = report["revision"].toString();
+    checkedBlockCount = report["block_count"].toInt();
     findings = report["findings"].toArray();
     table->setRowCount(findings.size());
     for (int row = 0; row < findings.size(); ++row) {

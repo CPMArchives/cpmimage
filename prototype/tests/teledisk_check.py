@@ -98,9 +98,23 @@ class TeleDiskCheck(unittest.TestCase):
         self.assertEqual([(row['id'], row['size']) for row in track['sectors']],
                          [(sector, 128) for sector in range(26, 0, -1)])
 
+        page = result(first, 'filesystem_structure', session=token, view='blocks')
+        self.assertTrue(page['physical_links'])
+        linked = result(first, 'source_metadata', session=token, block=0,
+                        revision=page['revision'])
+        self.assertEqual(linked['block_sectors'], [
+            dict(cylinder=2, head=0, id=sector) for sector in (1, 7, 13, 19, 25, 5, 11, 17)
+        ])
+        stale = first.request('source_metadata', session=token, block=0, revision='stale')
+        self.assertEqual(stale['error'], 'stale_revision')
+
         other = result(second, 'open', image=str(second.image), format='ibm-3740', container='raw')['session']
         self.assertEqual(second.request('source_metadata', session=token)['error'], 'stale_session')
         self.assertEqual(result(second, 'source_metadata', session=other)['tracks'], [])
+        raw_page = result(second, 'filesystem_structure', session=other, view='blocks')
+        self.assertFalse(raw_page['physical_links'])
+        self.assertEqual(second.request('source_metadata', session=other, block=0,
+                                       revision=raw_page['revision'])['error'], 'physical_mapping')
 
         output = first.directory / 'converted.raw'
         args = dict(session=token, destination=str(output), container='raw', sidecar=False)
