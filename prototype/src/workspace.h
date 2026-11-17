@@ -20,13 +20,14 @@
 #include <QSettings>
 #include <QScopedValueRollback>
 #include <utility>
+#include <memory>
 
 class Workspace : public QMainWindow {
 public:
     explicit Workspace(RuntimePaths paths, const QString &settingsFile = {})
         : runtime(std::move(paths)),
-          settings(settingsFile.isEmpty() ? QSettings("CPMArchives", "cpmimage")
-                                          : QSettings(settingsFile, QSettings::IniFormat)) {
+          settings(settingsFile.isEmpty() ? std::make_unique<QSettings>("CPMArchives", "cpmimage")
+                                          : std::make_unique<QSettings>(settingsFile, QSettings::IniFormat)) {
         setCentralWidget(tabs);
         setAcceptDrops(true);
         tabs->setTabsClosable(true);
@@ -46,25 +47,6 @@ public:
             "QTabBar::tab:selected { background: palette(highlight); color: palette(highlighted-text); }");
 #endif
 
-        enableWorkbenchAction = new QAction("Enable Workbench", this);
-        enableWorkbenchAction->setObjectName("enableWorkbenchAction");
-        enableWorkbenchAction->setCheckable(true);
-        enableWorkbenchAction->setChecked(settings.value("workbenchEnabled", false).toBool());
-        connect(enableWorkbenchAction, &QAction::toggled, this, [this](bool enabled) {
-            settings.setValue("workbenchEnabled", enabled);
-            for (auto *page : tabs->findChildren<Window *>()) page->setWorkbenchEnabled(enabled);
-            for (auto *dialog : findChildren<QDialog *>()) {
-                if (!dialog->property("workbenchWindow").toBool()) continue;
-                if (!enabled && dialog->isVisible()) {
-                    dialog->setProperty("workbenchHidden", true);
-                    dialog->hide();
-                } else if (enabled && dialog->property("workbenchHidden").toBool()) {
-                    dialog->setProperty("workbenchHidden", false);
-                    dialog->show();
-                }
-            }
-            updateMenus();
-        });
         compareAction = new QAction("Compare Images…", this);
         compareAction->setObjectName("compareImagesAction");
         compareAction->setEnabled(false);
@@ -99,9 +81,9 @@ public:
         pinAction = new QAction("Pin Current Image", this);
         connect(pinAction, &QAction::triggered, this, [this] {
             const auto path = tabs->currentWidget()->property("imagePath").toString();
-            auto paths = settings.value("pinnedImages").toStringList();
+            auto paths = settings->value("pinnedImages").toStringList();
             if (!paths.removeAll(path)) paths.prepend(path);
-            settings.setValue("pinnedImages", paths);
+            settings->setValue("pinnedImages", paths);
             updatePin();
         });
         connect(tabs, &QTabWidget::currentChanged, this, [this] { updateMenus(); });
@@ -123,8 +105,7 @@ public:
     Window &addSession() {
         auto *page = new Window(runtime.root, runtime.python, runtime.helper, 30000, 2000, runtime.notices);
         page->workspaceManaged = true;
-        page->canCloseWorkbench = [this, page] { return canCloseWithHiddenWorkbench(page); };
-        page->setWorkbenchEnabled(enableWorkbenchAction->isChecked());
+        page->canCloseWorkbench = [this, page] { return canCloseWithWorkbenchDraft(page); };
         page->bindWorkbenchAction("compare-images", compareAction);
         page->repairReferences = [this, page] {
             QList<ImageComparison::Source> references;
@@ -151,10 +132,10 @@ public:
         connect(page, &Window::imagePicked, this, [this](const QString &path) { openPath(path); });
         connect(page, &Window::imageOpened, this, [this, page](const QString &path) {
             page->setProperty("imagePath", path);
-            auto paths = settings.value("recentImages").toStringList();
+            auto paths = settings->value("recentImages").toStringList();
             paths.removeAll(path);
             paths.prepend(path);
-            settings.setValue("recentImages", paths.mid(0, 12));
+            settings->setValue("recentImages", paths.mid(0, 12));
             updatePin();
         });
         if (!catalogue.isEmpty()) page->setCataloguePath(catalogue);
@@ -174,7 +155,7 @@ protected:
         }
     }
     void closeEvent(QCloseEvent *event) override {
-        if (!canCloseWithHiddenWorkbench(this)) { event->ignore(); return; }
+        if (!canCloseWithWorkbenchDraft(this)) { event->ignore(); return; }
         QScopedValueRollback<bool> closing(closingWorkspace, true);
         while (tabs->count()) {
             auto *page = static_cast<Window *>(tabs->currentWidget());
@@ -184,18 +165,18 @@ protected:
     }
 
 private:
-    bool canCloseWithHiddenWorkbench(QWidget *scope) {
+    bool canCloseWithWorkbenchDraft(QWidget *scope) {
         for (auto *dialog : scope->findChildren<QDialog *>()) {
             auto *editor = dynamic_cast<DiskFormatEditor *>(dialog);
-            if (!editor || !editor->property("workbenchHidden").toBool() || !editor->hasUnsavedWork()) continue;
+            if (!editor || !editor->isVisible() || !editor->hasUnsavedWork()) continue;
             QMessageBox warning(QMessageBox::Warning, "Unsaved Workbench Changes",
-                "A hidden Workbench window has unsaved work.", QMessageBox::NoButton, this);
+                "The Disk Format Editor has an unsaved draft.", QMessageBox::NoButton, this);
             auto *cancel = warning.addButton("Cancel and Return", QMessageBox::RejectRole);
-            auto *enable = warning.addButton("Enable Workbench", QMessageBox::ActionRole);
+            auto *enable = warning.addButton("Review Draft", QMessageBox::ActionRole);
             warning.setDefaultButton(cancel);
             warning.setEscapeButton(cancel);
             warning.exec();
-            if (warning.clickedButton() == enable) enableWorkbenchAction->setChecked(true);
+            if (warning.clickedButton() == enable) { editor->raise(); editor->activateWindow(); }
             return false;
         }
         return true;
@@ -205,7 +186,7 @@ private:
 
     void populateImages(QMenu *menu, const QString &key) {
         menu->clear();
-        for (const auto &path : settings.value(key).toStringList()) {
+        for (const auto &path : settings->value(key).toStringList()) {
             auto *action = menu->addAction(path);
             action->setEnabled(QFileInfo(path).isFile());
             connect(action, &QAction::triggered, this, [this, path] { openPath(path); });
@@ -216,7 +197,7 @@ private:
         const auto *page = tabs->currentWidget();
         const auto path = page ? page->property("imagePath").toString() : QString();
         pinAction->setEnabled(!path.isEmpty());
-        pinAction->setText(settings.value("pinnedImages").toStringList().contains(path)
+        pinAction->setText(settings->value("pinnedImages").toStringList().contains(path)
                            ? "Unpin Current Image" : "Pin Current Image");
     }
 
@@ -232,7 +213,7 @@ private:
 
     void updateCompareAction() {
         const auto *active = qobject_cast<Window *>(tabs->currentWidget());
-        compareAction->setEnabled(enableWorkbenchAction->isChecked() && active && !active->session.isEmpty() && !comparisonTargets(active).isEmpty());
+        compareAction->setEnabled(active && !active->session.isEmpty() && !comparisonTargets(active).isEmpty());
     }
 
     ImageComparison::Source comparisonSource(Window *page) const {
@@ -259,7 +240,7 @@ private:
 
     void compareImages() {
         auto *active = qobject_cast<Window *>(tabs->currentWidget());
-        if (!enableWorkbenchAction->isChecked() || !active || active->session.isEmpty()) return;
+        if (!active || active->session.isEmpty()) return;
         const auto available = comparisonTargets(active);
         if (available.isEmpty()) return;
         QList<ImageComparison::Source> targets;
@@ -275,7 +256,6 @@ private:
         if (auto *page = qobject_cast<Window *>(tabs->currentWidget())) {
             const auto actions = page->menuBar()->actions();
             for (const auto &title : {"File", "Edit", "View", "Workbench", "Settings", "Help"}) {
-                if (QLatin1String(title) == "Workbench" && !enableWorkbenchAction->isChecked()) continue;
                 for (auto *action : actions) {
                     auto *menu = action->menu();
                     if (!menu || menu->title() != QLatin1String(title)) continue;
@@ -291,8 +271,6 @@ private:
                     }
                     if (QLatin1String(title) == "Workbench" && !menu->actions().contains(compareAction))
                         menu->insertAction(page->filesystemCheckAction, compareAction);
-                    if (QLatin1String(title) == "Settings" && !menu->actions().contains(enableWorkbenchAction))
-                        menu->insertAction(menu->actions().value(0), enableWorkbenchAction);
                     menuBar()->addAction(action);
                     break;
                 }
@@ -304,12 +282,11 @@ private:
     RuntimePaths runtime;
     QTabWidget *tabs = new QTabWidget;
     bool closingWorkspace = false;
-    QAction *enableWorkbenchAction = nullptr;
     QAction *compareAction = nullptr;
     QAction *newTabAction = nullptr;
     QAction *closeTabAction = nullptr;
     QMenu *recentImages = nullptr;
     QMenu *pinnedImages = nullptr;
     QAction *pinAction = nullptr;
-    QSettings settings;
+    std::unique_ptr<QSettings> settings;
 };

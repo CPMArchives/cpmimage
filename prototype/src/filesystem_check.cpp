@@ -219,7 +219,7 @@ void FilesystemCheckDialog::updateSource() {
     status->setText("Loading disk definitions…");
     request({{"op", "catalogue"}}, [guard = QPointer<FilesystemCheckDialog>(this)]
             (const QJsonObject &result, const QString &error) {
-        if (!guard || (!guard->isVisible() && !guard->property("workbenchHidden").toBool())) return;
+        if (!guard || !guard->isVisible()) return;
         guard->busy = false;
         if (!error.isEmpty() || !result["formats"].isArray()) {
             guard->status->setText(error.isEmpty() ? "Disk definitions could not be loaded." : error);
@@ -253,7 +253,7 @@ void FilesystemCheckDialog::check() {
     status->setText("Checking filesystem…");
     request(fields, [guard = QPointer<FilesystemCheckDialog>(this)]
             (const QJsonObject &result, const QString &error) {
-        if (!guard || (!guard->isVisible() && !guard->property("workbenchHidden").toBool())) return;
+        if (!guard || !guard->isVisible()) return;
         guard->busy = false;
         if (error.isEmpty()) guard->showReport(result);
         else guard->status->setText(error);

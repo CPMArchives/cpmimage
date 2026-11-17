@@ -6,7 +6,7 @@ Choose **Open image** and select a disk image. If the format picker appears, com
 
 ## Edit disk format definitions
 
-Enable advanced tools with **Settings → Enable Workbench**. Workbench starts off. Turning it off hides the menu, toolbar, and open tools. Re-enable it to return to the same windows and drafts. If a hidden window has unsaved work when you try to quit, you can cancel or re-enable Workbench to review it.
+The **Workbench** menu is always available. Use **View → Workbench Toolbar** to show or hide its icons. The toolbar starts hidden.
 
 Open **File → Disk Format Editor…**, or choose **Disk Format Editor…** from the format picker. Use **New** to enter a definition, **Duplicate** to copy a catalogue entry under a new identifier, or **Import diskdefs…** to review a standalone definition. Review any import diagnostics before saving or exporting.
 

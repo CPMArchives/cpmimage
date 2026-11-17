@@ -197,17 +197,10 @@ See the [published v1.3 release and downloads](https://github.com/CPMArchives/cp
 - Produce evidence-based repair plans for review and require explicit user approval before applying any proposed modifications.
 - Integrate navigation between physical observations, format definitions, filesystem structures, comparison results, and diagnostic findings within the relevant image session.
 
-### Workbench interface segregation (v2.0)
+### Workbench interface (v2.0)
 
-- Keep **one CP/M Image application, codebase, and executable**, not separate Manager and Workbench products. Preserve the ordinary WinZip-style CP/M file-management interface as the default experience.
-- Implement and qualify advanced investigation, inspection, comparison, and maintenance capabilities in the existing interface during v1.4–v1.8. **Defer separating their presentation into Manager and Workbench interfaces until v2.0**; do not reorganize or hide unfinished features prematurely.
-- In v2.0, add a persistent **Settings → Enable Workbench** checkbox, **off by default**. Enabling it reveals a Workbench menu and advanced analysis/editing tools; disabling it hides those entry points while preserving ordinary image-management commands.
-- When Workbench is disabled, hide any open Workbench windows **without closing or destroying them**. Preserve their contents, selections, pending changes, and related session state. Re-enabling Workbench restores those windows. Switching visibility must never implicitly save, discard, or publish changes.
-- If application exit is attempted while Workbench is disabled and **hidden Workbench windows contain unsaved work**, interrupt shutdown with a warning offering **exactly two actions**:
-  1. **Cancel and Return** — abort shutdown, leave Workbench disabled, and preserve all state.
-  2. **Enable Workbench** — abort shutdown, enable Workbench, and restore hidden windows so the user can review their work.
-- Neither action saves or discards work. Clean hidden windows alone do not trigger this warning. Existing image-session Save/Discard and exit protections continue to apply independently, including to modifications made through Workbench.
-- Treat Workbench as an **interface visibility preference, not a security or capability boundary**. Implement visibility consistently across menus, context actions, shortcuts, and other entry points when the v2.0 UI is designed.
+- Keep the Workbench menu available in the main application.
+- Offer a separate **View → Workbench Toolbar** preference, off by default. Toggling the toolbar leaves open tools and drafts intact.
 
 ## Scope deferred from v1.0
 

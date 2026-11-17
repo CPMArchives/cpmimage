@@ -202,7 +202,7 @@ void ImageComparison::send(int side, QJsonObject fields, std::function<void(QJso
     pendingSide = side;
     source(side).request(std::move(fields), [guard = QPointer<ImageComparison>(this), accept = std::move(accept)]
                          (QJsonObject result, const QString &error) {
-        if (!guard || (!guard->isVisible() && !guard->property("workbenchHidden").toBool())) return;
+        if (!guard || !guard->isVisible()) return;
         guard->pendingSide = -1;
         if (error.isEmpty()) accept(std::move(result));
         else guard->fail(error);
