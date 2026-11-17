@@ -630,6 +630,7 @@ void Window::setBusy(bool value) {
     physicalDiskAction->setEnabled(!busy && !session.isEmpty());
     filesystemInspectorAction->setEnabled(!busy && !session.isEmpty());
     progress->setVisible(busy && batchActive);
+    emit comparisonAvailabilityChanged();
 }
 bool Window::confirmWrite() {
     return writeConfirmed || QMessageBox::question(this, "Confirm format for writing",
@@ -2488,7 +2489,8 @@ void Window::begin(QJsonObject request) {
         fail("The image reader is restarting. Open the image again."); return;
     }
     setBusy(true);
-    status->setText(operation == "filesystem_structure" ? "Reading filesystem structures…" :
+    status->setText(operation.startsWith("comparison_") ? "Comparing images…" :
+        operation == "filesystem_structure" ? "Reading filesystem structures…" :
         operation == "source_metadata" ? "Reading source metadata…" :
         brokerResultHandler ? "Checking disk definition…" : operation == "open" ? "Reading image…" : operation == "catalogue" ? "Loading disk definitions…" :
         operation == "inspect" ? "Checking image format…" :
@@ -2588,7 +2590,8 @@ void Window::readReply() {
         auto handler = std::exchange(brokerResultHandler, {});
         setBusy(false);
         status->setText(dirty ? "Unsaved changes." :
-                        (operation == "source_metadata" || operation == "filesystem_structure")
+                        (operation == "source_metadata" || operation == "filesystem_structure" ||
+                         operation.startsWith("comparison_"))
                         ? "Image ready." : "Disk definitions ready.");
         handler(result, {});
         return;

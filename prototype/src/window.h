@@ -46,6 +46,7 @@ public:
 signals:
     void completed(bool success);
     void sessionClosed();
+    void comparisonAvailabilityChanged();
     void newImageRequested();
     void imageOpened(const QString &path);
     void imagePicked(const QString &path);
@@ -54,6 +55,7 @@ protected:
     void closeEvent(QCloseEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
 private:
+    friend class Workspace;
     void begin(QJsonObject request);
     void requestBrokerResult(QJsonObject request, std::function<void(QJsonObject, QString)> reply);
     bool showDiskFormatEditor(const QString &selectedFormat = {});

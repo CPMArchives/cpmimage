@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include "window.h"
+#include "image_comparison.h"
+#include <QPointer>
 #include "runtime_paths.h"
 #include <QTabWidget>
 #include <QTabBar>
@@ -38,6 +40,10 @@ public:
             "QTabBar::tab:selected { background: palette(highlight); color: palette(highlighted-text); }");
 #endif
 
+        compareAction = new QAction("Compare Images…", this);
+        compareAction->setObjectName("compareImagesAction");
+        compareAction->setEnabled(false);
+        connect(compareAction, &QAction::triggered, this, [this] { compareImages(); });
         newTabAction = new QAction("New Tab", this);
         auto *create = newTabAction;
         create->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
@@ -98,8 +104,10 @@ public:
         connect(page, &QWidget::windowTitleChanged, this, [this, page](const QString &title) {
             tabs->setTabText(tabs->indexOf(page), title.section(" — ", 1));
         });
+        connect(page, &Window::comparisonAvailabilityChanged, this, [this] { updateCompareAction(); });
         connect(page, &Window::sessionClosed, this, [this, page] {
             tabs->removeTab(tabs->indexOf(page));
+            updateCompareAction();
             page->deleteLater();
             if (!closingWorkspace && !tabs->count()) QTimer::singleShot(0, this, [this] {
                 if (!tabs->count() && isVisible()) addSession();
@@ -160,6 +168,52 @@ private:
                            ? "Unpin Current Image" : "Pin Current Image");
     }
 
+    QList<Window *> comparisonTargets() const {
+        QList<Window *> available;
+        const auto *active = qobject_cast<Window *>(tabs->currentWidget());
+        if (!active || active->busy || active->session.isEmpty()) return available;
+        for (int index = 0; index < tabs->count(); ++index) {
+            auto *page = qobject_cast<Window *>(tabs->widget(index));
+            if (page && page != active && !page->busy && !page->session.isEmpty()) available.append(page);
+        }
+        return available;
+    }
+
+    void updateCompareAction() {
+        compareAction->setEnabled(!comparisonTargets().isEmpty());
+    }
+
+    void compareImages() {
+        const auto available = comparisonTargets();
+        if (available.isEmpty()) return;
+        auto source = [this](Window *page) -> ImageComparison::Source {
+            const auto token = page->session;
+            const QPointer<Window> guard(page);
+            const int index = tabs->indexOf(page);
+            return {
+                QString("Tab %1 · %2").arg(index + 1).arg(tabs->tabText(index)),
+                [guard, token](QJsonObject fields, auto reply) {
+                    if (!guard || guard->session != token) {
+                        reply({}, "An image session changed. Reopen the comparison.");
+                        return;
+                    }
+                    fields["session"] = token;
+                    guard->requestBrokerResult(std::move(fields), std::move(reply));
+                },
+                [guard, token] {
+                    if (guard && guard->session == token && guard->busy &&
+                        (guard->operation.startsWith("comparison_") || guard->operation == "filesystem_structure"))
+                        guard->cancel();
+                }
+            };
+        };
+        QList<ImageComparison::Source> targets;
+        for (auto *page : available) targets.append(source(page));
+        auto *dialog = new ImageComparison(source(qobject_cast<Window *>(tabs->currentWidget())),
+                                           std::move(targets), this);
+        dialog->show();
+    }
+
     void updateMenus() {
         for (auto *action : menuBar()->actions()) menuBar()->removeAction(action);
         if (auto *page = qobject_cast<Window *>(tabs->currentWidget())) {
@@ -175,6 +229,7 @@ private:
                     }
                     if (QLatin1String(title) == "View" && !menu->actions().contains(newTabAction)) {
                         if (!menu->actions().isEmpty()) menu->addSeparator();
+                        menu->addAction(compareAction);
                         menu->addAction(newTabAction);
                         menu->addAction(closeTabAction);
                     }
@@ -184,10 +239,12 @@ private:
             }
         }
         updatePin();
+        updateCompareAction();
     }
     RuntimePaths runtime;
     QTabWidget *tabs = new QTabWidget;
     bool closingWorkspace = false;
+    QAction *compareAction = nullptr;
     QAction *newTabAction = nullptr;
     QAction *closeTabAction = nullptr;
     QMenu *recentImages = nullptr;
