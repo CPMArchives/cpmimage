@@ -566,7 +566,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         action->setChecked(settings->value(key, defaultVisible).toBool());
         widget->setVisible(action->isChecked());
         connect(action, &QAction::toggled, this, [this, widget, key](bool visible) {
-            widget->setVisible(visible && (widget->objectName() != "workbenchToolbar" || workbenchEnabled));
+            widget->setVisible(visible);
             settings->setValue(key, visible);
         });
     };
@@ -689,7 +689,7 @@ void Window::setBusy(bool value) {
     formats->setEnabled(!busy && !image.isEmpty() && !catalogueRows.isEmpty());
     externalCatalogueAction->setEnabled(!busy);
     bundledCatalogueAction->setEnabled(!busy);
-    diskFormatEditorAction->setEnabled(workbenchEnabled && !busy);
+    diskFormatEditorAction->setEnabled(!busy);
     table->setEnabled(!busy && !session.isEmpty());
     userAreas->setEnabled(!busy && !session.isEmpty());
     showAllAction->setEnabled(userAreas->isEnabled());
@@ -701,10 +701,10 @@ void Window::setBusy(bool value) {
     cancelButton->setVisible(busy);
     imageInfoButton->setEnabled(!busy && !session.isEmpty());
     imageInfoAction->setEnabled(!busy && !session.isEmpty());
-    diskAnalysisAction->setEnabled(workbenchEnabled && !busy && !session.isEmpty());
-    physicalDiskAction->setEnabled(workbenchEnabled && !busy && !session.isEmpty());
-    filesystemInspectorAction->setEnabled(workbenchEnabled && !busy && !session.isEmpty());
-    filesystemCheckAction->setEnabled(workbenchEnabled && !busy);
+    diskAnalysisAction->setEnabled(!busy && !session.isEmpty());
+    physicalDiskAction->setEnabled(!busy && !session.isEmpty());
+    filesystemInspectorAction->setEnabled(!busy && !session.isEmpty());
+    filesystemCheckAction->setEnabled(!busy);
     progress->setVisible(busy && batchActive);
     emit comparisonAvailabilityChanged();
 }
@@ -1022,24 +1022,13 @@ void Window::requestBrokerResult(QJsonObject request, std::function<void(QJsonOb
     begin(std::move(request));
 }
 
-void Window::setWorkbenchEnabled(bool enabled) {
-    workbenchEnabled = enabled;
-    findChild<QMenu *>("workbenchMenu")->menuAction()->setVisible(enabled);
-    diskFormatEditorAction->setVisible(enabled);
-    auto *toolbar = findChild<QAction *>("workbenchToolbarVisible");
-    toolbar->setVisible(enabled);
-    findChild<QWidget *>("workbenchToolbar")->setVisible(enabled && toolbar->isChecked());
-    setBusy(busy);
-}
-
 void Window::registerWorkbenchDialog(QDialog *dialog) {
     if (!workspaceManaged) return;
-    dialog->setProperty("workbenchWindow", true);
     dialog->setWindowModality(Qt::NonModal);
 }
 
 bool Window::showDiskFormatEditor(const QString &selectedFormat, const QString &draft, bool modeless) {
-    if (busy || !workbenchEnabled) return false;
+    if (busy) return false;
     auto *editor = new DiskFormatEditor([this](auto request, auto reply) {
         requestBrokerResult(std::move(request), std::move(reply));
     }, catalogueRows, requestedImage.isEmpty() ? image : requestedImage, selectedFormat, this);
@@ -1189,7 +1178,6 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
     auto *editFormats = new QPushButton("Disk Format Editor…");
     editFormats->setObjectName("formatPickerEditor");
     editFormats->setAutoDefault(false);
-    editFormats->setVisible(workbenchEnabled);
     layout->addWidget(editFormats);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Open | QDialogButtonBox::Cancel);
     layout->addWidget(buttons);
@@ -1273,11 +1261,9 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
             }
         }
         if (!findingsInvalidated && inspection["proposal_tested"].toInt() > 0)
-            lines << QString("No catalogue match for %1. %2 layouts passed the directory and consistency checks. Appearance here does not verify file contents. %3")
+            lines << QString("No catalogue match for %1. %2 layouts passed the directory and consistency checks. Appearance here does not verify file contents. Select a layout and choose Review Candidate…")
                          .arg(QFileInfo(requestedImage.isEmpty() ? image : requestedImage).fileName())
-                         .arg(inspection["proposal_matches"].toInt())
-                         .arg(workbenchEnabled ? "Select a layout and choose Review Candidate…"
-                                               : "Enable Workbench in Settings before opening the image to review drafts.");
+                         .arg(inspection["proposal_matches"].toInt());
         if (!findingsInvalidated && !inspection["proposal_note"].toString().isEmpty())
             lines << inspection["proposal_note"].toString();
         if (rejectedCount > 0 && group->currentIndex() != proposalsGroup) {
@@ -2484,7 +2470,7 @@ void Window::bindWorkbenchAction(const char *icon, QAction *action) {
 }
 
 void Window::showDiskAnalysis() {
-    if (!workbenchEnabled || busy || session.isEmpty()) return;
+    if (busy || session.isEmpty()) return;
     auto *dialog = new QDialog(this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setWindowTitle("Disk Analysis");
@@ -2548,7 +2534,7 @@ void Window::showDiskAnalysis() {
 }
 
 void Window::showFilesystemInspector(int slot, QString revision, int allocationBlock) {
-    if (!workbenchEnabled || busy || session.isEmpty()) return;
+    if (busy || session.isEmpty()) return;
     const auto inspectedSession = session;
     auto *dialog = new FilesystemInspector([this, inspectedSession](QJsonObject fields, auto reply) {
         if (session != inspectedSession) {
@@ -2571,7 +2557,7 @@ void Window::showFilesystemInspector(int slot, QString revision, int allocationB
 }
 
 void Window::showFilesystemCheck() {
-    if (!workbenchEnabled || busy) return;
+    if (busy) return;
     const auto checkedSession = session;
     auto *dialog = new FilesystemCheckDialog(
         checkedSession.isEmpty() ? QString() : QFileInfo(image).fileName(), format,
@@ -2607,7 +2593,7 @@ void Window::showFilesystemCheck() {
 }
 
 void Window::showPhysicalDiskInspector(int block, QString revision) {
-    if (!workbenchEnabled || busy || session.isEmpty()) return;
+    if (busy || session.isEmpty()) return;
     const auto inspectedSession = session;
     QJsonObject request{{"op", "source_metadata"}, {"session", inspectedSession}};
     if (block >= 0) {
@@ -2616,7 +2602,7 @@ void Window::showPhysicalDiskInspector(int block, QString revision) {
     }
     requestBrokerResult(std::move(request),
                         [this, inspectedSession](const QJsonObject &result, const QString &failure) {
-        if (session != inspectedSession || !isVisible() || !workbenchEnabled) return;
+        if (session != inspectedSession || !isVisible()) return;
         if (!failure.isEmpty()) {
             QMessageBox::warning(this, "Physical Disk Inspector", failure);
             return;
@@ -2717,7 +2703,7 @@ void Window::showPhysicalDiskInspector(int block, QString revision) {
                                     [guard = QPointer<QDialog>(dialog), address, count = track["sector_count"].toInt(),
                                      trackPicker, trackStatus, sectors, blockSectors]
                                     (const QJsonObject &details, const QString &error) {
-                    if (!guard || (!guard->isVisible() && !guard->property("workbenchHidden").toBool())) return;
+                    if (!guard || !guard->isVisible()) return;
                     trackPicker->setEnabled(true);
                     if (!error.isEmpty()) {
                         trackStatus->setText(error);

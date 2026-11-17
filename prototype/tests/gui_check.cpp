@@ -319,7 +319,6 @@ private slots:
         QVERIFY(temp.isValid());
         Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
                              qEnvironmentVariable("CPMIMAGE_HELPER"), {}}, temp.filePath("workspace.ini"));
-        workspace.findChild<QAction *>("enableWorkbenchAction")->setChecked(true);
         workspace.show();
         auto &first = workspace.addSession();
         auto viewAction = [&workspace]() -> QAction * {
@@ -426,7 +425,6 @@ private slots:
         QVERIFY(temp.isValid());
         Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
                              qEnvironmentVariable("CPMIMAGE_HELPER"), {}}, temp.filePath("workspace.ini"));
-        workspace.findChild<QAction *>("enableWorkbenchAction")->setChecked(true);
         workspace.show();
         auto &first = workspace.addSession();
         auto viewAction = [&workspace]() -> QAction * {
@@ -588,7 +586,6 @@ private slots:
                             temp.filePath("workspace.ini"));
         workspace.show();
         auto &left = workspace.addSession();
-        workspace.findChild<QAction *>("enableWorkbenchAction")->setChecked(true);
         auto *action = workspace.findChild<QAction *>("compareImagesAction");
         QMenu *workbenchMenu = nullptr;
         for (auto *item : workspace.menuBar()->actions())
@@ -956,7 +953,6 @@ private slots:
         }
         Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
                              qEnvironmentVariable("CPMIMAGE_HELPER"), {}}, temp.filePath("workspace.ini"));
-        workspace.findChild<QAction *>("enableWorkbenchAction")->setChecked(true);
         workspace.show();
         auto &reference = workspace.addSession();
         QSignalSpy opened(&reference, &Window::completed);
@@ -1200,7 +1196,7 @@ private slots:
         QCOMPARE(tabs->count(), 0);
     }
 
-    void workbenchVisibilityPreservesDraftAndExit() {
+    void workbenchToolbarPreservesDraftAndExit() {
         QTemporaryDir temp;
         QVERIFY(temp.isValid());
         const auto profile = temp.filePath("workspace.ini");
@@ -1210,22 +1206,16 @@ private slots:
         Workspace workspace(paths, profile);
         workspace.show();
         auto &page = workspace.addSession();
-        auto *enable = workspace.findChild<QAction *>("enableWorkbenchAction");
         auto *edit = page.findChild<QAction *>("diskFormatEditorAction");
         auto *menu = page.findChild<QMenu *>("workbenchMenu");
         auto *toolbarToggle = page.findChild<QAction *>("workbenchToolbarVisible");
         auto *toolbar = page.findChild<QWidget *>("workbenchToolbar");
-        QVERIFY(enable && edit && menu && toolbarToggle && toolbar);
+        QVERIFY(edit && menu && toolbarToggle && toolbar);
         const auto originalToolbar = toolbarToggle->isChecked();
         const auto restoreToolbar = qScopeGuard([originalToolbar] {
             QSettings("CPMArchives", "cpmimage").setValue("workbenchToolbarVisible", originalToolbar);
         });
-        QVERIFY(!enable->isChecked());
-        QVERIFY(!toolbarToggle->isVisible() && toolbar->isHidden());
-        QVERIFY(!workspace.menuBar()->actions().contains(menu->menuAction()));
-        QVERIFY(!edit->isVisible() && !edit->isEnabled());
-
-        enable->setChecked(true);
+        QVERIFY(!workspace.findChild<QAction *>("enableWorkbenchAction"));
         QVERIFY(workspace.menuBar()->actions().contains(menu->menuAction()));
         QVERIFY(edit->isVisible() && edit->isEnabled());
         toolbarToggle->setChecked(true);
@@ -1237,13 +1227,12 @@ private slots:
         QVERIFY(identifier);
         QTRY_VERIFY(identifier->isEnabled());
         identifier->setText("retained-draft");
-        enable->setChecked(false);
-        QVERIFY(!editor->isVisible());
-        QVERIFY(toolbarToggle->isChecked() && toolbar->isHidden());
-        QVERIFY(!edit->isVisible());
-        QVERIFY(!workspace.menuBar()->actions().contains(menu->menuAction()));
+        toolbarToggle->setChecked(false);
+        QVERIFY(editor->isVisible());
+        QVERIFY(toolbar->isHidden());
+        QVERIFY(workspace.menuBar()->actions().contains(menu->menuAction()));
 
-        for (const auto *choice : {"Cancel and Return", "Enable Workbench"}) {
+        for (const auto *choice : {"Cancel and Return", "Review Draft"}) {
             bool offered = false;
             QTimer::singleShot(0, &workspace, [&] {
                 auto *warning = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
@@ -1261,22 +1250,11 @@ private slots:
             QVERIFY(offered);
             QVERIFY(workspace.isVisible());
             QCOMPARE(identifier->text(), QString("retained-draft"));
-            QCOMPARE(editor->isVisible(), QLatin1String(choice) == "Enable Workbench");
+            QVERIFY(editor->isVisible());
         }
-        QVERIFY(enable->isChecked());
-        QVERIFY(toolbar->isVisible());
         identifier->clear();
-        QTRY_VERIFY(page.findChild<QAction *>("filesystemCheckAction")->isEnabled());
-        page.findChild<QAction *>("filesystemCheckAction")->trigger();
-        auto *check = page.findChild<QDialog *>("filesystemCheckDialog");
-        QVERIFY(check && check->isVisible());
-        enable->setChecked(false);
-        QVERIFY(!editor->isVisible());
-        QVERIFY(!check->isVisible());
         workspace.close();
         QTRY_VERIFY(!workspace.isVisible());
-        Workspace reopened(paths, profile);
-        QVERIFY(!reopened.findChild<QAction *>("enableWorkbenchAction")->isChecked());
     }
 
     void workbenchDiskAnalysis() {
