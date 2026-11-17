@@ -150,6 +150,9 @@ private:
     FilenamePolicy filenamePolicy;
     QSettings *settings;
     QPushButton *reportButton, *imageInfoButton;
+    QAction *diskAnalysisAction;
+    void bindWorkbenchAction(const char *icon, QAction *action);
+    void showDiskAnalysis();
     QAction *openAction, *imageInfoAction, *physicalDiskAction, *filesystemInspectorAction, *filesystemCheckAction;
     QString snapshotHash, exportDiagnostics;
     QProgressBar *progress;

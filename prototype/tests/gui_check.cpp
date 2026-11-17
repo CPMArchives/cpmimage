@@ -319,7 +319,7 @@ private slots:
         auto &first = workspace.addSession();
         auto viewAction = [&workspace]() -> QAction * {
             for (auto *action : workspace.menuBar()->actions()) {
-                if (auto *menu = action->menu(); menu && menu->title() == "View") {
+                if (auto *menu = action->menu(); menu && menu->title() == "Workbench") {
                     for (auto *item : menu->actions())
                         if (item->objectName() == "physicalDiskInspectorAction") return item;
                 }
@@ -342,7 +342,9 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(firstDone.size(), 1, 15000);
         QVERIFY(firstDone.first().first().toBool());
         QVERIFY(viewAction()->isEnabled());
-        viewAction()->trigger();
+        auto *button = first.findChild<QPushButton *>("workbench-physical-disk");
+        QVERIFY(button && button->isEnabled());
+        button->click();
         QTRY_VERIFY(first.findChild<QDialog *>("physicalDiskInspector"));
         auto *dialog = first.findChild<QDialog *>("physicalDiskInspector");
         QVERIFY(dialog->isVisible());
@@ -398,7 +400,7 @@ private slots:
         auto &first = workspace.addSession();
         auto viewAction = [&workspace]() -> QAction * {
             for (auto *action : workspace.menuBar()->actions())
-                if (auto *menu = action->menu(); menu && menu->title() == "View")
+                if (auto *menu = action->menu(); menu && menu->title() == "Workbench")
                     for (auto *item : menu->actions())
                         if (item->objectName() == "filesystemStructureInspectorAction") return item;
             return nullptr;
@@ -444,7 +446,9 @@ private slots:
         QVERIFY(done.takeFirst().first().toBool());
 
         QVERIFY(viewAction()->isEnabled());
-        viewAction()->trigger();
+        auto *workbenchButton = first.findChild<QPushButton *>("workbench-filesystem");
+        QVERIFY(workbenchButton && workbenchButton->isEnabled());
+        workbenchButton->click();
         auto *inspector = first.findChild<QDialog *>("filesystemStructureInspector");
         QVERIFY(inspector);
         const auto button = [inspector](const char *name) { return inspector->findChild<QPushButton *>(name); };
@@ -555,6 +559,12 @@ private slots:
         workspace.show();
         auto &left = workspace.addSession();
         auto *action = workspace.findChild<QAction *>("compareImagesAction");
+        QMenu *workbenchMenu = nullptr;
+        for (auto *item : workspace.menuBar()->actions())
+            if (item->menu() && item->menu()->title() == "Workbench")
+                workbenchMenu = item->menu();
+        QVERIFY(workbenchMenu && workbenchMenu->actions().contains(action));
+        QCOMPARE(workbenchMenu->actions().size(), 5);
         QVERIFY(action);
         QVERIFY(!action->isEnabled());
         QSignalSpy leftDone(&left, &Window::completed);
@@ -569,11 +579,11 @@ private slots:
         QVERIFY(rightDone.takeFirst().first().toBool());
         workspace.findChild<QTabWidget *>()->setCurrentWidget(&left);
         QVERIFY(action->isEnabled());
-        bool onViewMenu = false;
+        bool onWorkbenchMenu = false;
         for (auto *item : workspace.menuBar()->actions())
-            if (auto *menu = item->menu(); menu && menu->title() == "View")
-                onViewMenu = menu->actions().contains(action);
-        QVERIFY(onViewMenu);
+            if (auto *menu = item->menu(); menu && menu->title() == "Workbench")
+                onWorkbenchMenu = menu->actions().contains(action);
+        QVERIFY(onWorkbenchMenu);
 
         QFile pending(temp.filePath("PENDING.BIN"));
         QVERIFY(pending.open(QIODevice::WriteOnly));
@@ -595,7 +605,9 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(leftDone.size(), 1, 15000);
         approve.stop();
         QVERIFY(leftDone.takeFirst().first().toBool());
-        action->trigger();
+        auto *workbenchButton = left.findChild<QPushButton *>("workbench-compare-images");
+        QVERIFY(workbenchButton && workbenchButton->isEnabled());
+        workbenchButton->click();
         auto *comparison = workspace.findChild<QDialog *>("imageComparison");
         QVERIFY(comparison);
         auto *target = comparison->findChild<QComboBox *>("imageComparisonTarget");
@@ -672,7 +684,9 @@ private slots:
         QVERIFY(done.first().first().toBool());
         auto *action = window.findChild<QAction *>("filesystemCheckAction");
         QVERIFY(action && action->isEnabled());
-        action->trigger();
+        auto *workbenchButton = window.findChild<QPushButton *>("workbench-check-filesystem");
+        QVERIFY(workbenchButton && workbenchButton->isEnabled());
+        workbenchButton->click();
         auto *dialog = window.findChild<QDialog *>("filesystemCheckDialog");
         QVERIFY(dialog);
         auto *mode = dialog->findChild<QComboBox *>("filesystemCheckMode");
@@ -970,6 +984,32 @@ private slots:
         QTRY_VERIFY(!workspace.isVisible());
         QCOMPARE(prompts, 4);
         QCOMPARE(tabs->count(), 0);
+    }
+
+    void workbenchDiskAnalysis() {
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                      qEnvironmentVariable("CPMIMAGE_HELPER"), 30000, 2000, {},
+                      temp.filePath("settings.ini"));
+        auto *button = window.findChild<QPushButton *>("workbench-analyze-disk");
+        QVERIFY(button && !button->isEnabled());
+        window.show();
+        window.openImage(root + "/fixtures/ibm3740-independent.raw", "ibm-3740", "raw");
+        QTRY_VERIFY_WITH_TIMEOUT(button->isEnabled(), 15000);
+        button->click();
+        auto *results = window.findChild<QListWidget *>("diskAnalysisCandidates");
+        QVERIFY(results);
+        QTRY_VERIFY_WITH_TIMEOUT(results->count() > 0, 30000);
+        const auto matches = results->findItems("ibm-3740 —", Qt::MatchStartsWith);
+        QVERIFY(!matches.isEmpty());
+        auto *search = results->parentWidget()->findChild<QLineEdit *>();
+        QVERIFY(search);
+        search->setText("no-such-definition");
+        QVERIFY(matches.first()->isHidden());
+        search->clear();
+        QVERIFY(!matches.first()->isHidden());
     }
 
     void toolbarVisibility() {

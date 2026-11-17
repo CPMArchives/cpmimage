@@ -791,9 +791,12 @@ def main():
                 saved_loaded = True
                 reply = dict(v=1, id=rid, ok=True, result=dict(formats=rows, catalogue=str(path)))
             elif op == 'inspect':
-                source = Path(request['image']).absolute()
+                working = 'session' in request
+                if working and (not session or request['session'] != session['token']):
+                    raise backend.Failure('stale_session', 'Open the image again.')
+                source = session['image'] if working else Path(request['image']).absolute()
                 data = read_image(source)
-                container = image_container(source, data, request.get('container'))
+                container = 'raw' if working else image_container(source, data, request.get('container'))
                 validate_investigation_container(data, container)
                 explicit = request.get('explicit_format')
                 if explicit and explicit not in definitions:
@@ -806,7 +809,7 @@ def main():
                     validate_catalogue(definitions)
                 with tempfile.TemporaryDirectory(prefix='cpmimage-inspect-') as temp:
                     directory = Path(temp)
-                    if not request.get('explicit_format'):
+                    if not working and not request.get('explicit_format'):
                         try:
                             selected = resolve_sidecar(source, directory)
                         except backend.Failure as error:
