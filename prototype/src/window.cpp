@@ -198,6 +198,15 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         {openButton, "open"}, {newButton, "new"}, {saveButton, "save"},
         {importButton, "import"}, {exportButton, "export"}
     };
+    const auto addCaption = [](QHBoxLayout *row, QWidget *icon, const QString &title) {
+        auto *column = new QVBoxLayout;
+        column->setSpacing(0);
+        column->addWidget(icon, 0, Qt::AlignHCenter);
+        auto *caption = new QLabel(title);
+        caption->setAlignment(Qt::AlignCenter);
+        column->addWidget(caption);
+        row->addLayout(column);
+    };
     auto *workbenchWidget = new QWidget(central);
     workbenchWidget->setObjectName("workbenchToolbar");
     auto *workbench = new QHBoxLayout(workbenchWidget);
@@ -211,7 +220,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         sample->setAccessibleName(label);
         sample->setToolTip(QString("%1 (preview)").arg(label));
         sample->setContentsMargins(4, 4, 4, 4);
-        workbench->addWidget(sample);
+        addCaption(workbench, sample, label);
         workbenchIcons.append({sample, icon});
     }
     workbench->addStretch();
@@ -244,11 +253,11 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         button->setStyleSheet("QPushButton { border: none; background: transparent; padding: 4px; }"
                               "QPushButton:focus { background: palette(mid); }");
     }
-    toolbar->addWidget(openButton);
-    toolbar->addWidget(newButton);
-    toolbar->addWidget(saveButton);
-    toolbar->addWidget(importButton);
-    toolbar->addWidget(exportButton);
+    addCaption(toolbar, openButton, "Open");
+    addCaption(toolbar, newButton, "New");
+    addCaption(toolbar, saveButton, "Save");
+    addCaption(toolbar, importButton, "Import");
+    addCaption(toolbar, exportButton, "Export");
     layout->addWidget(toolbarWidget);
     layout->addWidget(workbenchWidget);
     toolbar->addStretch();
