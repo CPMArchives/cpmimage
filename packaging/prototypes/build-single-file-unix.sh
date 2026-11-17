@@ -7,14 +7,14 @@ if [ "$#" -ne 3 ]; then
 fi
 base=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 case "$1" in
-    macos) test -x "$2/Contents/MacOS/cpmimage-review" ;;
-    linux) test -x "$2/CPMImage" ;;
+    macos) test -x "$2/Contents/MacOS/cpmwb" ;;
+    linux) test -x "$2/cpmwb" ;;
     *) exit 2 ;;
 esac
 scratch=$(mktemp)
 trap 'rm -f -- "$scratch"' EXIT
 if [ "$1" = macos ]; then
-    tar -czf "$scratch" -s "|^$(basename -- "$2")|CPMImage.app|" -C "$(dirname -- "$2")" "$(basename -- "$2")"
+    tar -czf "$scratch" -s "|^$(basename -- "$2")|CPMImageWorkbench.app|" -C "$(dirname -- "$2")" "$(basename -- "$2")"
 else
     tar -czf "$scratch" -C "$2" .
 fi

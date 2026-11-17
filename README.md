@@ -1,6 +1,6 @@
-# CP/M Image
+# CP/M Image Workbench
 
-CP/M Image is a graphical file manager for CP/M disk images on macOS, Windows, and Linux. It bundles cpmtools for command-line use.
+CP/M Image Workbench is a graphical file manager for CP/M disk images on macOS, Windows, and Linux. It bundles cpmtools for command-line use.
 
 ## Download v1.3
 
@@ -39,13 +39,13 @@ See [CP/M Image Help](docs/HELP.md) for everyday workflows. The same guide is av
 
 ## Command line
 
-Run the package executable with a utility selector. On macOS, use the executable inside the installed app:
+In Workbench v2.0, run `cpmwb` with a utility selector. On macOS, use the executable inside the installed app:
 
 ```sh
-/Applications/CPMImage.app/Contents/MacOS/cpmimage /cpmls -f ibm-3740 disk.raw
+/Applications/CPMImageWorkbench.app/Contents/MacOS/cpmwb /cpmls -f ibm-3740 disk.raw
 ```
 
-On Windows or Linux, pass the same arguments to the downloaded executable. Selectors include `/cpmls`, `/cpmrm`, `/cpmcp`, `/cpmchmod`, `/cpmchattr`, `/mkfs.cpm`, `/fsck.cpm`, and `/fsed.cpm`. Use `/diskdefs=PATH` to override the bundled catalogue.
+On Windows, use `cpmwb.exe`. On Linux, use `cpmwb`. The v1.3 packages above use their original executable names. Selectors include `/cpmls`, `/cpmrm`, `/cpmcp`, `/cpmchmod`, `/cpmchattr`, `/mkfs.cpm`, `/fsck.cpm`, and `/fsed.cpm`. Use `/diskdefs=PATH` to override the bundled catalogue.
 
 ## Build and packaging
 

@@ -12,6 +12,39 @@ from source_ownership import Ownership
 
 
 class EditCheck(unittest.TestCase):
+    def test_disk_hex_reads_private_working_bytes(self):
+        broker = CatalogueCheck()
+        broker.setUp()
+        self.addCleanup(broker.doCleanups)
+        self.addCleanup(broker.tearDown)
+        original = broker.image.read_bytes()
+        opened = broker.request('open', image=str(broker.image), format='ibm-3740', container='raw')
+        self.assertTrue(opened['ok'], opened)
+        options = dict(session=opened['result']['session'])
+        track = broker.request('source_metadata', track=[0, 0], include_raw=True, **options)
+        self.assertEqual(track['result']['sectors'][1], dict(id=1, size=128))
+        def inspect(**request):
+            reply = broker.request('inspect_bytes', **options, **request)
+            self.assertTrue(reply['ok'], reply)
+            return reply['result']
+        sector = dict(sector=[0, 0, 1], raw_slots=True)
+        self.assertEqual(bytes.fromhex(inspect(**sector)['bytes']), original[128:256])
+        self.assertEqual(inspect(**sector)['image_offset'], 128)
+        boot_end = 52 * 128
+        self.assertEqual(bytes.fromhex(inspect()['bytes']), original[:4096])
+        self.assertEqual(bytes.fromhex(inspect(offset=4096)['bytes']), original[4096:boot_end])
+        for fields in (dict(offset=1), dict(offset=8192), dict(sector=[0, 0, 26], raw_slots=True),
+                       dict(sector=[0, 0, 1])):
+            self.assertFalse(broker.request('inspect_bytes', **options, **fields)['ok'])
+        replacement = broker.directory / 'boot.bin'
+        replacement.write_bytes(bytes(range(128)) * 52)
+        changed = broker.request('systems_import', path=str(replacement), confirmed=True, **options)
+        self.assertTrue(changed['ok'], changed)
+        self.assertEqual(bytes.fromhex(inspect(**sector)['bytes']), bytes(range(128)))
+        self.assertEqual(broker.image.read_bytes(), original)
+        self.assertTrue(broker.request('discard', **options)['ok'])
+        self.assertEqual(bytes.fromhex(inspect(**sector)['bytes']), original[128:256])
+
     def test_failed_transfer_batch_leaves_both_working_directories_unchanged(self):
         source, destination = CatalogueCheck(), CatalogueCheck()
         for broker in (source, destination):

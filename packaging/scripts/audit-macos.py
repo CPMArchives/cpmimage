@@ -2,7 +2,7 @@
 import json,subprocess
 from pathlib import Path
 from notices import BASE
-app=BASE/'dist/CPMImage-macOS-arm64/CPMImage.app';rows=[]
+app=BASE/'dist/CPMImage-macOS-arm64/CPMImageWorkbench.app';rows=[]
 magic={b'\xcf\xfa\xed\xfe',b'\xfe\xed\xfa\xcf',b'\xca\xfe\xba\xbe',b'\xbe\xba\xfe\xca'}
 for f in app.rglob('*'):
  if not f.is_file() or f.is_symlink():continue
