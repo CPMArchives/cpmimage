@@ -2,10 +2,10 @@
 
 **Status:** Approved development sequence, reconciled with Engineering Specification 1.0  
 **Project:** CPMArchives/cpmimage  
-**Target release:** 1.0  
-**Date:** November 14, 2026
+**Roadmap through:** v2.0\
+**Original 1.0 roadmap date:** November 14, 2026
 
-This roadmap defines the implementation sequence and acceptance criteria for CP/M Image 1.0. The [Engineering Specification](ENGINEERING_SPEC.md) is authoritative for product behavior, architecture, compatibility, and scope. Milestone assignments do not authorize changes outside their stated scope.
+This roadmap records the implementation sequence and acceptance criteria for CP/M Image 1.0, the subsequent milestones through v1.3, and the approved development sequence from v1.4 through v2.0. The [Engineering Specification](ENGINEERING_SPEC.md) is authoritative for product behavior, architecture, compatibility, and scope. Milestone assignments do not authorize changes outside their stated scope.
 
 ## Baseline — v0.2
 
@@ -165,12 +165,44 @@ Use V, Return, double-click, or View → View File to inspect one selected file 
 
 See the [published v1.3 release and downloads](https://github.com/CPMArchives/cpmimage/releases/tag/v1.3#assets), [Disk Format Editor help](HELP.md#edit-disk-format-definitions), and [package validation results](VALIDATION.md#v13-disk-format-editor-package-checks).
 
-## Explicitly deferred beyond v1.0
+## v1.4 — TD0 Support & Physical Disk Inspection
 
-- Graphical `fsck.cpm`-style consistency checking and repair.
+- Complete and qualify TD0 import, already available in v1.4 Beta 1. Import supported TD0 images into unsaved RAW tabs using the source basename and preserve the original archive.
+- Retain useful source metadata already obtained during decoding and inexpensive to keep when opening or converting TD0, DMK, IMD, JV3, and other supported containers. Retention belongs to the image session and applies regardless of container type. The read-only metadata describes the original source, remains available to the Disk Format Editor and other investigation tools for the life of the tab, and is discarded on close. Keep it out of RAW images, `.FDF` files, and additional sidecars.
+- Provide a read-only Physical Disk Inspector for observed tracks, heads, sector IDs, sizes, order, and available status and source metadata. Report unavailable information explicitly and distinguish source observations from the current working image.
+
+## v1.5 — Format Investigation & Diagnostics
+
+- Extend the existing Disk Format Editor to compare observed physical layouts with candidate disk definitions and show geometry, sector-mapping, and filesystem plausibility diagnostics.
+- Improve existing assisted format detection and explain the evidence for candidate rankings, mismatches, and unresolved ambiguities.
+
+## v1.6 — Filesystem Structure Inspection
+
+- Provide a read-only Filesystem Structure Inspector for CP/M directory entries, extents, and allocation blocks under the selected disk definition. Show how entries and extents reference blocks.
+
+## v1.7 — Image Comparison
+
+- Compare images at the filesystem level across directory structures and CP/M user areas. Identify added, removed, changed, and identical files using file contents and attributes, with structural differences visible where relevant.
+
+## v1.8 — Filesystem Checking & Controlled Repair
+
+- Check filesystem consistency and report findings with the affected structures and supporting evidence.
+- Determine the extent of repair in an engineering review. Approve only operations with understood effects and qualified safety behavior. Show the proposed changes and require explicit approval before applying them to the private working image. Use the existing Save and Discard workflow.
+
+## v2.0 — Automated Disk Analysis & Recovery Assistance
+
+- Extend existing format identification with deeper validation against available container metadata, geometry, sector mapping, directory entries, extent consistency, and allocation evidence.
+- When existing definitions fail, systematically test plausible parameters and construct candidate `diskdefs` entries for review in the Disk Format Editor.
+- Automate filesystem analysis and comparison of related images. Explain inconsistencies, distinguish likely format mismatches from filesystem damage where evidence permits, and identify differences, duplicate contents, and potentially more complete or reliable copies.
+- Produce evidence-based repair plans for review and require explicit user approval before applying any proposed modifications.
+- Integrate navigation between physical observations, format definitions, filesystem structures, comparison results, and diagnostic findings within the relevant image session.
+
+## Scope deferred from v1.0
+
+- Graphical `fsck.cpm`-style consistency checking and controlled repair are scheduled for v1.8.
 - Graphical `fsed.cpm`-style filesystem structure/sector editing.
 - Low-level track/sector and flux editing.
-- Advanced disk-image comparison, merging, and reconstruction.
+- Filesystem-level comparison is scheduled for v1.7, with automated comparison and candidate disk-definition reconstruction in v2.0. Image merging remains deferred.
 - Physical floppy-drive access.
 
 Editable Image Properties remains exploratory work. Future design shall distinguish reinterpreting existing image bytes, changing image contents or metadata through the working-image and Save workflow, and authoring new reusable disk definitions.
@@ -182,7 +214,11 @@ The existing cpmtools CLI executables, including `fsck.cpm` and `fsed.cpm`, rema
 - Maintain the Qt GUI → Python broker → isolated native helper architecture unless a consequential change is reviewed and approved.
 - Use cpmtools as the authoritative filesystem engine and `diskdefs` interpreter; do not add an application-level format whitelist.
 - Treat RAW compatibility with **independent, unmodified cpmtools** as the container interoperability invariant.
-- Keep source images safe until explicit publication.
+- Keep source images safe through the existing private working-image and Save/Discard model. Require explicit user approval for proposed diagnostic or repair modifications and explicit Save or Save As for publication.
+- Preserve LibDsk's authority for supported container sector I/O and the existing dedicated adapters where applicable.
+- Keep format investigation and filesystem maintenance distinct. They may share diagnostics and image-session context.
+- Make analysis deterministic and explainable. Identify supporting evidence and distinguish plausible interpretations from verified findings.
+- Make each intermediate release independently useful.
 - Test and review each milestone independently. Do not interpret this roadmap as authorization to implement all milestones in a single Work assignment.
 - Resolve open implementation details in the milestone where they matter, without reopening approved product requirements.
 - Treat the approved 1.0 product/UI design as feature-frozen; **Show All User Areas is required** for 1.0, while the future file viewer is not a release blocker.
