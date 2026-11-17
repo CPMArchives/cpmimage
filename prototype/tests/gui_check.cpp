@@ -519,12 +519,16 @@ private slots:
         const auto restore = qScopeGuard([nativeDisabled] {
             QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, nativeDisabled);
         });
+        QVERIFY(QDir(temp.path()).mkdir("saved"));
+        const QDir destination(temp.filePath("saved"));
+        QStringList saveDirectories;
         int savePrompts = 0;
         QTimer respond;
         connect(&respond, &QTimer::timeout, &workspace, [&] {
             if (auto *chooser = fileDialog()) {
                 if (auto *filename = chooser->findChild<QLineEdit *>("fileNameEdit")) {
-                    filename->setText(temp.filePath(QFileInfo(filename->text()).fileName()));
+                    saveDirectories.append(chooser->directory().canonicalPath());
+                    filename->setText(destination.filePath(QFileInfo(filename->text()).fileName()));
                     QMetaObject::invokeMethod(chooser, "accept");
                 }
             } else if (auto *prompt = qobject_cast<QMessageBox *>(QApplication::activeModalWidget())) {
@@ -540,9 +544,12 @@ private slots:
         QVERIFY(!workspace.close());
         QTRY_VERIFY_WITH_TIMEOUT(!workspace.isVisible(), 15000);
         QCOMPARE(savePrompts, 4);
+        QCOMPARE(saveDirectories.size(), 4);
+        for (const auto &directory : saveDirectories.mid(1))
+            QCOMPARE(directory, destination.canonicalPath());
         QCOMPARE(tabs->count(), 0);
         for (int i = 0; i < 4; ++i)
-            QCOMPARE(QFileInfo(temp.filePath(QString("XEROX-%1.raw").arg(i))).size(), qint64(256256));
+            QCOMPARE(QFileInfo(destination.filePath(QString("XEROX-%1.raw").arg(i))).size(), qint64(256256));
     }
 
     void teleDiskImportSave() {
