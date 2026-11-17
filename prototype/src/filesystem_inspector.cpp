@@ -31,8 +31,9 @@ QString entryType(const QString &kind) {
 }
 }
 
-FilesystemInspector::FilesystemInspector(Request request, const QString &imageName, QWidget *parent)
-    : QDialog(parent), request(std::move(request)) {
+FilesystemInspector::FilesystemInspector(Request request, const QString &imageName, QWidget *parent,
+                                         int slot, QString initialRevision)
+    : QDialog(parent), request(std::move(request)), revision(std::move(initialRevision)) {
     setAttribute(Qt::WA_DeleteOnClose);
     setWindowModality(Qt::ApplicationModal);
     setWindowTitle("Filesystem Structure Inspector");
@@ -125,7 +126,9 @@ FilesystemInspector::FilesystemInspector(Request request, const QString &imageNa
     layout->addWidget(close);
     connect(close, &QDialogButtonBox::rejected, this, &QDialog::reject);
     updateLinks();
-    QTimer::singleShot(0, this, [this] { if (isVisible()) load(View::Directory); });
+    QTimer::singleShot(0, this, [this, slot] {
+        if (isVisible()) load(View::Directory, std::max(0, slot) / pageSize * pageSize, -1, slot);
+    });
 }
 
 void FilesystemInspector::load(View target, int offset, int targetBlock, int selected) {

@@ -588,6 +588,56 @@ def main():
         if data.startswith(DSK_MAGIC) != (container == 'dsk'):
             raise backend.Failure('container_mismatch', 'The image header does not match the selected container.')
 
+    def check_filesystem(request):
+        """Check a tab revision or a separately selected image under an explicit definition."""
+        with tempfile.TemporaryDirectory(prefix='cpmimage-check-') as temp:
+            directory = Path(temp)
+            if 'session' in request:
+                if any(key in request for key in ('image', 'format', 'container')):
+                    raise backend.Failure('invalid_request', 'Choose either an active session or an external image.')
+                context = dict(working_revision(request), mode='working', container='raw')
+                working, definition = session['image'], session['definitions']
+            else:
+                fmt = request.get('format')
+                if not isinstance(fmt, str) or fmt not in definitions:
+                    raise backend.Failure('unknown_format', 'Select an explicit definition from the active catalogue.')
+                if not isinstance(request.get('image'), str) or not request['image']:
+                    raise backend.Failure('invalid_request', 'Choose an image to check.')
+                source = Path(request['image']).absolute()
+                data = read_image(source)
+                container = image_container(source, data, request.get('container'))
+                definition = definitions[fmt]
+                context = dict(mode='external', source_name=source.name, format=fmt,
+                               container=container, source_sha256=hashlib.sha256(data).hexdigest(),
+                               definition_sha256=catalogue.digest(definition))
+                try:
+                    validate_investigation_container(data, container)
+                    working = directory / 'image.raw'
+                    if container == 'raw':
+                        # The diagnostic reader reports missing directory or data
+                        # sectors itself, including a partial final RAW sector.
+                        working.write_bytes(data)
+                    else:
+                        geometry = describe(fmt, definition, directory)
+                        if container == 'td0':
+                            teledisk_raw(source, teledisk_inventory(data, directory), geometry, working)
+                        else:
+                            working, _, _ = stage_image(source, data, container, geometry, directory)
+                except backend.Failure as error:
+                    if stop.is_set() or error.code == 'cancelled':
+                        raise backend.Failure('cancelled') from error
+                    return dict(context, status='incomplete', phase='container',
+                                code=error.code, message=error.message, findings=[], finding_count=0, omitted=0)
+            if stop.is_set():
+                raise backend.Failure('cancelled')
+            (directory / 'diskdefs').write_text(definition, encoding='utf-8')
+            report = adapter().native(directory, 'filesystem-check', working, context['format'], 'raw')
+            if stop.is_set():
+                raise backend.Failure('cancelled')
+            report.pop('v')
+            report.pop('ok')
+            return dict(context, **report)
+
     def render_record(record):
         try:
             from disk_format import DiskFormatError, render_definition
@@ -716,7 +766,7 @@ def main():
         rid = request['id']
         try:
             op = request.get('op')
-            if not saved_loaded and op in ('inspect', 'open', 'new_image'):
+            if not saved_loaded and op in ('inspect', 'open', 'new_image', 'filesystem_check'):
                 definitions = merged_definitions(base_definitions, store.records()[0])
                 saved_loaded = True
             if isinstance(op, str) and op in EDITOR_OPERATIONS:
@@ -864,6 +914,8 @@ def main():
                 reply = dict(v=1, id=rid, ok=True, result=dict(context, rows=rows))
             elif op == 'comparison_classify':
                 reply = dict(v=1, id=rid, ok=True, result=classify_comparison(request, backend))
+            elif op == 'filesystem_check':
+                reply = dict(v=1, id=rid, ok=True, result=check_filesystem(request))
             elif op == 'filesystem_structure':
                 context = working_revision(request)
                 view = request.get('view')

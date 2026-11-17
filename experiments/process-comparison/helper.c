@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include <errno.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -412,6 +413,184 @@ static int filesystem_structure(struct cpmSuperBlock *sb, const char *view, int 
   return 0;
 }
 
+#ifdef CPMIMAGE_READ_ONLY
+extern int cpmImageReadDirectory(struct cpmSuperBlock *, const char *, const char **);
+extern int cpmImageBlockPresent(const struct cpmSuperBlock *, int);
+
+enum { MAX_CHECK_FINDINGS = 256 };
+
+struct CheckExtent
+{
+  unsigned char key[12];
+  int group, slot;
+};
+
+struct CheckOwner
+{
+  int slot, pointer;
+};
+
+static int compare_check_extents(const void *left, const void *right)
+{
+  const struct CheckExtent *a = left, *b = right;
+  int file = memcmp(a->key, b->key, sizeof a->key);
+  if (file) return file;
+  if (a->group != b->group) return a->group - b->group;
+  return a->slot - b->slot;
+}
+
+static void check_finding(unsigned *total, const char *code, int slot, int observed,
+                          const char *expected, int block, int pointer, int related, int relatedPointer)
+{
+  if ((*total)++ >= MAX_CHECK_FINDINGS) return;
+  if (*total > 1) putchar(',');
+  fputs("{\"code\":", stdout);
+  quoted(code);
+  printf(",\"slot\":%d,\"observed\":%d,\"expected\":", slot, observed);
+  quoted(expected);
+  if (block >= 0) printf(",\"block\":%d", block);
+  if (pointer >= 0) printf(",\"pointer\":%d", pointer);
+  if (related >= 0) printf(",\"related_slot\":%d", related);
+  if (relatedPointer >= 0) printf(",\"related_pointer\":%d", relatedPointer);
+  putchar('}');
+}
+
+static void check_field(unsigned *total, const char *code, int slot, int observed, const char *expected)
+{
+  check_finding(total, code, slot, observed, expected, -1, -1, -1, -1);
+}
+
+static int incomplete_check(const char *phase, const char *message)
+{
+  fputs("{\"v\":1,\"ok\":true,\"status\":\"incomplete\",\"phase\":", stdout);
+  quoted(phase);
+  fputs(",\"message\":", stdout);
+  quoted(message ? message : "Filesystem data is unavailable.");
+  puts(",\"findings\":[],\"finding_count\":0,\"omitted\":0}");
+  return 0;
+}
+
+static int filesystem_check(const char *path, const char *format)
+{
+  struct cpmSuperBlock sb = {0};
+  const char *phase = "definition";
+  const char *error = Device_open(&sb.dev, path, O_RDONLY, "cpmimage-raw");
+  if (error) return incomplete_check("open", error);
+  if (cpmImageReadDirectory(&sb, format, &phase) < 0)
+  {
+    /* Return the directory read error before closing the device. */
+    int result = incomplete_check(phase, boo);
+    Device_close(&sb.dev);
+    return result;
+  }
+  if (sb.extents <= 0)
+  {
+    Device_close(&sb.dev);
+    return incomplete_check("geometry", "Invalid logical extent factor.");
+  }
+  struct CheckOwner *owners = calloc((size_t)sb.size, sizeof *owners);
+  struct CheckExtent *extents = malloc((size_t)sb.maxdir * sizeof *extents);
+  if (!owners || !extents)
+  {
+    free(owners);
+    free(extents);
+    Device_close(&sb.dev);
+    return fail("memory", "Could not allocate filesystem check state.");
+  }
+
+  const int width = sb.size > 256 ? 2 : 1;
+  const int maxUser = sb.type & CPMFS_HI_USER ? 31 : 15;
+  unsigned total = 0;
+  int extentCount = 0, labelSlot = -1;
+  printf("{\"v\":1,\"ok\":true,\"directory_slots\":%d,\"block_count\":%d,\"findings\":[",
+         sb.maxdir, sb.size);
+  for (int slot = 0; slot < sb.maxdir; ++slot)
+  {
+    const struct PhysDirectoryEntry *entry = sb.dir + slot;
+    const unsigned char status = entry->status;
+    if (status == 0xe5) continue;
+    if (status > maxUser)
+    {
+      const char *kind = slot_kind(&sb, status);
+      if (!strcmp(kind, "unknown"))
+        check_field(&total, "invalid_status", slot, status, "File user or directory status supported by this variant");
+      else if (!strcmp(kind, "timestamp") && slot % 4 != 3)
+        check_field(&total, "misplaced_timestamp", slot, slot % 4, "Timestamp in the fourth slot of its directory group");
+      else if (!strcmp(kind, "label"))
+      {
+        if (labelSlot >= 0)
+          check_finding(&total, "duplicate_label", slot, status, "One disk label", -1, -1, labelSlot, -1);
+        else labelSlot = slot;
+      }
+      continue;
+    }
+
+    struct CheckExtent *extent = extents + extentCount++;
+    extent->key[0] = status;
+    extent->group = EXTENT(entry->extnol, entry->extnoh) / sb.extents;
+    extent->slot = slot;
+    for (int i = 0; i < 11; ++i)
+    {
+      const unsigned char value = (i < 8 ? entry->name[i] : entry->ext[i-8]) & 0x7f;
+      extent->key[i+1] = (unsigned char)toupper(value);
+      if (!ISFILECHAR(i != 0, value))
+        check_field(&total, "invalid_name_character", slot, value, "Valid CP/M filename character");
+    }
+    const unsigned char low = entry->extnol, high = entry->extnoh;
+    if (low > 31)
+      check_field(&total, "invalid_extent_low", slot, low, "Low extent byte in the range 0 to 31");
+    if (high > 63)
+      check_field(&total, "invalid_extent_high", slot, high, "High extent byte in the range 0 to 63");
+    if ((unsigned char)entry->blkcnt > 128)
+      check_field(&total, "invalid_record_count", slot, (unsigned char)entry->blkcnt, "Record count in the range 0 to 128");
+    if ((unsigned char)entry->lrc > 128)
+      check_field(&total, "invalid_last_record_count", slot, (unsigned char)entry->lrc, "Last-record byte count in the range 0 to 128");
+
+    for (int pointer = 0; pointer < 16 / width; ++pointer)
+    {
+      const int block = allocation_pointer(entry, pointer, width);
+      if (!block) continue;
+      if (block < sb.dirblks || block >= sb.size)
+      {
+        check_finding(&total, block < sb.dirblks ? "reserved_block" : "block_out_of_range",
+                      slot, block, "Block in the filesystem data area", block, pointer, -1, -1);
+        continue;
+      }
+      struct CheckOwner *owner = owners + block;
+      if (owner->slot)
+        check_finding(&total, "shared_block", slot, block, "One file pointer per data block",
+                      block, pointer, owner->slot - 1, owner->pointer);
+      else
+      {
+        owner->slot = slot + 1;
+        owner->pointer = pointer;
+        if (!cpmImageBlockPresent(&sb, block))
+          check_finding(&total, "missing_allocated_sectors", slot, block, "All sectors of an allocated block present",
+                        block, pointer, -1, -1);
+      }
+    }
+  }
+
+  qsort(extents, (size_t)extentCount, sizeof *extents, compare_check_extents);
+  const struct CheckExtent *first = extents;
+  for (int i = 1; i < extentCount; ++i)
+  {
+    const struct CheckExtent *entry = extents + i;
+    if (entry->group == first->group && !memcmp(entry->key, first->key, sizeof entry->key))
+      check_finding(&total, "duplicate_extent", entry->slot, entry->group,
+                    "One physical extent per file and extent group", -1, -1, first->slot, -1);
+    else first = entry;
+  }
+  free(owners);
+  free(extents);
+  /* cpmUmount syncs filesystems. This child only reads and closes its device. */
+  if (Device_close(&sb.dev)) return 2;
+  printf("],\"status\":\"%s\",\"phase\":\"complete\",\"finding_count\":%u,\"omitted\":%u}\n",
+         total ? "findings" : "clean", total, total > MAX_CHECK_FINDINGS ? total - MAX_CHECK_FINDINGS : 0);
+  return 0;
+}
+#endif
+
 int main(int argc,char **argv) {
   struct cpmSuperBlock sb={0};struct cpmInode root,ino; const char *err;
 #ifdef CPMIMAGE_READ_ONLY
@@ -436,6 +615,8 @@ int main(int argc,char **argv) {
     puts("]}");
     return 0;
   }
+  if (argc==5 && !strcmp(argv[1],"filesystem-check") && !strcmp(argv[4],"raw"))
+    return filesystem_check(argv[2], argv[3]);
   if (argc==4 && !strcmp(argv[1],"encode")) return encode(argv[2],argv[3]);
   if (argc==4 && !strcmp(argv[1],"decode")) return decode(argv[2],argv[3]);
 #endif

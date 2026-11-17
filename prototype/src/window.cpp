@@ -5,6 +5,7 @@
 #include "disk_format_editor.h"
 #include "format_diagnostics.h"
 #include "filesystem_inspector.h"
+#include "filesystem_check.h"
 #include <QEventLoop>
 #include <QMetaMethod>
 #include <QLocale>
@@ -486,7 +487,10 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     connect(physicalDiskAction, &QAction::triggered, this, &Window::showPhysicalDiskInspector);
     filesystemInspectorAction = view->addAction("Filesystem Structure Inspector…");
     filesystemInspectorAction->setObjectName("filesystemStructureInspectorAction");
-    connect(filesystemInspectorAction, &QAction::triggered, this, &Window::showFilesystemInspector);
+    connect(filesystemInspectorAction, &QAction::triggered, this, [this] { showFilesystemInspector(); });
+    filesystemCheckAction = view->addAction("Filesystem Check…");
+    filesystemCheckAction->setObjectName("filesystemCheckAction");
+    connect(filesystemCheckAction, &QAction::triggered, this, &Window::showFilesystemCheck);
     viewFileAction = view->addAction("View File…");
     viewFileAction->setObjectName("viewFileAction");
     connect(viewFileAction, &QAction::triggered, this, [this] { viewFile(); });
@@ -629,6 +633,7 @@ void Window::setBusy(bool value) {
     imageInfoAction->setEnabled(!busy && !session.isEmpty());
     physicalDiskAction->setEnabled(!busy && !session.isEmpty());
     filesystemInspectorAction->setEnabled(!busy && !session.isEmpty());
+    filesystemCheckAction->setEnabled(!busy);
     progress->setVisible(busy && batchActive);
     emit comparisonAvailabilityChanged();
 }
@@ -2339,7 +2344,7 @@ void Window::showImageInformation() {
     dialog.exec();
 }
 
-void Window::showFilesystemInspector() {
+void Window::showFilesystemInspector(int slot, QString revision) {
     if (busy || session.isEmpty()) return;
     const auto inspectedSession = session;
     auto *dialog = new FilesystemInspector([this, inspectedSession](QJsonObject fields, auto reply) {
@@ -2350,7 +2355,30 @@ void Window::showFilesystemInspector() {
         fields["op"] = "filesystem_structure";
         fields["session"] = inspectedSession;
         requestBrokerResult(std::move(fields), std::move(reply));
-    }, QFileInfo(image).fileName(), this);
+    }, QFileInfo(image).fileName(), this, slot, std::move(revision));
+    dialog->show();
+}
+
+void Window::showFilesystemCheck() {
+    if (busy) return;
+    const auto checkedSession = session;
+    auto *dialog = new FilesystemCheckDialog(
+        checkedSession.isEmpty() ? QString() : QFileInfo(image).fileName(), format,
+        [this, checkedSession](QJsonObject fields, auto reply) {
+            if (fields["op"].toString() == "catalogue") fields["path"] = cataloguePath;
+            else if (!fields.contains("image")) {
+                if (session.isEmpty() || session != checkedSession) {
+                    reply({}, "The image session changed. Reopen the check.");
+                    return;
+                }
+                fields["session"] = checkedSession;
+            }
+            requestBrokerResult(std::move(fields), std::move(reply));
+        },
+        [this, checkedSession](int slot, QString revision) {
+            if (session != checkedSession) return;
+            showFilesystemInspector(slot, std::move(revision));
+        }, this);
     dialog->show();
 }
 
@@ -2489,7 +2517,8 @@ void Window::begin(QJsonObject request) {
         fail("The image reader is restarting. Open the image again."); return;
     }
     setBusy(true);
-    status->setText(operation.startsWith("comparison_") ? "Comparing images…" :
+    status->setText(operation == "filesystem_check" ? "Checking filesystem…" :
+        operation.startsWith("comparison_") ? "Comparing images…" :
         operation == "filesystem_structure" ? "Reading filesystem structures…" :
         operation == "source_metadata" ? "Reading source metadata…" :
         brokerResultHandler ? "Checking disk definition…" : operation == "open" ? "Reading image…" : operation == "catalogue" ? "Loading disk definitions…" :
@@ -2590,7 +2619,7 @@ void Window::readReply() {
         auto handler = std::exchange(brokerResultHandler, {});
         setBusy(false);
         status->setText(dirty ? "Unsaved changes." :
-                        (operation == "source_metadata" || operation == "filesystem_structure" ||
+                        (operation == "source_metadata" || operation == "filesystem_structure" || operation == "filesystem_check" ||
                          operation.startsWith("comparison_"))
                         ? "Image ready." : "Disk definitions ready.");
         handler(result, {});

@@ -1,0 +1,110 @@
+--- a/cpmfs.c
++++ b/cpmfs.c
+@@ -1089,6 +1089,21 @@
+ }
+ /*}}}*/
+ #ifdef CPMIMAGE_READ_ONLY_NAMES
++/* Check availability using the same RAW/skew addressing as readBlock. */
++int cpmImageBlockPresent(const struct cpmSuperBlock *d, int block)
++{
++  if (d->dev.imageLimit < 0) return 1;
++  int first=block*(d->blksiz/d->secLength)+bootOffset(d);
++  for (int n=0; n<d->blksiz/d->secLength; ++n)
++  {
++    int sector=first+n;
++    long long end=((long long)(sector/d->sectrk)*d->sectrk+
++      d->skewtab[sector%d->sectrk]+1)*d->secLength+d->offset;
++    if (end>d->dev.imageLimit) return 0;
++  }
++  return 1;
++}
++
+ static int cpmImageCheckDirectory(const struct cpmSuperBlock *d)
+ {
+   unsigned char *seen=calloc((size_t)d->size,1);
+@@ -1114,19 +1129,9 @@
+         boo="Invalid or duplicated file allocation"; free(seen); return -1;
+       }
+       seen[block]=1;
+-      if (d->dev.imageLimit>=0)
++      if (!cpmImageBlockPresent(d,block))
+       {
+-        int first=block*(d->blksiz/d->secLength)+bootOffset(d);
+-        for (int n=0;n<d->blksiz/d->secLength;++n)
+-        {
+-          int sector=first+n;
+-          long long end=((long long)(sector/d->sectrk)*d->sectrk+
+-            d->skewtab[sector%d->sectrk]+1)*d->secLength+d->offset;
+-          if (end>d->dev.imageLimit)
+-          {
+-            boo="Missing allocated sectors"; free(seen); return -1;
+-          }
+-        }
++        boo="Missing allocated sectors"; free(seen); return -1;
+       }
+     }
+   }
+@@ -1135,8 +1140,10 @@
+ }
+ #endif
+ /* cpmReadSuper       -- get DPB and init in-core data for drive */ /*{{{*/
+-int cpmReadSuper(struct cpmSuperBlock *d, struct cpmInode *root, char const *format, int uppercase)
++static int readSuper(struct cpmSuperBlock *d, struct cpmInode *root, char const *format,
++                     int uppercase, const char **checkPhase)
+ {
++  if (checkPhase) *checkPhase="definition";
+   while (s_ifdir && !S_ISDIR(s_ifdir)) s_ifdir<<=1;
+   assert(s_ifdir);
+   while (s_ifreg && !S_ISREG(s_ifreg)) s_ifreg<<=1;
+@@ -1149,6 +1156,7 @@
+   if (d->type&CPMFS_CPM3_OTHER) d->type &= ~CPMFS_HI_USER;
+ #endif
+   d->uppercase=uppercase;
++  if (checkPhase) *checkPhase="geometry";
+ 
+   assert(d->boottrk>=0 || d->bootsec>=0);
+   assert(d->secLength>0);
+@@ -1192,6 +1200,7 @@
+   }
+   /*}}}*/
+   /* initialise allocation vector bitmap */ /*{{{*/
++  if (!checkPhase)
+   {
+     d->alvSize= ((((d->sectrk * d->tracks)-bootOffset(d)) * d->secLength)/d->blksiz+INTBITS-1)/INTBITS;
+     if ((d->alv=malloc(d->alvSize*sizeof(int)))==(int*)0) 
+@@ -1202,6 +1211,7 @@
+   }
+   /*}}}*/
+   /* allocate directory buffer */ /*{{{*/
++  if (checkPhase) *checkPhase="directory";
+   assert(sizeof(struct PhysDirectoryEntry)==32);
+   if ((d->dir=malloc(((d->maxdir*32+d->blksiz-1)/d->blksiz)*d->blksiz))==(struct PhysDirectoryEntry*)0)
+   {
+@@ -1228,6 +1238,8 @@
+   }
+   /*}}}*/
+ #ifdef CPMIMAGE_READ_ONLY_NAMES
++  /* A diagnostic read stops before validation or normal mount state is built. */
++  if (checkPhase) return 0;
+   if (d->dev.opened && cpmImageCheckDirectory(d)<0) return -1;
+ #endif
+   alvInit(d);
+@@ -1325,6 +1337,18 @@
+   return 0;
+ }
+ /*}}}*/
++int cpmReadSuper(struct cpmSuperBlock *d, struct cpmInode *root, char const *format, int uppercase)
++{
++  return readSuper(d,root,format,uppercase,NULL);
++}
++
++#ifdef CPMIMAGE_READ_ONLY_NAMES
++int cpmImageReadDirectory(struct cpmSuperBlock *d, const char *format, const char **phase)
++{
++  return readSuper(d,NULL,format,0,phase);
++}
++#endif
++
+ /* syncDs             -- write all datestamper timestamps        */ /*{{{*/
+ static int syncDs(const struct cpmSuperBlock *sb)
+ {
