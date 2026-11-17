@@ -512,6 +512,139 @@ private slots:
         QVERIFY(!QFile::exists(temp.filePath("working.FDF")));
     }
 
+    void compareImagesShowsFilesAndDirectoryDifferences() {
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        const auto helper = qEnvironmentVariable("CPMIMAGE_HELPER");
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        QVERIFY(QFile::copy(root + "/fixtures/diskdefs", temp.filePath("diskdefs")));
+        const auto leftPath = temp.filePath("left.raw");
+        const auto rightPath = temp.filePath("right.raw");
+        for (const auto &path : {leftPath, rightPath})
+            QVERIFY(QFile::copy(root + "/fixtures/ibm3740-empty.raw", path));
+        auto edit = [&](const QStringList &arguments) {
+            QProcess process;
+            process.setWorkingDirectory(temp.path());
+            process.start(helper, arguments);
+            return process.waitForFinished() && process.exitCode() == 0;
+        };
+        auto addFile = [&](const QString &image, const QString &name, char byte) {
+            QFile input(temp.filePath("input.bin"));
+            if (!input.open(QIODevice::WriteOnly)) return false;
+            if (input.write(QByteArray(128, byte)) != 128) return false;
+            input.close();
+            return edit({"edit_import", image, "ibm-3740", "raw", name, input.fileName()});
+        };
+        QVERIFY(addFile(leftPath, "00SAME.BIN", 'S'));
+        QVERIFY(addFile(leftPath, "00CHANGED.BIN", 'L'));
+        QVERIFY(addFile(leftPath, "00ATTR.BIN", 'A'));
+        QVERIFY(addFile(leftPath, "01MOVED.BIN", 'M'));
+        QVERIFY(addFile(rightPath, "00CHANGED.BIN", 'R'));
+        QVERIFY(addFile(rightPath, "00SAME.BIN", 'S'));
+        QVERIFY(addFile(rightPath, "00ATTR.BIN", 'A'));
+        QVERIFY(addFile(rightPath, "02MOVED.BIN", 'M'));
+        QVERIFY(edit({"edit_attrs", rightPath, "ibm-3740", "raw", "00ATTR.BIN", "256"}));
+        QFile leftDisk(leftPath), rightDisk(rightPath);
+        QVERIFY(leftDisk.open(QIODevice::ReadOnly));
+        QVERIFY(rightDisk.open(QIODevice::ReadOnly));
+        const auto leftBytes = leftDisk.readAll(), rightBytes = rightDisk.readAll();
+        leftDisk.close();
+        rightDisk.close();
+
+        Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"), helper, {}});
+        workspace.show();
+        auto &left = workspace.addSession();
+        auto *action = workspace.findChild<QAction *>("compareImagesAction");
+        QVERIFY(action);
+        QVERIFY(!action->isEnabled());
+        QSignalSpy leftDone(&left, &Window::completed);
+        left.openImage(leftPath, "ibm-3740", "raw");
+        QTRY_COMPARE_WITH_TIMEOUT(leftDone.size(), 1, 15000);
+        QVERIFY(leftDone.takeFirst().first().toBool());
+        QVERIFY(!action->isEnabled());
+        auto &right = workspace.addSession();
+        QSignalSpy rightDone(&right, &Window::completed);
+        right.openImage(rightPath, "ibm-3740", "raw");
+        QTRY_COMPARE_WITH_TIMEOUT(rightDone.size(), 1, 15000);
+        QVERIFY(rightDone.takeFirst().first().toBool());
+        workspace.findChild<QTabWidget *>()->setCurrentWidget(&left);
+        QVERIFY(action->isEnabled());
+        bool onViewMenu = false;
+        for (auto *item : workspace.menuBar()->actions())
+            if (auto *menu = item->menu(); menu && menu->title() == "View")
+                onViewMenu = menu->actions().contains(action);
+        QVERIFY(onViewMenu);
+
+        QFile pending(temp.filePath("PENDING.BIN"));
+        QVERIFY(pending.open(QIODevice::WriteOnly));
+        QCOMPARE(pending.write(QByteArray(128, 'U')), 128);
+        pending.close();
+        left.findChild<QListWidget *>("userAreas")->setCurrentRow(1);
+        QTimer approve;
+        connect(&approve, &QTimer::timeout, &left, [] {
+            if (auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget())) {
+                if (auto *message = qobject_cast<QMessageBox *>(dialog)) {
+                    if (auto *yes = message->button(QMessageBox::Yes)) yes->click();
+                    else message->reject();
+                } else if (dialog->windowTitle() == "Review import") dialog->accept();
+                else dialog->reject();
+            }
+        });
+        approve.start(20);
+        left.importFiles({pending.fileName()});
+        QTRY_COMPARE_WITH_TIMEOUT(leftDone.size(), 1, 15000);
+        approve.stop();
+        QVERIFY(leftDone.takeFirst().first().toBool());
+        action->trigger();
+        auto *comparison = workspace.findChild<QDialog *>("imageComparison");
+        QVERIFY(comparison);
+        auto *target = comparison->findChild<QComboBox *>("imageComparisonTarget");
+        QVERIFY(target);
+        QCOMPARE(target->count(), 1);
+        QVERIFY(target->currentText().contains("right.raw"));
+        comparison->findChild<QPushButton *>("imageComparisonRun")->click();
+        auto *files = comparison->findChild<QTableWidget *>("imageComparisonFiles");
+        auto *directory = comparison->findChild<QTableWidget *>("imageComparisonDirectory");
+        auto *summary = comparison->findChild<QLabel *>("imageComparisonSummary");
+        QVERIFY(files && directory && summary);
+        QTRY_COMPARE_WITH_TIMEOUT(files->rowCount(), 6, 15000);
+        QVERIFY(summary->text().contains("left.raw"));
+        QVERIFY(summary->text().contains("Unsaved changes included"));
+        QCOMPARE(files->editTriggers(), QAbstractItemView::NoEditTriggers);
+        const auto row = [files](const QString &name, int user = 0) {
+            for (int index = 0; index < files->rowCount(); ++index)
+                if (files->item(index, 0)->text().toInt() == user && files->item(index, 1)->text() == name) return index;
+            return -1;
+        };
+        const int same = row("SAME.BIN"), changed = row("CHANGED.BIN"), attrs = row("ATTR.BIN");
+        QVERIFY(same >= 0 && changed >= 0 && attrs >= 0);
+        QCOMPARE(files->item(same, 2)->text(), QString("Identical"));
+        QVERIFY(files->item(same, 3)->text().contains("Allocation"));
+        QCOMPARE(files->item(changed, 2)->text(), QString("Content changed"));
+        QCOMPARE(files->item(attrs, 2)->text(), QString("Attributes changed"));
+        files->selectRow(attrs);
+        QVERIFY(comparison->findChild<QPlainTextEdit *>("imageComparisonFileDetails")->toPlainText().contains("Attributes RO"));
+        auto *userAreas = comparison->findChild<QComboBox *>("imageComparisonArea");
+        userAreas->setCurrentIndex(userAreas->findData(2));
+        QCOMPARE(files->rowCount(), 1);
+        QCOMPARE(files->item(0, 1)->text(), QString("MOVED.BIN"));
+        QCOMPARE(files->item(0, 2)->text(), QString("Added"));
+        comparison->findChild<QTabWidget *>()->setCurrentIndex(1);
+        QVERIFY(directory->rowCount() >= 4);
+        QVERIFY(comparison->findChild<QPlainTextEdit *>("imageComparisonSlotDetails")->toPlainText().contains("Blocks"));
+        comparison->reject();
+        QTRY_VERIFY(!workspace.findChild<QDialog *>("imageComparison"));
+        QVERIFY(left.windowTitle().endsWith(" *"));
+        QVERIFY(leftDisk.open(QIODevice::ReadOnly));
+        QVERIFY(rightDisk.open(QIODevice::ReadOnly));
+        QCOMPARE(leftDisk.readAll(), leftBytes);
+        QCOMPARE(rightDisk.readAll(), rightBytes);
+        QVERIFY(!QFile::exists(temp.filePath("left.FDF")));
+        QVERIFY(!QFile::exists(temp.filePath("right.FDF")));
+        right.close();
+        QTRY_VERIFY(!action->isEnabled());
+    }
+
     void flatExportConsolidatesIdenticalHostFile() {
         const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
         Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),

@@ -80,6 +80,116 @@ class SourceTracks(dict):
         self.statuses = {}
 
 
+def classify_comparison(request, backend):
+    """Classify bounded batches of pairs joined by file identity or directory slot."""
+    view, pairs = request.get('view'), request.get('pairs')
+    if view not in ('files', 'directory') or not isinstance(pairs, list) or len(pairs) > 64:
+        raise backend.Failure('invalid_request', 'Choose a comparison view and up to 64 pairs.')
+
+    def digest(value):
+        return (isinstance(value, str) and len(value) == 64
+                and all(char in '0123456789abcdef' for char in value))
+
+    definitions = request.get('left_definition'), request.get('right_definition')
+    if not all(digest(value) for value in definitions):
+        raise backend.Failure('invalid_request', 'Send both disk definition fingerprints.')
+    same_definition = definitions[0] == definitions[1]
+
+    def checked_extents(rows):
+        if rows is None:
+            return None
+        fields = ('slot', 'extent', 'physical_extent', 'record_count')
+        if not isinstance(rows, list) or any(
+                not isinstance(row, dict)
+                or any(type(row.get(field)) is not int or row[field] < 0 for field in fields)
+                or not isinstance(row.get('pointers'), list) or len(row['pointers']) > 16
+                or any(block is not None and (type(block) is not int or not 1 <= block <= 65535)
+                       for block in row['pointers']) for row in rows):
+            raise backend.Failure('invalid_request', 'Provide directory extents with ordered block pointers.')
+        return rows
+
+    def structure_changes(left, right):
+        if left is None or right is None:
+            return None
+
+        def coverage(rows):
+            return sorted((row['extent'], row['physical_extent'], row['record_count']) for row in rows)
+
+        def allocation(rows):
+            return sorted((row['physical_extent'], tuple(-1 if block is None else block
+                          for block in row['pointers'])) for row in rows)
+
+        # Ignore the ordinal in the extent view. Keep repeated records visible.
+        return dict(extents_changed=coverage(left) != coverage(right),
+                    slots_changed=sorted(row['slot'] for row in left) != sorted(row['slot'] for row in right),
+                    allocation_changed=allocation(left) != allocation(right) if same_definition else None)
+
+    def directory_signature(row):
+        fields = ('kind', 'status', 'user', 'name', 'extension', 'extent', 'physical_extent',
+                  'record_count', 'attributes')
+        return tuple(row.get(field) for field in fields)
+
+    results = []
+    seen = set()
+    for pair in pairs:
+        if not isinstance(pair, dict):
+            raise backend.Failure('invalid_request', 'Each comparison pair must be an object.')
+        left, right = pair.get('left'), pair.get('right')
+        sides = [side for side in (left, right) if side is not None]
+        if not sides or not all(isinstance(side, dict) for side in sides):
+            raise backend.Failure('invalid_request', 'Each pair must contain at least one comparison row.')
+        if view == 'files':
+            if not all(isinstance(side.get('name'), str) for side in sides):
+                raise backend.Failure('invalid_request', 'File rows require a CP/M name.')
+            keys = [backend.filename(side['name'], True) for side in sides]
+            if any(type(side.get('size')) is not int or not 0 <= side['size'] <= MAX_IMAGE_BYTES
+                   or type(side.get('attr')) is not int or not 0 <= side['attr'] <= 16383 for side in sides):
+                raise backend.Failure('invalid_request', 'File rows require a size and CP/M attributes.')
+        else:
+            keys = [side.get('slot') for side in sides]
+            if any(type(slot) is not int or not 0 <= slot <= 0x7fffffff for slot in keys):
+                raise backend.Failure('invalid_request', 'Directory rows require a valid slot.')
+        key = keys[0]
+        if key in seen or any(item != key for item in keys):
+            raise backend.Failure('invalid_request', 'Comparison identities must match and appear only once per batch.')
+        seen.add(key)
+        presence = 'removed' if right is None else 'added' if left is None else 'both'
+        if view == 'directory':
+            fields_changed = directory_signature(left) != directory_signature(right) if presence == 'both' else None
+            has_pointers = presence == 'both' and (left.get('kind') == 'file' or right.get('kind') == 'file')
+            allocation_changed = (left.get('pointers') != right.get('pointers')
+                                  if has_pointers and same_definition else None)
+            status = presence
+            if presence == 'both':
+                if fields_changed or allocation_changed:
+                    status = 'changed'
+                elif has_pointers and not same_definition:
+                    status = 'unavailable'
+                else:
+                    status = 'identical'
+            results.append(dict(slot=key, status=status, fields_changed=fields_changed,
+                                allocation_changed=allocation_changed))
+            continue
+
+        result = dict(name=key, user=int(key[:2]), filename=key[2:], status=presence,
+                      content_changed=None, attributes_changed=None, structure=None)
+        if presence == 'both':
+            attributes = left['attr'] != right['attr']
+            content = None
+            if left['size'] != right['size']:
+                content = True
+            elif digest(left.get('sha256')) and digest(right.get('sha256')):
+                content = left['sha256'] != right['sha256']
+            result.update(content_changed=content, attributes_changed=attributes,
+                          structure=structure_changes(checked_extents(left.get('extents')),
+                                                      checked_extents(right.get('extents'))),
+                          status='unavailable' if content is None else
+                                 'changed' if content or attributes else 'identical')
+        results.append(result)
+    key = 'name' if view == 'files' else 'slot'
+    return dict(view=view, same_definition=same_definition, rows=sorted(results, key=lambda row: row[key]))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=Path, required=True)
@@ -141,6 +251,38 @@ def main():
         if len(data) > MAX_IMAGE_BYTES:
             raise backend.Failure('input_limit', 'Image exceeds the 128 MiB working image limit.')
         return data
+
+    def working_revision(request):
+        if not session or request.get('session') != session['token']:
+            raise backend.Failure('stale_session', 'Open an image first.')
+        # Working-image edits publish by replacement. Include the mount and file
+        # identity so a page cannot be resumed after an edit, format switch or Discard.
+        info = session['image'].stat()
+        definition_hash = catalogue.digest(session['definitions'])
+        revision = hashlib.sha256(repr((
+            session['token'], definition_hash, info.st_dev, info.st_ino, info.st_size,
+            info.st_mtime_ns, info.st_ctime_ns, session['dirty'],
+        )).encode('ascii')).hexdigest()
+        if request.get('revision', revision) != revision:
+            raise backend.Failure('stale_revision', 'The working image changed. Reload the results.')
+        return dict(revision=revision, format=session['format'],
+                    definition_sha256=definition_hash, dirty=session['dirty'])
+
+    def comparison_files(context, rid):
+        cached = session.get('comparison_files')
+        if cached is not None and cached[0] == context['revision']:
+            return cached[1]
+        reply = adapter().request(dict(v=1, id=rid, op='list', image=str(session['image']),
+                                       format=session['format'], container='raw'),
+                                  defs_override=session['definitions'])
+        if not reply['ok']:
+            raise backend.Failure(reply['error'], reply.get('message', ''))
+        listing = reply['result']
+        result = dict(files={row['name']: {key: row[key] for key in ('name', 'size', 'attr')}
+                             for row in listing['entries']},
+                      free_bytes=listing.get('free_bytes'), total_bytes=listing.get('total_bytes'))
+        session['comparison_files'] = context['revision'], result
+        return result
 
     def install_system_tracks(image, geometry, path, pad):
         start = geometry.get('offset', 0)
@@ -665,9 +807,65 @@ def main():
                     for row in candidates:
                         row.pop('evaluation')
                     result.update(rejected=[], diagnostics_truncated=True)
+            elif op == 'comparison_manifest':
+                # Each tab produces its own paged manifest. Join files on the full
+                # CP/M name (including user area) and directory rows on slot.
+                context = working_revision(request)
+                start, limit = request.get('start', 0), request.get('limit', 64)
+                if (type(start) is not int or not 0 <= start <= 0x7fffffff
+                        or type(limit) is not int or not 1 <= limit <= 128
+                        or (start and 'revision' not in request)):
+                    raise backend.Failure('invalid_request', 'Choose a valid comparison page and revision.')
+                listing = comparison_files(context, rid)
+                files = list(listing['files'].values())
+                end = start + limit
+                result = dict(context, rows=files[start:end], total=len(files), start=start,
+                              next_start=end if end < len(files) else None,
+                              free_bytes=listing['free_bytes'], total_bytes=listing['total_bytes'],
+                              geometry=session['geometry'])
+                reply = dict(v=1, id=rid, ok=True, result=result)
+            elif op == 'comparison_fingerprints':
+                # Only complete, unconverted logical file streams get fingerprints.
+                context = working_revision(request)
+                names = request.get('names')
+                if ('revision' not in request or not isinstance(names, list) or not 1 <= len(names) <= 16
+                        or not all(isinstance(name, str) for name in names)):
+                    raise backend.Failure('invalid_request', 'Send a revision and 1 to 16 filenames.')
+                names = [backend.filename(name, True) for name in names]
+                files = comparison_files(context, rid)['files']
+                if len(set(names)) != len(names) or any(name not in files for name in names):
+                    raise backend.Failure('invalid_request', 'Choose distinct files from the comparison manifest.')
+                rows = []
+                with tempfile.TemporaryDirectory(prefix='cpmimage-compare-') as temp:
+                    directory = Path(temp)
+                    (directory / 'diskdefs').write_text(session['definitions'], encoding='utf-8')
+                    output = directory / 'file.bin'
+                    helper = adapter()
+                    for name in names:
+                        if stop.is_set():
+                            raise backend.Failure('cancelled')
+                        try:
+                            helper.native(directory, 'export', session['image'], session['format'],
+                                          'raw', name, output)
+                            if not output.is_file() or output.stat().st_size != files[name]['size']:
+                                raise backend.Failure('incomplete_read', 'The extracted size differs from the listing.')
+                            fingerprint = file_hash(output)
+                            if fingerprint is None:
+                                raise backend.Failure('incomplete_read', 'The extracted file is unavailable.')
+                            rows.append(dict(name=name, sha256=fingerprint))
+                        except backend.Failure as error:
+                            if error.code == 'cancelled':
+                                raise
+                            rows.append(dict(name=name, error=error.code))
+                        finally:
+                            output.unlink(missing_ok=True)
+                if stop.is_set():
+                    raise backend.Failure('cancelled')
+                reply = dict(v=1, id=rid, ok=True, result=dict(context, rows=rows))
+            elif op == 'comparison_classify':
+                reply = dict(v=1, id=rid, ok=True, result=classify_comparison(request, backend))
             elif op == 'filesystem_structure':
-                if not session or request.get('session') != session['token']:
-                    raise backend.Failure('stale_session', 'Open an image first.')
+                context = working_revision(request)
                 view = request.get('view')
                 start, limit = request.get('start', 0), request.get('limit', 128)
                 block = request.get('block') if view == 'references' else 0
@@ -677,16 +875,6 @@ def main():
                         or type(block) is not int or not 0 <= block <= 0x7fffffff):
                     raise backend.Failure('invalid_request', 'Choose a filesystem view and a valid page or block.')
                 working = session['image']
-                # Working-image edits publish by replacement. Include file identity and
-                # timestamps so a page cannot be resumed after replacement or Discard.
-                info = working.stat()
-                definition_hash = catalogue.digest(session['definitions'])
-                revision = hashlib.sha256(repr((
-                    session['token'], definition_hash, info.st_dev, info.st_ino, info.st_size,
-                    info.st_mtime_ns, info.st_ctime_ns, session['dirty'],
-                )).encode('ascii')).hexdigest()
-                if request.get('revision', revision) != revision:
-                    raise backend.Failure('stale_revision', 'The working image changed. Reload the filesystem structure.')
                 with tempfile.TemporaryDirectory(prefix='cpmimage-structure-') as temp:
                     directory = Path(temp)
                     (directory / 'diskdefs').write_text(session['definitions'], encoding='utf-8')
@@ -697,8 +885,7 @@ def main():
                 result.pop('v')
                 result.pop('ok')
                 total = result['total']
-                result.update(view=view, start=start, revision=revision, format=session['format'],
-                              definition_sha256=definition_hash, dirty=session['dirty'],
+                result.update(context, view=view, start=start,
                               next_start=start + limit if start + limit < total else None)
                 if view == 'references':
                     result['block'] = block
