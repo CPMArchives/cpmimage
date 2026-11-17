@@ -40,6 +40,7 @@ private:
     QList<ImageComparison::Source> references;
     QJsonArray findings;
     int omittedFindings = 0;
+    bool repairLayout = false;
     QComboBox *mode, *formats;
     QWidget *external;
     QLineEdit *path;

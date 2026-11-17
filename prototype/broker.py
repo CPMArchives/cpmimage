@@ -673,7 +673,9 @@ def main():
             if 'session' in request:
                 if any(key in request for key in ('image', 'format', 'container')):
                     raise backend.Failure('invalid_request', 'Choose either an active session or an external image.')
-                context = dict(working_revision(request), mode='working', container='raw')
+                context = dict(working_revision(request), mode='working', container='raw',
+                               repair_layout=not (session['geometry'].get('offset') or
+                                                  session['geometry'].get('boot_geometry')))
                 working, definition = session['image'], session['definitions']
             else:
                 fmt = request.get('format')
@@ -715,6 +717,42 @@ def main():
             report.pop('v')
             report.pop('ok')
             return dict(context, **report)
+
+    def repair_extent_flags(candidate, edit_dir, revision):
+        # Only repair findings whose correction preserves cpmtools' masked
+        # extent number. A mixed or incomplete report needs manual review.
+        fmt = session['format']
+        geo = session['geometry']
+        if geo.get('offset') or geo.get('boot_geometry'):
+            raise backend.Failure('unsupported_repair', 'This layout has no verified directory byte mapping.')
+        report = adapter().native(edit_dir, 'filesystem-check', candidate, fmt, 'raw')
+        fields = {'invalid_extent_low': (12, 31), 'invalid_extent_high': (14, 63)}
+        findings = report['findings']
+        if (report['status'] != 'findings' or report['omitted'] or not findings
+                or any(row['code'] not in fields for row in findings)):
+            raise backend.Failure('unsupported_repair', 'Only complete reports containing extent flag findings can be repaired.')
+        sector_size = geo['sector_size']
+        blocks = {}
+        with candidate.open('r+b') as stream:
+            for row in findings:
+                field, mask = fields[row['code']]
+                block, relative = divmod(row['slot'] * 32 + field, geo['block_size'])
+                if block not in blocks:
+                    blocks[block] = adapter().native(edit_dir, 'filesystem-structure', candidate, fmt, 'raw',
+                                                     'sector_slots', 0, 1, block)['slots']
+                sector, offset = divmod(relative, sector_size)
+                track, slot = blocks[block][sector]
+                address = (track * geo['sectors_per_track'] + slot) * sector_size + offset
+                stream.seek(address)
+                observed = row['observed']
+                if stream.read(1) != bytes((observed,)):
+                    raise backend.Failure('stale_revision', 'The mapped directory byte differs from the finding.')
+                stream.seek(address)
+                stream.write(bytes((observed & mask,)))
+        verified = adapter().native(edit_dir, 'filesystem-check', candidate, fmt, 'raw')
+        if verified['status'] != 'clean':
+            raise backend.Failure('unsupported_repair', 'The repaired copy did not pass the filesystem check.')
+        working_revision({'session': session['token'], 'revision': revision})
 
     def render_record(record):
         try:
@@ -1289,9 +1327,13 @@ def main():
                 if not session['confirmed'] and request.get('confirmed') is not True:
                     raise backend.Failure('confirmation_required', 'Confirm the selected disk definition for writing.')
                 action = request['action']
-                if action not in ('rename', 'delete', 'delete_many', 'attrs', 'import', 'move'):
+                if action == 'repair_extent_flags':
+                    if request.get('confirmed') is not True or not isinstance(request.get('revision'), str):
+                        raise backend.Failure('confirmation_required', 'Approve the repair for the checked working revision.')
+                    working_revision(request)
+                if action not in ('rename', 'delete', 'delete_many', 'attrs', 'import', 'move', 'repair_extent_flags'):
                     raise backend.Failure('invalid_edit', 'Unknown editing operation.')
-                name = '' if action in ('import', 'delete_many') else backend.filename(request['name'], True)
+                name = '' if action in ('import', 'delete_many', 'repair_extent_flags') else backend.filename(request['name'], True)
                 argument = '-'
                 if action in ('rename', 'move'):
                     argument = backend.filename(request['target'], True)
@@ -1315,7 +1357,9 @@ def main():
                     candidate = edit_dir / 'edited.raw'
                     shutil.copyfile(working, candidate)
                     (edit_dir / 'diskdefs').write_text(session['definitions'], encoding='utf-8')
-                    if action == 'import':
+                    if action == 'repair_extent_flags':
+                        repair_extent_flags(candidate, edit_dir, request['revision'])
+                    elif action == 'import':
                         items = request.get('items', [request])
                         if not isinstance(items, list) or not 1 <= len(items) <= 256:
                             raise backend.Failure('invalid_edit', 'Import batches support 1 to 256 files.')

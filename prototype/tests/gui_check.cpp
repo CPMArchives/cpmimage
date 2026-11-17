@@ -776,7 +776,7 @@ private slots:
         auto bytes = fixture.readAll();
         QByteArray entry(32, '\0');
         entry.replace(1, 11, "FILE    BIN");
-        entry[13] = char(129);
+        entry[12] = char(32);
         entry[15] = char(1);
         entry[16] = char(2);
         bytes.replace(2 * 26 * 128 + 2 * 32, entry.size(), entry);
@@ -810,9 +810,9 @@ private slots:
         QTRY_COMPARE(report->rowCount(), 1);
         QVERIFY(identity->text().contains("Working image · ibm-3740"));
         QCOMPARE(report->editTriggers(), QAbstractItemView::NoEditTriggers);
-        QCOMPARE(report->item(0, 0)->text(), QString("Invalid last-record byte count"));
+        QCOMPARE(report->item(0, 0)->text(), QString("Invalid low extent byte"));
         QCOMPARE(report->item(0, 1)->text(), QString("2"));
-        QCOMPARE(report->item(0, 6)->text(), QString("129"));
+        QCOMPARE(report->item(0, 6)->text(), QString("32"));
         QVERIFY(goToSlot->isVisible() && goToSlot->isEnabled());
         goToSlot->click();
         auto *inspector = window.findChild<QDialog *>("filesystemStructureInspector");
@@ -822,8 +822,35 @@ private slots:
         QTRY_COMPARE(directory->rowCount(), 64);
         QCOMPARE(directory->item(directory->currentRow(), 0)->text(), QString("2"));
         inspector->reject();
+        auto *review = dialog->findChild<QPushButton *>("filesystemCheckReviewPlan");
+        bool confirmed = false;
+        QTimer::singleShot(0, dialog, [&] {
+            auto *plan = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            QVERIFY(plan);
+            const auto close = qScopeGuard([plan] { if (plan->isVisible()) plan->reject(); });
+            auto *apply = plan->findChild<QPushButton *>("filesystemRepairApply");
+            QVERIFY(apply);
+            QTimer::singleShot(0, plan, [&] {
+                auto *approval = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+                QVERIFY(approval);
+                approval->button(QMessageBox::Cancel)->click();
+            });
+            apply->click();
+            QVERIFY(plan->isVisible());
+            QVERIFY(!window.windowTitle().endsWith(" *"));
+            QTimer::singleShot(0, plan, [&] {
+                auto *approval = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+                QVERIFY(approval);
+                confirmed = true;
+                approval->button(QMessageBox::Yes)->click();
+            });
+            apply->click();
+        });
+        review->click();
+        QVERIFY(confirmed);
+        QTRY_VERIFY(window.windowTitle().endsWith(" *"));
+        QTRY_VERIFY(dialog->findChild<QLabel *>("filesystemCheckStatus")->text().contains("Repair applied"));
         dialog->reject();
-        QVERIFY(!window.windowTitle().endsWith(" *"));
         QVERIFY(image.open(QIODevice::ReadOnly));
         QCOMPARE(image.readAll(), bytes);
         QVERIFY(!QFile::exists(temp.filePath("active.FDF")));
