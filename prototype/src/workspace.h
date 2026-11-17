@@ -134,8 +134,8 @@ protected:
     void closeEvent(QCloseEvent *event) override {
         QScopedValueRollback<bool> closing(closingWorkspace, true);
         while (tabs->count()) {
-            auto *page = tabs->currentWidget();
-            if (!page->close()) { event->ignore(); return; }
+            auto *page = static_cast<Window *>(tabs->currentWidget());
+            if (!page->closeSession([this] { close(); })) { event->ignore(); return; }
         }
         event->accept();
     }

@@ -38,6 +38,7 @@ public:
     void exportSelection(const QString &directory, bool skipExisting = false);
     void exportUserArea(const QString &directory, bool skipExisting = false);
     QString lastBatchReport() const { return batchReport; }
+    bool closeSession(std::function<void()> retry);
     int entryCount() const;
     bool readerRunning() const { return process.state() != QProcess::NotRunning; }
     void selectEntry(int row);
@@ -125,7 +126,8 @@ private:
     QByteArray pending;
     int deadlineMs, graceMs;
     void *readerJob = nullptr;
-    bool busy = false, closing = false;
+    bool busy = false;
+    std::function<void()> closeRetry, closing;
     QPushButton *formats;
     QAction *externalCatalogueAction, *bundledCatalogueAction, *diskFormatEditorAction;
     QString definitionStore;

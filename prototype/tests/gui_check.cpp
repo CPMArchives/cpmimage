@@ -458,6 +458,45 @@ private slots:
         QCOMPARE(QFile::exists(copy + ".BAK"), saveOnClose);
     }
 
+    void workspaceCloseUnsavedTabs() {
+        const auto maslin = qEnvironmentVariable("CPMIMAGE_MASLIN");
+        if (maslin.isEmpty()) QSKIP("External Maslin corpus unavailable");
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        Workspace workspace({qEnvironmentVariable("CPMIMAGE_ROOT"),
+                             qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}});
+        workspace.show();
+        auto *tabs = workspace.findChild<QTabWidget *>();
+        QVERIFY(tabs);
+        for (int i = 0; i < 3; ++i) {
+            const auto source = temp.filePath(QString("XEROX-%1.TD0").arg(i));
+            QVERIFY(QFile::copy(maslin + "/1995/sydex/xerox/820sys8s.td0", source));
+            auto &page = workspace.addSession();
+            page.inspectImage(source, "ibm-3740");
+            QTRY_COMPARE_WITH_TIMEOUT(tabs->tabText(i), QString("XEROX-%1.raw *").arg(i), 15000);
+        }
+        int prompts = 0;
+        bool cancelSecond = true;
+        QTimer respond;
+        connect(&respond, &QTimer::timeout, &workspace, [&] {
+            auto *prompt = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+            if (!prompt || !prompt->button(QMessageBox::Discard)) return;
+            ++prompts;
+            prompt->button(cancelSecond && prompts == 2 ? QMessageBox::Cancel : QMessageBox::Discard)->click();
+        });
+        respond.start(20);
+        QVERIFY(!workspace.close());
+        QTRY_COMPARE(prompts, 2);
+        QVERIFY(workspace.isVisible());
+        QCOMPARE(tabs->count(), 2);
+        cancelSecond = false;
+        QVERIFY(!workspace.close());
+        QTRY_VERIFY(!workspace.isVisible());
+        QCOMPARE(prompts, 4);
+        QCOMPARE(tabs->count(), 0);
+    }
+
     void teleDiskImportSave() {
         const auto maslin = qEnvironmentVariable("CPMIMAGE_MASLIN");
         if (maslin.isEmpty()) QSKIP("External Maslin corpus unavailable");
