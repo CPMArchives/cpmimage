@@ -114,6 +114,49 @@ class FilesystemCheck(unittest.TestCase):
         self.assertEqual(report['omitted'], report['finding_count'] - len(report['findings']))
         self.assertEqual(path.read_bytes(), data)
 
+    def test_verified_extent_repair_discard_and_save(self):
+        # Directory slot 4 starts logical sector 1, stored in physical slot 6
+        # by the IBM 3740 skew. Keep every other byte as a preservation check.
+        address = (2 * 26 + 6) * 128
+        damaged = bytearray(self.blank)
+        damaged[address:address + 32] = self.entry(extent_low=32, extent_high=64, blocks=(2,))
+        self.tab.image.write_bytes(damaged)
+        opened = self.result('open', image=str(self.tab.image), format='ibm-3740', container='raw')
+        session = opened['session']
+        check = self.result('filesystem_check', session=session)
+        self.assertEqual({row['code'] for row in check['findings']},
+                         {'invalid_extent_low', 'invalid_extent_high'})
+        args = dict(session=session, action='repair_extent_flags', revision=check['revision'])
+        self.assertEqual(self.tab.request('edit', **args)['error'], 'confirmation_required')
+        self.assertTrue(self.result('edit', confirmed=True, **args)['dirty'])
+        self.assertEqual(self.result('filesystem_check', session=session)['status'], 'clean')
+        self.assertEqual(self.tab.image.read_bytes(), damaged)
+        self.assertEqual(self.tab.request('edit', confirmed=True, **args)['error'], 'stale_revision')
+        self.assertFalse(self.result('discard', session=session)['dirty'])
+        check = self.result('filesystem_check', session=session)
+        self.assertEqual(check['finding_count'], 2)
+        self.result('edit', session=session, action='repair_extent_flags',
+                    confirmed=True, revision=check['revision'])
+        options = dict(session=session, destination=str(self.tab.image))
+        plan = self.result('save_plan', **options)
+        self.result('save', plan=plan, confirm_sidecar=True, **options)
+        expected = bytearray(damaged)
+        expected[address + 12] = 0
+        expected[address + 14] = 0
+        self.assertEqual(self.tab.image.read_bytes(), expected)
+        self.assertEqual(self.tab.image.with_name(self.tab.image.name + '.BAK').read_bytes(), damaged)
+        self.assertEqual(self.result('filesystem_check', session=session)['status'], 'clean')
+
+    def test_mixed_findings_cannot_be_applied(self):
+        damaged = self.write(self.tab.image, self.entry(extent_low=32, last=129, blocks=(2,)))
+        session = self.result('open', image=str(self.tab.image), format='ibm-3740', container='raw')['session']
+        check = self.result('filesystem_check', session=session)
+        rejected = self.tab.request('edit', session=session, action='repair_extent_flags',
+                                    revision=check['revision'], confirmed=True)
+        self.assertEqual(rejected['error'], 'unsupported_repair')
+        self.assertEqual(self.result('filesystem_check', session=session), check)
+        self.assertEqual(self.tab.image.read_bytes(), damaged)
+
     def test_cpm_plus_metadata_is_recognized(self):
         created = self.result('new_image', format='pcw', confirmed=True, label='PROOF', timestamps=True)
         report = self.result('filesystem_check', session=created['session'])

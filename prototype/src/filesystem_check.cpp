@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMap>
+#include <QMessageBox>
 #include <QPointer>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -17,6 +18,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 #include <utility>
+#include <algorithm>
 
 namespace {
 constexpr int workingMode = 0;
@@ -200,6 +202,7 @@ void FilesystemCheckDialog::clearReport() {
     checkedBlockCount = 0;
     findings = {};
     omittedFindings = 0;
+    repairLayout = false;
     table->setRowCount(0);
     identity->clear();
     status->clear();
@@ -290,6 +293,7 @@ void FilesystemCheckDialog::showReport(const QJsonObject &report) {
                     QString(count == 1 ? "%1 finding" : "%1 findings").arg(count));
     if (working) checkedRevision = report["revision"].toString();
     checkedDefinition = report["definition_sha256"].toString();
+    repairLayout = report["repair_layout"].toBool();
     checkedBlockCount = report["block_count"].toInt();
     findings = report["findings"].toArray();
     table->setRowCount(findings.size());
@@ -314,7 +318,7 @@ void FilesystemCheckDialog::showRepairPlan() {
     auto *details = new QPlainTextEdit(&plan);
     details->setObjectName("filesystemRepairPlan");
     details->setReadOnly(true);
-    QStringList lines{identity->text(), "Review only. This plan makes no changes to the image."};
+    QStringList lines{identity->text(), "Reviewing this plan does not change the image."};
     if (omittedFindings)
         lines << QString("Partial plan. %1 findings were omitted.").arg(omittedFindings);
     for (const auto &value : findings) {
@@ -425,7 +429,39 @@ void FilesystemCheckDialog::showRepairPlan() {
         connect(slot, &QComboBox::currentIndexChanged, &plan, compare);
     }
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &plan);
+    const bool canApply = repairLayout && !checkedRevision.isEmpty() && !omittedFindings &&
+        std::all_of(findings.begin(), findings.end(), [](const QJsonValue &value) {
+            const auto code = value.toObject()["code"].toString();
+            return code == "invalid_extent_low" || code == "invalid_extent_high";
+        });
+    if (canApply) {
+        auto *apply = buttons->addButton("Apply to Working Image…", QDialogButtonBox::ActionRole);
+        apply->setObjectName("filesystemRepairApply");
+        apply->setAutoDefault(false);
+        connect(apply, &QPushButton::clicked, &plan, [this, &plan] {
+            if (QMessageBox::question(&plan, "Approve Filesystem Repair",
+                "Clear the out-of-range extent bits shown in this plan? The selected disk definition determines "
+                "where these bytes are written. Changes stay in the private working image until you Save.",
+                QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) return;
+            plan.accept();
+        });
+    }
     connect(buttons, &QDialogButtonBox::rejected, &plan, &QDialog::reject);
     layout->addWidget(buttons);
-    plan.exec();
+    if (plan.exec() != QDialog::Accepted || !canApply) return;
+    const auto revision = checkedRevision;
+    busy = true;
+    updateControls();
+    request({{"op", "edit"}, {"action", "repair_extent_flags"}, {"revision", revision}, {"confirmed", true}},
+            [guard = QPointer<FilesystemCheckDialog>(this)](const QJsonObject &, const QString &error) {
+        if (!guard) return;
+        guard->busy = false;
+        if (error.isEmpty()) {
+            guard->clearReport();
+            guard->status->setText("Repair applied to the working image. Save or Discard from the image tab.");
+        } else {
+            guard->status->setText(error);
+            guard->updateControls();
+        }
+    });
 }

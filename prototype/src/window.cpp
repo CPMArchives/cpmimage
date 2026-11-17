@@ -2545,7 +2545,15 @@ void Window::showFilesystemCheck() {
                 }
                 fields["session"] = checkedSession;
             }
-            requestBrokerResult(std::move(fields), std::move(reply));
+            if (fields["op"] == "edit") {
+                if (busy) { reply({}, "Wait for the current image operation to finish."); return; }
+                connect(this, &Window::completed, this, [this, reply = std::move(reply)](bool ok) {
+                    reply({}, ok ? QString() : status->text());
+                }, Qt::SingleShotConnection);
+                begin(std::move(fields));
+            } else {
+                requestBrokerResult(std::move(fields), std::move(reply));
+            }
         },
         [this, checkedSession](int slot, QString revision) {
             if (session != checkedSession) return;
