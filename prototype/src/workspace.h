@@ -97,6 +97,7 @@ public:
 
     Window &addSession() {
         auto *page = new Window(runtime.root, runtime.python, runtime.helper, 30000, 2000, runtime.notices);
+        page->bindWorkbenchAction("compare-images", compareAction);
         page->menuBar()->setNativeMenuBar(false);
         page->menuBar()->hide();
         page->findChild<QWidget *>("imageName")->hide();
@@ -218,7 +219,7 @@ private:
         for (auto *action : menuBar()->actions()) menuBar()->removeAction(action);
         if (auto *page = qobject_cast<Window *>(tabs->currentWidget())) {
             const auto actions = page->menuBar()->actions();
-            for (const auto &title : {"File", "Edit", "View", "Settings", "Help"}) {
+            for (const auto &title : {"File", "Edit", "View", "Workbench", "Settings", "Help"}) {
                 for (auto *action : actions) {
                     auto *menu = action->menu();
                     if (!menu || menu->title() != QLatin1String(title)) continue;
@@ -229,10 +230,11 @@ private:
                     }
                     if (QLatin1String(title) == "View" && !menu->actions().contains(newTabAction)) {
                         if (!menu->actions().isEmpty()) menu->addSeparator();
-                        menu->addAction(compareAction);
                         menu->addAction(newTabAction);
                         menu->addAction(closeTabAction);
                     }
+                    if (QLatin1String(title) == "Workbench" && !menu->actions().contains(compareAction))
+                        menu->insertAction(page->filesystemCheckAction, compareAction);
                     menuBar()->addAction(action);
                     break;
                 }

@@ -214,15 +214,19 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     workbenchWidget->setObjectName("workbenchToolbar");
     auto *workbench = new QHBoxLayout(workbenchWidget);
     workbench->setContentsMargins(0, 0, 0, 0);
-    QList<std::pair<QLabel *, const char *>> workbenchIcons;
+    QList<std::pair<QPushButton *, const char *>> workbenchIcons;
     for (const auto &[label, icon] : {
              std::pair{"Analyze Disk", "analyze-disk"}, std::pair{"Physical Disk", "physical-disk"},
              std::pair{"Filesystem", "filesystem"}, std::pair{"Compare Images", "compare-images"},
              std::pair{"Check Filesystem", "check-filesystem"}}) {
-        auto *sample = new QLabel(workbenchWidget);
+        auto *sample = new QPushButton(workbenchWidget);
+        sample->setObjectName(QString("workbench-%1").arg(icon));
         sample->setAccessibleName(label);
-        sample->setToolTip(QString("%1 (preview)").arg(label));
-        sample->setContentsMargins(4, 4, 4, 4);
+        sample->setToolTip(label);
+        sample->setIconSize(QSize(64, 64));
+        sample->setFlat(true);
+        sample->setStyleSheet("QPushButton { border: none; background: transparent; padding: 4px; }"
+                              "QPushButton:focus { background: palette(mid); }");
         addCaption(workbench, sample, label);
         workbenchIcons.append({sample, icon});
     }
@@ -239,8 +243,8 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         };
         for (const auto &[button, icon] : toolbarButtons)
             button->setIcon(artwork(icon));
-        for (const auto &[label, icon] : workbenchIcons)
-            label->setPixmap(artwork(icon).pixmap(QSize(64, 64), label->devicePixelRatioF()));
+        for (const auto &[button, icon] : workbenchIcons)
+            button->setIcon(artwork(icon));
     };
     connect(QApplication::styleHints(), &QStyleHints::colorSchemeChanged,
             toolbarWidget, updateToolbarIcons, Qt::QueuedConnection);
@@ -531,15 +535,24 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
         setBusy(busy); updateSelectionStatus();
     });
     auto *view = menuBar()->addMenu("View");
-    physicalDiskAction = view->addAction("Physical Disk Inspector…");
+    auto *workbenchMenu = menuBar()->addMenu("Workbench");
+    diskAnalysisAction = workbenchMenu->addAction("Disk Analysis…");
+    diskAnalysisAction->setObjectName("diskAnalysisAction");
+    connect(diskAnalysisAction, &QAction::triggered, this, &Window::showDiskAnalysis);
+    physicalDiskAction = workbenchMenu->addAction("Physical Disk Inspector…");
     physicalDiskAction->setObjectName("physicalDiskInspectorAction");
     connect(physicalDiskAction, &QAction::triggered, this, &Window::showPhysicalDiskInspector);
-    filesystemInspectorAction = view->addAction("Filesystem Structure Inspector…");
+    filesystemInspectorAction = workbenchMenu->addAction("Filesystem Structure Inspector…");
     filesystemInspectorAction->setObjectName("filesystemStructureInspectorAction");
     connect(filesystemInspectorAction, &QAction::triggered, this, [this] { showFilesystemInspector(); });
-    filesystemCheckAction = view->addAction("Filesystem Check…");
+    filesystemCheckAction = workbenchMenu->addAction("Filesystem Check…");
     filesystemCheckAction->setObjectName("filesystemCheckAction");
     connect(filesystemCheckAction, &QAction::triggered, this, &Window::showFilesystemCheck);
+    bindWorkbenchAction("analyze-disk", diskAnalysisAction);
+    bindWorkbenchAction("physical-disk", physicalDiskAction);
+    bindWorkbenchAction("filesystem", filesystemInspectorAction);
+    bindWorkbenchAction("check-filesystem", filesystemCheckAction);
+    findChild<QPushButton *>("workbench-compare-images")->setEnabled(false);
     viewFileAction = view->addAction("View File…");
     viewFileAction->setObjectName("viewFileAction");
     connect(viewFileAction, &QAction::triggered, this, [this] { viewFile(); });
@@ -685,6 +698,7 @@ void Window::setBusy(bool value) {
     cancelButton->setVisible(busy);
     imageInfoButton->setEnabled(!busy && !session.isEmpty());
     imageInfoAction->setEnabled(!busy && !session.isEmpty());
+    diskAnalysisAction->setEnabled(!busy && !session.isEmpty());
     physicalDiskAction->setEnabled(!busy && !session.isEmpty());
     filesystemInspectorAction->setEnabled(!busy && !session.isEmpty());
     filesystemCheckAction->setEnabled(!busy);
@@ -2396,6 +2410,55 @@ void Window::showImageInformation() {
     if (container == "imd") text->append("\nIMD comment:\n" + imdComment.toHtmlEscaped());
     connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
     dialog.exec();
+}
+
+void Window::bindWorkbenchAction(const char *icon, QAction *action) {
+    auto *button = findChild<QPushButton *>(QString("workbench-%1").arg(icon));
+    button->setEnabled(action->isEnabled());
+    connect(action, &QAction::changed, button, [button, action] {
+        button->setEnabled(action->isEnabled());
+    });
+    connect(button, &QPushButton::clicked, action, &QAction::trigger);
+}
+
+void Window::showDiskAnalysis() {
+    if (busy || session.isEmpty()) return;
+    auto *dialog = new QDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowTitle("Disk Analysis");
+    dialog->resize(580, 420);
+    auto *layout = new QVBoxLayout(dialog);
+    auto *search = new QLineEdit(dialog);
+    search->setPlaceholderText("Search format candidates");
+    layout->addWidget(search);
+    auto *results = new QListWidget(dialog);
+    results->setObjectName("diskAnalysisCandidates");
+    layout->addWidget(results);
+    auto *summary = new QLabel("Checking the working RAW image…", dialog);
+    summary->setWordWrap(true);
+    layout->addWidget(summary);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, dialog);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::close);
+    connect(search, &QLineEdit::textChanged, results, [results](const QString &query) {
+        for (int i = 0; i < results->count(); ++i)
+            results->item(i)->setHidden(!results->item(i)->text().contains(query, Qt::CaseInsensitive));
+    });
+    dialog->show();
+    requestBrokerResult({{"op", "inspect"}, {"session", session}},
+                        [guard = QPointer(dialog), search, results, summary](const QJsonObject &result, const QString &error) {
+        if (!guard) return;
+        if (!error.isEmpty()) { summary->setText(error); return; }
+        const auto candidates = result["candidates"].toArray();
+        for (const auto &entry : candidates) {
+            const auto candidate = entry.toObject();
+            const auto label = candidate["id"].toString() + " — " + candidate["evidence"].toString();
+            auto *item = new QListWidgetItem(label, results);
+            item->setHidden(!label.contains(search->text(), Qt::CaseInsensitive));
+        }
+        summary->setText(candidates.isEmpty() ? "No plausible definitions found for the working RAW image."
+            : QString("%1 plausible definitions for the working RAW image.").arg(candidates.size()));
+    });
 }
 
 void Window::showFilesystemInspector(int slot, QString revision) {
