@@ -7,6 +7,7 @@
 #include <memory>
 #include "filename_policy.h"
 #include "export_plan.h"
+#include "image_comparison.h"
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QProcess>
@@ -56,6 +57,7 @@ protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 private:
     friend class Workspace;
+    std::function<QList<ImageComparison::Source>()> repairReferences;
     void begin(QJsonObject request);
     void requestBrokerResult(QJsonObject request, std::function<void(QJsonObject, QString)> reply);
     bool showDiskFormatEditor(const QString &selectedFormat = {}, const QString &draft = {});
