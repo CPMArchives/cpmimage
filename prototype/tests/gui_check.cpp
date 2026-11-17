@@ -1344,6 +1344,49 @@ private slots:
         QVERIFY(!done.takeFirst().first().toBool());
     }
 
+    void formatPickerOffersDraftsForReview() {
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        QFile catalogue(temp.filePath("diskdefs"));
+        QVERIFY(catalogue.open(QIODevice::WriteOnly));
+        catalogue.write("diskdef only-ibm\n seclen 128\n tracks 77\n sectrk 26\n"
+                        " blocksize 1024\n maxdir 64\n skew 6\n bootsec 52\n os 2.2\nend\n");
+        catalogue.close();
+        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                      qEnvironmentVariable("CPMIMAGE_HELPER"), 60000, 2000, {}, temp.filePath("settings.ini"));
+        window.show();
+        QSignalSpy done(&window, &Window::completed);
+        window.loadCatalogue(catalogue.fileName());
+        QVERIFY(done.wait(30000));
+        QVERIFY(done.takeFirst().first().toBool());
+
+        QTimer poll;
+        bool checked = false;
+        connect(&poll, &QTimer::timeout, &window, [&] {
+            auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            if (!dialog || dialog->windowTitle() != "Choose disk format") return;
+            poll.stop();
+            const auto close = qScopeGuard([dialog] { dialog->reject(); });
+            auto *list = dialog->findChild<QListWidget *>("formatPickerList");
+            auto *review = dialog->findChild<QPushButton *>("formatPickerEditor");
+            auto *buttons = dialog->findChild<QDialogButtonBox *>();
+            QVERIFY(list && review && buttons);
+            QVERIFY(list->count() > 1);
+            QVERIFY(list->currentItem()->text().contains("-byte blocks"));
+            QVERIFY(!list->currentItem()->text().contains("candidate-"));
+            QVERIFY(review->isEnabled());
+            QCOMPARE(review->text(), QString("Review Candidate…"));
+            QVERIFY(!buttons->button(QDialogButtonBox::Open)->isEnabled());
+            checked = true;
+        });
+        poll.start(20);
+        window.inspectImage(root + "/fixtures/ampro200-independent.dsk");
+        QVERIFY(done.wait(60000));
+        QVERIFY(checked);
+        QVERIFY(!done.takeFirst().first().toBool());
+    }
+
     void formatSelection() {
         QTemporaryDir temp;
         QVERIFY(temp.isValid());

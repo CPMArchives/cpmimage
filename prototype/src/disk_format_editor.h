@@ -21,6 +21,7 @@ public:
     DiskFormatEditor(Request request, const QJsonArray &catalogue,
                      const QString &imagePath, const QString &selectedFormat, QWidget *parent);
     void refreshRecords();
+    void importText(const QString &text);
     void setCatalogue(const QJsonArray &rows) { catalogue = rows; }
     void reject() override;
     bool savedDefinition() const { return saved; }
@@ -29,7 +30,6 @@ private:
     void send(QJsonObject request, Reply reply);
     void load(const QJsonObject &record);
     void updateDerived();
-    void importText(const QString &text);
     void showImportDiagnostics(const QJsonArray &items);
     void duplicateSelected();
     void runDefinition(const QString &operation);
