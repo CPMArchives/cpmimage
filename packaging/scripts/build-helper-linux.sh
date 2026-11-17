@@ -5,9 +5,15 @@ set -eu
 BASE=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 ROOT=$(CDPATH= cd -- "$BASE/.." && pwd)
 BUILD="$ROOT/prototype/build";PREFIX="$BUILD/deps"
+sh "$BASE/scripts/apply-libdsk-td0-patch.sh" "$BUILD/libdsk-1.4.2"
+if [ ! -f "$PREFIX/td0-reader-v1" ]; then
+ make -C "$BUILD/libdsk-1.4.2/lib" -j2
+ make -C "$BUILD/libdsk-1.4.2/lib" install
+ touch "$PREFIX/td0-reader-v1"
+fi
 python3 "$BASE/scripts/apply-cpmtools-patches.py" "$BUILD/cpmtools-2.23"
 make -C "$BUILD/cpmtools-2.23" cpmfs.o device_libdsk.o -j2
 cc -DCPMIMAGE_READ_ONLY_NAMES '-DDISKDEFS="diskdefs"' -I "$BUILD/cpmtools-2.23" -I "$PREFIX/include" -c "$BUILD/cpmtools-2.23/cpmfs.c" -o "$BUILD/cpmtools-2.23/cpmfs-readonly.o"
-cc -DCPMIMAGE_READ_ONLY -I "$BUILD/cpmtools-2.23" -I "$PREFIX/include" \
+cc -DCPMIMAGE_READ_ONLY -DCPMIMAGE_TELEDISK -I "$BUILD/cpmtools-2.23" -I "$PREFIX/include" \
  "$ROOT/experiments/process-comparison/helper.c" "$BUILD/cpmtools-2.23/cpmfs-readonly.o" "$BUILD/cpmtools-2.23/device_libdsk.o" \
  -L "$PREFIX/lib" -Wl,-rpath,"$PREFIX/lib" -ldsk -o "$BUILD/helper-readonly"

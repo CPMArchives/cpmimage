@@ -89,6 +89,9 @@ class Adapter:
   # Fault hooks are test-only, never accepted from a request.
   if self.fault:args=self.fault(list(map(str,args)))
   args=list(map(str,args));env=dict(os.environ,LC_ALL='C',TZ='UTC');env.pop('CPMTOOLSFMT',None)
+  if args[1:2] == ['teledisk-records']:
+   # LibDsk's mkstemp fallback otherwise uses /tmp, even on Windows.
+   env['TMPDIR'] = '.'
   if os.name=='nt':
    from windows_supervisor import supervise
    r=supervise(args,cwd,env,self.timeout,self.cancel)

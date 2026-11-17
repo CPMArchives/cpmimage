@@ -7,8 +7,9 @@ PREFIX="$BUILD/deps"
 mkdir -p "$BUILD" "$PREFIX"
 cd "$BUILD"
 tar xzf "$ROOT/vendor/cpmtools-2.23.tar.gz"
-if [ ! -f "$PREFIX/lib/libdsk.so" ]; then
+if [ ! -f "$PREFIX/lib/libdsk.so" ] || [ ! -f "$PREFIX/td0-reader-v1" ]; then
   tar xzf "$ROOT/vendor/libdsk-1.4.2.tar.gz"
+  sh "$ROOT/packaging/scripts/apply-libdsk-td0-patch.sh" "$BUILD/libdsk-1.4.2"
   cd libdsk-1.4.2
   cp ../cpmtools-2.23/config.guess config/config.guess
   cp ../cpmtools-2.23/config.sub config/config.sub
@@ -17,6 +18,7 @@ if [ ! -f "$PREFIX/lib/libdsk.so" ]; then
   make -C lib -j2
   make -C include install
   make -C lib install
+  touch "$PREFIX/td0-reader-v1"
   cd "$BUILD"
 fi
 if [ ! -f cpmtools-2.23/cpmfs.o ]; then
@@ -29,7 +31,7 @@ fi
 python3 "$ROOT/packaging/scripts/apply-cpmtools-patches.py" "$BUILD/cpmtools-2.23"
 make -C "$BUILD/cpmtools-2.23" cpmfs.o device_libdsk.o -j2
 cc -DCPMIMAGE_READ_ONLY_NAMES '-DDISKDEFS="diskdefs"' -I cpmtools-2.23 -I "$PREFIX/include" -c cpmtools-2.23/cpmfs.c -o cpmtools-2.23/cpmfs-readonly.o
-cc -DCPMIMAGE_READ_ONLY -I cpmtools-2.23 -I "$PREFIX/include" \
+cc -DCPMIMAGE_READ_ONLY -DCPMIMAGE_TELEDISK -I cpmtools-2.23 -I "$PREFIX/include" \
   "$ROOT/experiments/process-comparison/helper.c" cpmtools-2.23/cpmfs-readonly.o \
   cpmtools-2.23/device_libdsk.o -L "$PREFIX/lib" -Wl,-rpath,"$PREFIX/lib" \
   -ldsk -o helper-readonly

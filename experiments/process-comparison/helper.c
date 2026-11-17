@@ -248,9 +248,40 @@ static int edit(struct cpmSuperBlock *sb, struct cpmInode *root, const char *op,
   puts("{\"v\":1,\"ok\":true}");
   return 0;
 }
+#ifdef CPMIMAGE_TELEDISK
+extern dsk_err_t cpmimage_tele_scan(DSK_PDRIVER, FILE *);
+
+static int teledisk_records(const char *source, const char *destination)
+{
+  DSK_PDRIVER disk = NULL;
+  dsk_err_t error = dsk_open(&disk, source, "tele", NULL);
+  if (error) return fail("teledisk", dsk_strerror(error));
+  FILE *out = fopen(destination, "wb");
+  if (!out) error = DSK_ERR_SYSERR;
+  else
+  {
+    error = cpmimage_tele_scan(disk, out);
+    if (fclose(out) && !error) error = DSK_ERR_SYSERR;
+  }
+  dsk_err_t closed = dsk_close(&disk);
+  if (!error) error = closed;
+  if (error)
+  {
+    if (out) remove(destination);
+    return fail("teledisk", dsk_strerror(error));
+  }
+  puts("{\"v\":1,\"ok\":true}");
+  return 0;
+}
+#endif
+
 int main(int argc,char **argv) {
   struct cpmSuperBlock sb={0};struct cpmInode root,ino; const char *err;
 #ifdef CPMIMAGE_READ_ONLY
+#ifdef CPMIMAGE_TELEDISK
+  if (argc==4 && !strcmp(argv[1],"teledisk-records"))
+    return teledisk_records(argv[2], argv[3]);
+#endif
   if (argc==6 && (!strcmp(argv[1],"mapped-read") || !strcmp(argv[1],"mapped-write")) &&
       (!strcmp(argv[2],"imd") || !strcmp(argv[2],"jv3")))
     return mapped_transfer(argv[2],argv[3],argv[4],argv[5],!strcmp(argv[1],"mapped-write"));
