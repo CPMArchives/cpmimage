@@ -536,6 +536,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     });
     auto *view = menuBar()->addMenu("View");
     auto *workbenchMenu = menuBar()->addMenu("Workbench");
+    workbenchMenu->setObjectName("workbenchMenu");
     diskAnalysisAction = workbenchMenu->addAction("Disk Analysis…");
     diskAnalysisAction->setObjectName("diskAnalysisAction");
     connect(diskAnalysisAction, &QAction::triggered, this, &Window::showDiskAnalysis);
@@ -560,11 +561,12 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     const auto addToolbarToggle = [this, view](const char *label, const char *key,
                                                 QWidget *widget, bool defaultVisible) {
         auto *action = view->addAction(label);
+        action->setObjectName(key);
         action->setCheckable(true);
         action->setChecked(settings->value(key, defaultVisible).toBool());
         widget->setVisible(action->isChecked());
         connect(action, &QAction::toggled, this, [this, widget, key](bool visible) {
-            widget->setVisible(visible);
+            widget->setVisible(visible && (widget->objectName() != "workbenchToolbar" || workbenchEnabled));
             settings->setValue(key, visible);
         });
     };
@@ -585,7 +587,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     bundledCatalogueAction = fileMenu->addAction("Use bundled diskdefs");
     diskFormatEditorAction = fileMenu->addAction("Disk Format Editor…");
     diskFormatEditorAction->setObjectName("diskFormatEditorAction");
-    connect(diskFormatEditorAction, &QAction::triggered, this, [this] { showDiskFormatEditor(); });
+    connect(diskFormatEditorAction, &QAction::triggered, this, [this] { showDiskFormatEditor({}, {}, workspaceManaged); });
     connect(externalCatalogueAction, &QAction::triggered, this, [this] {
         const auto path = QFileDialog::getOpenFileName(this, "Load diskdefs catalogue", cataloguePath);
         if (!path.isEmpty()) loadCatalogue(path);
@@ -622,6 +624,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
 }
 
 Window::~Window() {
+    process.disconnect(this);
     process.closeWriteChannel();
     if (!process.waitForFinished(250)) { stopReader(); process.waitForFinished(2000); }
 #ifdef Q_OS_WIN
@@ -686,7 +689,7 @@ void Window::setBusy(bool value) {
     formats->setEnabled(!busy && !image.isEmpty() && !catalogueRows.isEmpty());
     externalCatalogueAction->setEnabled(!busy);
     bundledCatalogueAction->setEnabled(!busy);
-    diskFormatEditorAction->setEnabled(!busy);
+    diskFormatEditorAction->setEnabled(workbenchEnabled && !busy);
     table->setEnabled(!busy && !session.isEmpty());
     userAreas->setEnabled(!busy && !session.isEmpty());
     showAllAction->setEnabled(userAreas->isEnabled());
@@ -698,10 +701,10 @@ void Window::setBusy(bool value) {
     cancelButton->setVisible(busy);
     imageInfoButton->setEnabled(!busy && !session.isEmpty());
     imageInfoAction->setEnabled(!busy && !session.isEmpty());
-    diskAnalysisAction->setEnabled(!busy && !session.isEmpty());
-    physicalDiskAction->setEnabled(!busy && !session.isEmpty());
-    filesystemInspectorAction->setEnabled(!busy && !session.isEmpty());
-    filesystemCheckAction->setEnabled(!busy);
+    diskAnalysisAction->setEnabled(workbenchEnabled && !busy && !session.isEmpty());
+    physicalDiskAction->setEnabled(workbenchEnabled && !busy && !session.isEmpty());
+    filesystemInspectorAction->setEnabled(workbenchEnabled && !busy && !session.isEmpty());
+    filesystemCheckAction->setEnabled(workbenchEnabled && !busy);
     progress->setVisible(busy && batchActive);
     emit comparisonAvailabilityChanged();
 }
@@ -1019,29 +1022,60 @@ void Window::requestBrokerResult(QJsonObject request, std::function<void(QJsonOb
     begin(std::move(request));
 }
 
-bool Window::showDiskFormatEditor(const QString &selectedFormat, const QString &draft) {
-    if (busy) return false;
-    DiskFormatEditor editor([this](auto request, auto reply) {
+void Window::setWorkbenchEnabled(bool enabled) {
+    workbenchEnabled = enabled;
+    findChild<QMenu *>("workbenchMenu")->menuAction()->setVisible(enabled);
+    diskFormatEditorAction->setVisible(enabled);
+    auto *toolbar = findChild<QAction *>("workbenchToolbarVisible");
+    toolbar->setVisible(enabled);
+    findChild<QWidget *>("workbenchToolbar")->setVisible(enabled && toolbar->isChecked());
+    setBusy(busy);
+}
+
+void Window::registerWorkbenchDialog(QDialog *dialog) {
+    if (!workspaceManaged) return;
+    dialog->setProperty("workbenchWindow", true);
+    dialog->setWindowModality(Qt::NonModal);
+}
+
+bool Window::showDiskFormatEditor(const QString &selectedFormat, const QString &draft, bool modeless) {
+    if (busy || !workbenchEnabled) return false;
+    auto *editor = new DiskFormatEditor([this](auto request, auto reply) {
         requestBrokerResult(std::move(request), std::move(reply));
     }, catalogueRows, requestedImage.isEmpty() ? image : requestedImage, selectedFormat, this);
-    auto load = [&] {
+    auto load = [this, editor, draft] {
         if (!draft.isEmpty()) {
-            editor.importText(draft);
+            editor->importText(draft);
             return;
         }
         if (catalogueRows.isEmpty() || process.state() == QProcess::NotRunning) {
             requestBrokerResult({{"op", "catalogue"}, {"path", cataloguePath}},
-                          [this, guard = QPointer<DiskFormatEditor>(&editor)](auto result, auto failure) {
+                          [this, guard = QPointer<DiskFormatEditor>(editor)](auto result, auto failure) {
                 if (failure.isEmpty()) acceptCatalogue(result);
                 if (!guard) return;
                 guard->setCatalogue(catalogueRows);
                 guard->refreshRecords();
             });
-        } else editor.refreshRecords();
+        } else editor->refreshRecords();
     };
-    QTimer::singleShot(0, &editor, load);
-    editor.exec();
-    if (!editor.savedDefinition()) return false;
+    QTimer::singleShot(0, editor, load);
+    if (modeless) {
+        editor->setAttribute(Qt::WA_DeleteOnClose);
+        registerWorkbenchDialog(editor);
+        connect(editor, &QDialog::finished, this, [this, editor] {
+            if (editor->savedDefinition()) requestBrokerResult({{"op", "catalogue"}, {"path", cataloguePath}},
+                [this](auto result, auto failure) {
+                    if (failure.isEmpty()) acceptCatalogue(result);
+                    else status->setText(failure);
+                });
+        });
+        editor->show();
+        return false;
+    }
+    editor->exec();
+    const bool saved = editor->savedDefinition();
+    delete editor;
+    if (!saved) return false;
     // Refresh inside a short nested event loop so an already-open picker can
     // keep its original image selection and repopulate immediately.
     QEventLoop loop;
@@ -1155,6 +1189,7 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
     auto *editFormats = new QPushButton("Disk Format Editor…");
     editFormats->setObjectName("formatPickerEditor");
     editFormats->setAutoDefault(false);
+    editFormats->setVisible(workbenchEnabled);
     layout->addWidget(editFormats);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Open | QDialogButtonBox::Cancel);
     layout->addWidget(buttons);
@@ -1238,9 +1273,11 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
             }
         }
         if (!findingsInvalidated && inspection["proposal_tested"].toInt() > 0)
-            lines << QString("No catalogue match for %1. %2 layouts passed the directory and consistency checks. Appearance here does not verify file contents. Select a layout and choose Review Candidate…")
+            lines << QString("No catalogue match for %1. %2 layouts passed the directory and consistency checks. Appearance here does not verify file contents. %3")
                          .arg(QFileInfo(requestedImage.isEmpty() ? image : requestedImage).fileName())
-                         .arg(inspection["proposal_matches"].toInt());
+                         .arg(inspection["proposal_matches"].toInt())
+                         .arg(workbenchEnabled ? "Select a layout and choose Review Candidate…"
+                                               : "Enable Workbench in Settings before opening the image to review drafts.");
         if (!findingsInvalidated && !inspection["proposal_note"].toString().isEmpty())
             lines << inspection["proposal_note"].toString();
         if (rejectedCount > 0 && group->currentIndex() != proposalsGroup) {
@@ -2447,7 +2484,7 @@ void Window::bindWorkbenchAction(const char *icon, QAction *action) {
 }
 
 void Window::showDiskAnalysis() {
-    if (busy || session.isEmpty()) return;
+    if (!workbenchEnabled || busy || session.isEmpty()) return;
     auto *dialog = new QDialog(this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setWindowTitle("Disk Analysis");
@@ -2471,7 +2508,7 @@ void Window::showDiskAnalysis() {
     connect(review, &QPushButton::clicked, dialog, [this, results, dialog] {
         if (const auto *item = results->currentItem()) {
             const auto draft = item->data(Qt::UserRole).toString();
-            if (!draft.isEmpty() && showDiskFormatEditor({}, draft)) dialog->close();
+            if (!draft.isEmpty() && showDiskFormatEditor({}, draft, workspaceManaged)) dialog->close();
         }
     });
     layout->addWidget(buttons);
@@ -2482,6 +2519,7 @@ void Window::showDiskAnalysis() {
         if (const auto *item = results->currentItem())
             review->setEnabled(!item->isHidden() && !item->data(Qt::UserRole).toString().isEmpty());
     });
+    registerWorkbenchDialog(dialog);
     dialog->show();
     requestBrokerResult({{"op", "inspect"}, {"session", session}},
                         [guard = QPointer(dialog), search, results, summary](const QJsonObject &result, const QString &error) {
@@ -2510,7 +2548,7 @@ void Window::showDiskAnalysis() {
 }
 
 void Window::showFilesystemInspector(int slot, QString revision, int allocationBlock) {
-    if (busy || session.isEmpty()) return;
+    if (!workbenchEnabled || busy || session.isEmpty()) return;
     const auto inspectedSession = session;
     auto *dialog = new FilesystemInspector([this, inspectedSession](QJsonObject fields, auto reply) {
         if (session != inspectedSession) {
@@ -2528,11 +2566,12 @@ void Window::showFilesystemInspector(int slot, QString revision, int allocationB
             }
             showPhysicalDiskInspector(block, std::move(token));
         });
+    registerWorkbenchDialog(dialog);
     dialog->show();
 }
 
 void Window::showFilesystemCheck() {
-    if (busy) return;
+    if (!workbenchEnabled || busy) return;
     const auto checkedSession = session;
     auto *dialog = new FilesystemCheckDialog(
         checkedSession.isEmpty() ? QString() : QFileInfo(image).fileName(), format,
@@ -2563,11 +2602,12 @@ void Window::showFilesystemCheck() {
             if (session != checkedSession) return;
             showFilesystemInspector(-1, std::move(revision), block);
         }, this, repairReferences ? repairReferences() : QList<ImageComparison::Source>{});
+    registerWorkbenchDialog(dialog);
     dialog->show();
 }
 
 void Window::showPhysicalDiskInspector(int block, QString revision) {
-    if (busy || session.isEmpty()) return;
+    if (!workbenchEnabled || busy || session.isEmpty()) return;
     const auto inspectedSession = session;
     QJsonObject request{{"op", "source_metadata"}, {"session", inspectedSession}};
     if (block >= 0) {
@@ -2576,7 +2616,7 @@ void Window::showPhysicalDiskInspector(int block, QString revision) {
     }
     requestBrokerResult(std::move(request),
                         [this, inspectedSession](const QJsonObject &result, const QString &failure) {
-        if (session != inspectedSession || !isVisible()) return;
+        if (session != inspectedSession || !isVisible() || !workbenchEnabled) return;
         if (!failure.isEmpty()) {
             QMessageBox::warning(this, "Physical Disk Inspector", failure);
             return;
@@ -2677,7 +2717,7 @@ void Window::showPhysicalDiskInspector(int block, QString revision) {
                                     [guard = QPointer<QDialog>(dialog), address, count = track["sector_count"].toInt(),
                                      trackPicker, trackStatus, sectors, blockSectors]
                                     (const QJsonObject &details, const QString &error) {
-                    if (!guard || !guard->isVisible()) return;
+                    if (!guard || (!guard->isVisible() && !guard->property("workbenchHidden").toBool())) return;
                     trackPicker->setEnabled(true);
                     if (!error.isEmpty()) {
                         trackStatus->setText(error);
@@ -2718,6 +2758,7 @@ void Window::showPhysicalDiskInspector(int block, QString revision) {
         auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, dialog);
         layout->addWidget(buttons);
         connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
+        registerWorkbenchDialog(dialog);
         dialog->show();
         if (loadFirstTrack) loadFirstTrack();
     });
@@ -2779,6 +2820,7 @@ void Window::fail(const QString &message, const QJsonObject &details) {
         setBusy(false);
         status->setText(message);
         reply(details, message);
+        if (!busy && closing) QTimer::singleShot(0, this, std::exchange(closing, {}));
         return;
     }
     previewDirectory.reset();
@@ -2846,6 +2888,7 @@ void Window::readReply() {
                          operation.startsWith("comparison_"))
                         ? "Image ready." : "Disk definitions ready.");
         handler(result, {});
+        if (!busy && closing) QTimer::singleShot(0, this, std::exchange(closing, {}));
         return;
     }
     if (!reply["result"].isObject()) { invalid(); return; }
@@ -3046,6 +3089,7 @@ bool Window::closeSession(std::function<void()> retry) {
     return accepted;
 }
 void Window::closeEvent(QCloseEvent *event) {
+    if (canCloseWorkbench && !canCloseWorkbench()) { event->ignore(); return; }
     auto retry = std::exchange(closeRetry, {});
     if (!retry) retry = [this] { close(); };
     if (busy) { closing = std::move(retry); cancel(); event->ignore(); }

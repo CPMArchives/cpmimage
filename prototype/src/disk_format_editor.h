@@ -24,6 +24,7 @@ public:
     void importText(const QString &text);
     void setCatalogue(const QJsonArray &rows) { catalogue = rows; }
     void reject() override;
+    bool hasUnsavedWork() const { return record() != baseline; }
     bool savedDefinition() const { return saved; }
 
 private:
@@ -40,7 +41,7 @@ private:
 
     Request request;
     QJsonArray catalogue, records;
-    QJsonObject current, checkedMapping, checkedGeometry;
+    QJsonObject baseline, current, checkedMapping, checkedGeometry;
     QComboBox *selection, *os, *bootUnit, *skewMode, *offsetUnit;
     QLineEdit *identifier, *displayName, *libdsk, *slotOrder, *image;
     QSpinBox *sectorSize, *tracks, *sectors, *blockSize, *entries, *directoryBlocks,

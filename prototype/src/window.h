@@ -23,6 +23,8 @@ class QAction;
 class TransferFiles;
 
 class QTemporaryDir;
+class QDialog;
+
 class Window : public QMainWindow {
     Q_OBJECT
 public:
@@ -60,7 +62,12 @@ private:
     std::function<QList<ImageComparison::Source>()> repairReferences;
     void begin(QJsonObject request);
     void requestBrokerResult(QJsonObject request, std::function<void(QJsonObject, QString)> reply);
-    bool showDiskFormatEditor(const QString &selectedFormat = {}, const QString &draft = {});
+    bool showDiskFormatEditor(const QString &selectedFormat = {}, const QString &draft = {}, bool modeless = false);
+    void registerWorkbenchDialog(QDialog *dialog);
+    void setWorkbenchEnabled(bool enabled);
+    bool workbenchEnabled = true;
+    bool workspaceManaged = false;
+    std::function<bool()> canCloseWorkbench;
     void acceptCatalogue(const QJsonObject &result);
     void readReply();
     void fail(const QString &message, const QJsonObject &details = {});
