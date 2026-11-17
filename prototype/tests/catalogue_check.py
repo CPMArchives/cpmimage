@@ -97,13 +97,62 @@ class CatalogueCheck(unittest.TestCase):
         self.assertTrue(result['ok'], result)
         candidates = result['result']['candidates']
         self.assertIn('ibm-3740', [row['id'] for row in candidates])
-        ranking = []
-        for row in candidates:
-            evidence = row['evidence']
-            shortened = evidence.startswith('Short RAW')
-            missing = int(evidence.split('(')[1].split()[0].replace(',', '')) if shortened else 0
-            ranking.append((shortened, 'empty directory' in evidence, missing, row['id']))
+        ranking = [(*row['evaluation']['rank'], row['id']) for row in candidates]
         self.assertEqual(ranking, sorted(ranking))
+        ibm = next(row for row in candidates if row['id'] == 'ibm-3740')
+        self.assertEqual(ibm['evaluation']['consistency']['status'], 'clean')
+
+    def test_no_catalogue_match_produces_reviewable_dsk_drafts(self):
+        path = self.directory / 'reduced'
+        path.write_text(CUSTOM)
+        self.assertTrue(self.request('catalogue', path=str(path))['ok'])
+        image = self.directory / 'sample.dsk'
+        shutil.copyfile(ROOT / 'fixtures/ampro200-independent.dsk', image)
+        original = image.read_bytes()
+        result = self.request('inspect', image=str(image))['result']
+        self.assertEqual(result['candidates'], [])
+        self.assertGreater(result['proposal_matches'], 1)
+        drafts = result['proposed']
+        self.assertLessEqual(len(drafts), 12)
+        self.assertTrue(any(' bootsec 20\n' in row['definition'] and
+                            ' blocksize 2048\n' in row['definition'] for row in drafts))
+        self.assertTrue(all(' sectrk 10\n' in row['definition'] for row in drafts))
+        self.assertEqual(self.request('open', image=str(image), format=drafts[0]['id'], container='dsk')['error'],
+                         'unknown_format')
+        imported = self.request('definition_import', text=drafts[0]['definition'])
+        self.assertTrue(imported['ok'], imported)
+        self.assertEqual(imported['result']['record']['identifier'], drafts[0]['id'])
+        self.assertEqual(image.read_bytes(), original)
+        explicit = self.request('inspect', image=str(image), explicit_format='custom-3740')['result']
+        self.assertEqual(explicit['proposal_tested'], 0)
+
+        reference = next(row for row in json.loads((ROOT / 'fixtures/manifest.json').read_text())
+                         if row['file'] == 'ampro200-independent.dsk')
+        for directory_entries in (32, 64):
+            draft = next(row for row in drafts
+                         if all(line in row['definition'] for line in
+                                (' blocksize 2048\n', f' maxdir {directory_entries}\n',
+                                 ' bootsec 20\n', ' skew 0\n')))
+            path.write_text(draft['definition'])
+            self.assertTrue(self.request('catalogue', path=str(path))['ok'])
+            opened = self.request('open', image=str(image), format=draft['id'], container='dsk')
+            self.assertTrue(opened['ok'], opened)
+            for name, expected in reference['expected'].items():
+                destination = self.directory / f'{directory_entries}-{name}'
+                exported = self.request('export', session=opened['result']['session'],
+                                        name=name.upper(), destination=str(destination))
+                self.assertTrue(exported['ok'], exported)
+                payload = destination.read_bytes()
+                self.assertEqual(len(payload), expected['export_size'])
+                self.assertEqual(hashlib.sha256(payload).hexdigest(), expected['export_sha256'])
+        self.assertEqual(image.read_bytes(), original)
+
+    def test_raw_without_known_geometry_does_not_guess(self):
+        self.image.write_bytes(bytes(256))
+        inspected = self.request('inspect', image=str(self.image))['result']
+        self.assertFalse(inspected['candidates'])
+        self.assertFalse(inspected['proposed'])
+        self.assertIn('verified', inspected['proposal_note'])
 
     def test_short_raw_prefers_closer_populated_geometry(self):
         catalogue = self.directory / 'short-raw-definitions'

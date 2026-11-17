@@ -7,6 +7,7 @@ Only one operation runs at a time; cancellation is cooperative through the paren
 import argparse
 from dataclasses import asdict
 import hashlib
+from itertools import product
 import json
 import os
 from pathlib import Path
@@ -582,6 +583,81 @@ def main():
         evaluation.update(evidence=evidence, rank=[int(bool(missing)), bool(missing and not entries), missing])
         return evaluation, probe['result'], mapping
 
+    def consistency_evidence(raw, fmt, definition, directory):
+        (directory / 'diskdefs').write_text(definition, encoding='utf-8')
+        try:
+            report = adapter().native(directory, 'filesystem-check', raw, fmt, 'raw')
+        except backend.Failure as error:
+            if error.code == 'cancelled' or stop.is_set():
+                raise
+            return 'unavailable', 0
+        return report['status'], report['finding_count']
+
+    def propose_diskdefs(source, data, container, directory, rid, *, inventory, working):
+        # RAW length alone cannot establish track geometry. A working session
+        # supplies its selected geometry; structured input can supply observed geometry.
+        if working and not session['geometry'].get('boot_geometry') and not session['geometry']['offset']:
+            geometry = session['geometry']
+            size, tracks, sectors = (geometry[key] for key in ('sector_size', 'tracks', 'sectors_per_track'))
+            reserved = tuple(dict.fromkeys((geometry['boot_sectors'], sectors, 2 * sectors)))
+            skews = tuple(dict.fromkeys((tuple(geometry['skew_table']), 0, 6)))
+            blocks = tuple(dict.fromkeys((geometry['block_size'], 1024, 2048)))
+            entries = tuple(dict.fromkeys((geometry['directory_entries'], 32, 64)))
+        elif container == 'dsk':
+            size, tracks, sectors = 512, 40, 10
+            reserved, skews, blocks, entries = (0, 10, 20), (0, 2, 6), (1024, 2048, 4096), (32, 64, 128)
+        elif container == 'td0' and inventory and set(inventory) == {(i, 0) for i in range(len(inventory))}:
+            tracks = len(inventory)
+            first = inventory[0, 0]
+            sizes = {len(payload) for payload in first.values()}
+            if len(sizes) != 1:
+                return [], 0, 0, 'The observed sector sizes are mixed.'
+            size, sectors = sizes.pop(), len(first)
+            reserved, skews, blocks, entries = (0, sectors, 2 * sectors), (0, 2, 6), (1024, 2048, 4096), (32, 64, 128)
+        else:
+            return [], 0, 0, 'A verified supported layout or a working-image geometry is needed for candidate search.'
+
+        proposals, tested, matches = [], 0, 0
+        for boot, skew, block, count in product(reserved, skews, blocks, entries):
+            if stop.is_set():
+                raise backend.Failure('cancelled')
+            if block < size or block % size or boot >= tracks * sectors:
+                continue
+            if isinstance(skew, tuple):
+                # Omit long explicit tables rather than exceed cpmtools' line limit.
+                skew_line = 'skewtab ' + ','.join(map(str, skew))
+                if len(skew_line) > 250:
+                    continue
+            else:
+                skew_line = f'skew {skew}'
+            body = (f' seclen {size}\n tracks {tracks}\n sectrk {sectors}\n blocksize {block}\n'
+                    f' maxdir {count}\n bootsec {boot}\n {skew_line}\n os 2.2\nend\n')
+            identifier = 'candidate-' + hashlib.sha256(body.encode('ascii')).hexdigest()[:12]
+            if identifier in definitions:
+                continue
+            definition = f'diskdef {identifier}\n' + body
+            tested += 1
+            try:
+                geometry = describe(identifier, definition, directory)
+                evaluation, listing, _ = evaluate_candidate(
+                    source, data, container, identifier, definition, geometry, directory, rid,
+                    inventory=inventory, detecting=True)
+            except backend.Failure as error:
+                if error.code == 'cancelled':
+                    raise
+                continue
+            if not listing['entries'] or evaluation['layout'].get('missing_bytes'):
+                continue
+            status, _ = consistency_evidence(directory / 'candidate.raw', identifier, definition, directory)
+            if status != 'clean':
+                continue
+            matches += 1
+            if len(proposals) < 12:
+                proposals.append(dict(id=identifier, definition=definition,
+                                      evidence=f'{block:,}-byte blocks · {count} directory entries · {boot} boot sectors · '
+                                               + ('Explicit skew table' if isinstance(skew, tuple) else f'Skew {skew}')))
+        return proposals, tested, matches, ''
+
     def validate_investigation_container(data, container):
         if data.startswith(b'EXTENDED CPC DSK File'):
             raise backend.Failure('unsupported_container', 'Extended CPCEMU DSK is outside the supported container scope.')
@@ -820,6 +896,7 @@ def main():
                             warning = error.message
                     inventory = teledisk_inventory(data, directory) if container == 'td0' else None
                     ranked, rejected = [], []
+                    proposed, tested, matches, proposal_note = [], 0, 0, ''
                     rejected_count = 0
                     mapping_warning = False
                     choices = () if selected or explicit else sorted(definitions.items())
@@ -842,13 +919,27 @@ def main():
                                 rejected.append(dict(id=fmt, stage=stage, code=finding['code'],
                                                      detail=finding['message'][:240]))
                             continue
+                        consistency, count = ('not checked', 0)
+                        if evaluation['directory']['entries']:
+                            consistency, count = consistency_evidence(directory / 'candidate.raw', fmt, definition, directory)
+                        evaluation['consistency'] = dict(status=consistency, findings=count)
+                        quality = {'clean': 0, 'not checked': 1, 'findings': 2}.get(consistency, 3)
+                        evaluation['rank'].extend((quality, count))
+                        if consistency in ('clean', 'findings'):
+                            evaluation['evidence'] += (' · consistency check passed' if consistency == 'clean'
+                                                       else f' · {count} consistency findings')
                         maker, model, family = metadata.get(fmt, ('', '', ''))
                         ranked.append((*evaluation['rank'], fmt, dict(id=fmt, manufacturer=maker,
                             model=model, family=family, evidence=evaluation['evidence'],
                             definition_sha256=catalogue.digest(definition), evaluation=evaluation)))
                     candidates = [row for *_, row in sorted(ranked)]
+                    if not candidates and not selected and not explicit:
+                        proposed, tested, matches, proposal_note = propose_diskdefs(
+                            source, data, container, directory, rid, inventory=inventory, working=working)
                 result = dict(container=container, source_sha256=fingerprint, candidates=candidates,
                               rejected=rejected, rejected_count=rejected_count,
+                              proposed=proposed, proposal_tested=tested, proposal_matches=matches,
+                              proposal_note=proposal_note,
                               sidecar_warning=warning,
                               detection_warning=('No verified container mapping found during detection. '
                                                  'Select a definition to check its mapping and sector diagnostics.'

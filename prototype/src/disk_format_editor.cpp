@@ -185,11 +185,13 @@ DiskFormatEditor::DiskFormatEditor(Request request, const QJsonArray &catalogue,
     connect(image, &QLineEdit::textChanged, this, [this] { invalidateImageCheck(); });
 
     auto *results = fieldGroup("Results");
+    results->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     auto label = [&](const QString &title, const QString &name) {
         auto *control = new QLabel;
         control->setObjectName(name);
         control->setTextFormat(Qt::PlainText);
         control->setWordWrap(true);
+        control->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
         results->addRow(title, control);
         return control;
     };

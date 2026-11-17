@@ -1019,12 +1019,16 @@ void Window::requestBrokerResult(QJsonObject request, std::function<void(QJsonOb
     begin(std::move(request));
 }
 
-bool Window::showDiskFormatEditor(const QString &selectedFormat) {
+bool Window::showDiskFormatEditor(const QString &selectedFormat, const QString &draft) {
     if (busy) return false;
     DiskFormatEditor editor([this](auto request, auto reply) {
         requestBrokerResult(std::move(request), std::move(reply));
     }, catalogueRows, requestedImage.isEmpty() ? image : requestedImage, selectedFormat, this);
     auto load = [&] {
+        if (!draft.isEmpty()) {
+            editor.importText(draft);
+            return;
+        }
         if (catalogueRows.isEmpty() || process.state() == QProcess::NotRunning) {
             requestBrokerResult({{"op", "catalogue"}, {"path", cataloguePath}},
                           [this, guard = QPointer<DiskFormatEditor>(&editor)](auto result, auto failure) {
@@ -1131,6 +1135,9 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
     layout->addWidget(search);
     auto *group = new QComboBox;
     group->addItems({"Plausible candidates", "All formats", "Manufacturer and model", "System family", "Favorites"});
+    auto proposals = inspection["proposed"].toArray();
+    constexpr int proposalsGroup = 5;
+    if (!proposals.isEmpty()) group->addItem("Proposed definitions");
     layout->addWidget(group);
     auto *list = new QListWidget;
     list->setObjectName("formatPickerList");
@@ -1153,11 +1160,17 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    connect(list, &QListWidget::itemDoubleClicked, &dialog, &QDialog::accept);
+    connect(list, &QListWidget::itemDoubleClicked, &dialog, [&] {
+        if (buttons->button(QDialogButtonBox::Open)->isEnabled()) dialog.accept();
+    });
     auto updateButtons = [&] {
         const bool enabled = list->currentItem();
-        buttons->button(QDialogButtonBox::Open)->setEnabled(enabled);
-        favorite->setEnabled(enabled);
+        const bool reviewing = group->currentIndex() == proposalsGroup;
+        buttons->button(QDialogButtonBox::Open)->setEnabled(enabled && !reviewing);
+        favorite->setVisible(!reviewing);
+        favorite->setEnabled(enabled && !reviewing);
+        editFormats->setEnabled(!reviewing || enabled);
+        editFormats->setText(reviewing ? "Review Candidate…" : "Disk Format Editor…");
     };
     connect(list, &QListWidget::currentItemChanged, &dialog, updateButtons);
     const auto diagnostic = inspection["detection_warning"].toString();
@@ -1187,7 +1200,7 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
                 const auto evaluation = candidate["evaluation"].toObject();
                 const auto rank = evaluation["rank"].toArray();
                 lines << QString("Rank %1 of %2 plausible candidates.").arg(index + 1).arg(candidates.size());
-                if (rank.size() == 3 && candidates.size() > 1) {
+                if (rank.size() >= 3 && candidates.size() > 1) {
                     const auto rankAt = [&candidates](int position) {
                         return candidates.at(position).toObject()["evaluation"].toObject()["rank"].toArray();
                     };
@@ -1197,7 +1210,7 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
                     } else {
                         const int other = index > 0 ? index - 1 : 1;
                         const auto compared = rankAt(other);
-                        if (compared.size() == 3) {
+                        if (compared.size() >= 3) {
                             const auto direction = index > 0 ? "Ranks below" : "Ranks above";
                             const auto otherId = candidates.at(other).toObject()["id"].toString();
                             QString reason;
@@ -1207,6 +1220,8 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
                                 reason = "for short images, a populated directory ranks ahead of an empty directory";
                             else if (rank.at(2) != compared.at(2))
                                 reason = "fewer missing bytes rank higher";
+                            else if (rank != compared)
+                                reason = "filesystem consistency provides stronger evidence";
                             if (!reason.isEmpty())
                                 lines << QString("%1 %2 because %3.").arg(direction, otherId, reason);
                         }
@@ -1222,7 +1237,13 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
                 if (!detail.isEmpty()) lines << detail;
             }
         }
-        if (rejectedCount > 0) {
+        if (!findingsInvalidated && inspection["proposal_tested"].toInt() > 0)
+            lines << QString("No catalogue match for %1. %2 layouts passed the directory and consistency checks. Appearance here does not verify file contents. Select a layout and choose Review Candidate…")
+                         .arg(QFileInfo(requestedImage.isEmpty() ? image : requestedImage).fileName())
+                         .arg(inspection["proposal_matches"].toInt());
+        if (!findingsInvalidated && !inspection["proposal_note"].toString().isEmpty())
+            lines << inspection["proposal_note"].toString();
+        if (rejectedCount > 0 && group->currentIndex() != proposalsGroup) {
             lines << QString("%1 definitions rejected. Select a definition in All formats to see its available findings.")
                      .arg(rejectedCount);
         }
@@ -1241,7 +1262,7 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
                                                   : (switching ? format : QString());
         list->clear();
         const int mode = group->currentIndex();
-        const auto rows = mode == 0 ? candidates : catalogueRows;
+        const auto rows = mode == 0 ? candidates : (mode == proposalsGroup ? proposals : catalogueRows);
         for (const auto &value : rows) {
             const auto row = value.toObject();
             const auto id = row["id"].toString();
@@ -1255,17 +1276,18 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
             if (mode == 2) label = maker + " / " + model + " — " + id;
             if (mode == 3) label = family + " — " + id;
             if (mode == 0 && row.contains("evidence")) label += " — " + row["evidence"].toString();
+            if (mode == proposalsGroup) label = row["evidence"].toString();
             auto *item = new QListWidgetItem(label, list);
             item->setData(Qt::UserRole, row);
             if (favorites.contains(id)) item->setToolTip("Favorite");
             if (id == selected) list->setCurrentItem(item);
         }
-        if (mode != 0) list->sortItems();
+        if (mode != 0 && mode != proposalsGroup) list->sortItems();
         if (!list->currentItem() && list->count()) list->setCurrentRow(0);
         updateButtons();
         showFindings();
     };
-    group->setCurrentIndex(candidates.isEmpty() ? 1 : 0);
+    group->setCurrentIndex(candidates.isEmpty() ? (proposals.isEmpty() ? 1 : proposalsGroup) : 0);
     connect(group, &QComboBox::currentIndexChanged, &dialog, populate);
     connect(search, &QLineEdit::textChanged, &dialog, populate);
     connect(favorite, &QPushButton::clicked, &dialog, [&] {
@@ -1275,10 +1297,13 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
         populate();
     });
     connect(editFormats, &QPushButton::clicked, &dialog, [&] {
-        const auto selected = list->currentItem() ? list->currentItem()->data(Qt::UserRole).toJsonObject()["id"].toString() : QString();
-        if (showDiskFormatEditor(selected)) {
+        const auto row = list->currentItem() ? list->currentItem()->data(Qt::UserRole).toJsonObject() : QJsonObject();
+        const auto draft = row["definition"].toString();
+        if (showDiskFormatEditor(draft.isEmpty() ? row["id"].toString() : QString(), draft)) {
             findingsInvalidated = findingsInvalidated || !candidates.isEmpty() || rejectedCount > 0;
             candidates = {};
+            proposals = {};
+            if (group->count() > proposalsGroup) group->removeItem(proposalsGroup);
             candidatePositions.clear();
             rejected.clear();
             rejectedCount = 0;
@@ -1288,7 +1313,7 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
     });
     populate();
     const bool creating = std::exchange(newImagePicker, false);
-    if (dialog.exec() == QDialog::Accepted && list->currentItem()) {
+    if (dialog.exec() == QDialog::Accepted && list->currentItem() && group->currentIndex() != proposalsGroup) {
         if (creating) {
             newDefinition = list->currentItem()->data(Qt::UserRole).toJsonObject();
             auto options = initializeOptions(newDefinition["geometry"].toObject());
@@ -2438,11 +2463,24 @@ void Window::showDiskAnalysis() {
     summary->setWordWrap(true);
     layout->addWidget(summary);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, dialog);
+    auto *review = buttons->addButton("Review Candidate…", QDialogButtonBox::ActionRole);
+    review->setEnabled(false);
+    connect(results, &QListWidget::currentItemChanged, review, [review](const QListWidgetItem *item) {
+        review->setEnabled(item && !item->isHidden() && !item->data(Qt::UserRole).toString().isEmpty());
+    });
+    connect(review, &QPushButton::clicked, dialog, [this, results, dialog] {
+        if (const auto *item = results->currentItem()) {
+            const auto draft = item->data(Qt::UserRole).toString();
+            if (!draft.isEmpty() && showDiskFormatEditor({}, draft)) dialog->close();
+        }
+    });
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::close);
-    connect(search, &QLineEdit::textChanged, results, [results](const QString &query) {
+    connect(search, &QLineEdit::textChanged, results, [results, review](const QString &query) {
         for (int i = 0; i < results->count(); ++i)
             results->item(i)->setHidden(!results->item(i)->text().contains(query, Qt::CaseInsensitive));
+        if (const auto *item = results->currentItem())
+            review->setEnabled(!item->isHidden() && !item->data(Qt::UserRole).toString().isEmpty());
     });
     dialog->show();
     requestBrokerResult({{"op", "inspect"}, {"session", session}},
@@ -2450,14 +2488,24 @@ void Window::showDiskAnalysis() {
         if (!guard) return;
         if (!error.isEmpty()) { summary->setText(error); return; }
         const auto candidates = result["candidates"].toArray();
-        for (const auto &entry : candidates) {
+        const auto proposals = result["proposed"].toArray();
+        for (const auto &entry : candidates.isEmpty() ? proposals : candidates) {
             const auto candidate = entry.toObject();
             const auto label = candidate["id"].toString() + " — " + candidate["evidence"].toString();
             auto *item = new QListWidgetItem(label, results);
+            item->setData(Qt::UserRole, candidate["definition"].toString());
             item->setHidden(!label.contains(search->text(), Qt::CaseInsensitive));
         }
-        summary->setText(candidates.isEmpty() ? "No plausible definitions found for the working RAW image."
-            : QString("%1 plausible definitions for the working RAW image.").arg(candidates.size()));
+        if (!candidates.isEmpty()) {
+            summary->setText(QString("%1 plausible definitions for the working RAW image.").arg(candidates.size()));
+        } else if (!proposals.isEmpty()) {
+            summary->setText(QString("%1 possible definitions (%2 shown). Review drafts before use.")
+                             .arg(result["proposal_matches"].toInt()).arg(proposals.size()));
+            results->setCurrentRow(0);
+        } else {
+            summary->setText(QString("No plausible definitions found for the working RAW image. %1")
+                             .arg(result["proposal_note"].toString()).trimmed());
+        }
     });
 }
 

@@ -58,7 +58,7 @@ private:
     friend class Workspace;
     void begin(QJsonObject request);
     void requestBrokerResult(QJsonObject request, std::function<void(QJsonObject, QString)> reply);
-    bool showDiskFormatEditor(const QString &selectedFormat = {});
+    bool showDiskFormatEditor(const QString &selectedFormat = {}, const QString &draft = {});
     void acceptCatalogue(const QJsonObject &result);
     void readReply();
     void fail(const QString &message, const QJsonObject &details = {});

@@ -192,7 +192,7 @@ See the [published v1.3 release and downloads](https://github.com/CPMArchives/cp
 ## v2.0 — Automated Disk Analysis & Recovery Assistance
 
 - Extend existing format identification with deeper validation against available container metadata, geometry, sector mapping, directory entries, extent consistency, and allocation evidence.
-- When existing definitions fail, systematically test plausible parameters and construct candidate `diskdefs` entries for review in the Disk Format Editor.
+- When the catalogue yields no plausible match, search a bounded set of CP/M 2.2 allocation, directory, reservation, and skew parameters. Draft definitions require a populated directory and a clean consistency check. Review them in the Disk Format Editor before saving or selecting one. Initially, search uses the qualified standard DSK layout, supported single-sided TD0 inventory, or the selected geometry of a working image. An external RAW file's length alone does not establish its track geometry.
 - Automate filesystem analysis and comparison of related images. Explain inconsistencies, distinguish likely format mismatches from filesystem damage where evidence permits, and identify differences, duplicate contents, and potentially more complete or reliable copies.
 - Produce evidence-based repair plans for review and require explicit user approval before applying any proposed modifications.
 - Integrate navigation between physical observations, format definitions, filesystem structures, comparison results, and diagnostic findings within the relevant image session.
