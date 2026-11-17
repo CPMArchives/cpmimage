@@ -299,6 +299,85 @@ private slots:
         QVERIFY(!information->isEnabled());QVERIFY(name->toolTip().isEmpty());
     }
 
+    void physicalDiskInspectorUsesActiveTab() {
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}});
+        workspace.show();
+        auto &first = workspace.addSession();
+        auto viewAction = [&workspace]() -> QAction * {
+            for (auto *action : workspace.menuBar()->actions()) {
+                if (auto *menu = action->menu(); menu && menu->title() == "View") {
+                    for (auto *item : menu->actions())
+                        if (item->objectName() == "physicalDiskInspectorAction") return item;
+                }
+            }
+            return nullptr;
+        };
+        QVERIFY(viewAction());
+        QVERIFY(!viewAction()->isEnabled());
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const auto disk = temp.filePath("Inspector source.dsk");
+        QVERIFY(QFile::copy(root + "/fixtures/ampro200-independent.dsk", disk));
+        QFile original(disk);
+        QVERIFY(original.open(QIODevice::ReadOnly));
+        const auto bytes = original.readAll();
+        original.close();
+
+        QSignalSpy firstDone(&first, &Window::completed);
+        first.openImage(disk, "bettercpm-ampro-little-board", "dsk");
+        QTRY_COMPARE_WITH_TIMEOUT(firstDone.size(), 1, 15000);
+        QVERIFY(firstDone.first().first().toBool());
+        QVERIFY(viewAction()->isEnabled());
+        viewAction()->trigger();
+        QTRY_VERIFY(first.findChild<QDialog *>("physicalDiskInspector"));
+        auto *dialog = first.findChild<QDialog *>("physicalDiskInspector");
+        QVERIFY(dialog->isVisible());
+        auto *origin = dialog->findChild<QLabel *>("physicalDiskSource");
+        auto *track = dialog->findChild<QComboBox *>("physicalDiskTrack");
+        auto *sectors = dialog->findChild<QTableWidget *>("physicalDiskSectors");
+        QVERIFY(origin && track && sectors);
+        QVERIFY(origin->text().contains("Inspector source.dsk"));
+        QVERIFY(origin->text().contains("Container: DSK"));
+        QVERIFY(origin->text().contains(QString::fromLatin1(
+            QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex())));
+        QCOMPARE(track->count(), 40);
+        QTRY_COMPARE(sectors->rowCount(), 10);
+        QCOMPARE(sectors->editTriggers(), QAbstractItemView::NoEditTriggers);
+        QCOMPARE(sectors->horizontalHeaderItem(0)->text(), QString("Descriptor order"));
+        QCOMPARE(sectors->item(0, 1)->text(), QString("1"));
+        QCOMPARE(sectors->item(9, 1)->text(), QString("10"));
+        QCOMPARE(sectors->item(9, 2)->text(), QString("512"));
+        QCOMPARE(sectors->item(9, 4)->text(), QString("Unavailable"));
+        track->setCurrentIndex(39);
+        QVERIFY(track->currentText().contains("Cylinder 39, head 0"));
+        QTRY_COMPARE(sectors->rowCount(), 10);
+        QVERIFY(!first.windowTitle().endsWith(" *"));
+        dialog->reject();
+        QTRY_VERIFY(!first.findChild<QDialog *>("physicalDiskInspector"));
+
+        auto &second = workspace.addSession();
+        QSignalSpy secondDone(&second, &Window::completed);
+        second.openImage(root + "/fixtures/ibm3740-empty.raw", "ibm-3740", "raw");
+        QTRY_COMPARE_WITH_TIMEOUT(secondDone.size(), 1, 15000);
+        QVERIFY(secondDone.first().first().toBool());
+        QVERIFY(viewAction()->isEnabled());
+        viewAction()->trigger();
+        QTRY_VERIFY(second.findChild<QDialog *>("physicalDiskInspector"));
+        auto *raw = second.findChild<QDialog *>("physicalDiskInspector");
+        auto *rawOrigin = raw->findChild<QLabel *>("physicalDiskSource");
+        QVERIFY(rawOrigin);
+        QVERIFY(rawOrigin->text().contains("ibm3740-empty.raw"));
+        QVERIFY(rawOrigin->text().contains("Container: RAW"));
+        QVERIFY(!raw->findChild<QTableWidget *>("physicalDiskSectors"));
+        QVERIFY(!first.findChild<QDialog *>("physicalDiskInspector"));
+        raw->reject();
+
+        QVERIFY(original.open(QIODevice::ReadOnly));
+        QCOMPARE(original.readAll(), bytes);
+    }
+
     void flatExportConsolidatesIdenticalHostFile() {
         const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
         Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),

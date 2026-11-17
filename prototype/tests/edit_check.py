@@ -137,6 +137,11 @@ class EditCheck(unittest.TestCase):
         opened = broker.request('open', image=str(broker.image), format=fmt, container='dsk')
         self.assertTrue(opened['ok'], opened)
         options = dict(session=opened['result']['session'])
+        metadata = broker.request('source_metadata', track=[0, 0], **options)
+        self.assertTrue(metadata['ok'], metadata)
+        self.assertEqual(metadata['result']['source']['container'], 'dsk')
+        self.assertEqual([(sector['id'], sector['size']) for sector in metadata['result']['sectors']],
+                         [(sector, 512) for sector in range(1, 11)])
         text = broker.directory / 'text.txt'
         text.write_bytes(b'A\nB\r\nC\r')
         result = broker.request('edit', action='import', confirmed=True, **options, items=[

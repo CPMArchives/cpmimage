@@ -46,6 +46,14 @@ class ContainerSaveCheck(unittest.TestCase):
                 reopened = broker.request('open', image=str(dst), format=fmt, container=container)
                 self.assertTrue(reopened['ok'], reopened)
                 token = reopened['result']['session']
+                metadata = broker.request('source_metadata', session=token)
+                self.assertTrue(metadata['ok'], metadata)
+                self.assertEqual(metadata['result']['source']['container'], container)
+                self.assertEqual(len(metadata['result']['tracks']), 77)
+                track = broker.request('source_metadata', session=token, track=[0, 0])
+                self.assertTrue(track['ok'], track)
+                self.assertEqual(sorted(row['id'] for row in track['result']['sectors']),
+                                 list(range(1, 27)))
                 payload = broker.directory / 'known.bin'
                 payload.write_bytes(bytes(range(128)))
                 edit = broker.request('edit', action='import', session=token, name='00KNOWN.BIN',
