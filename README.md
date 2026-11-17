@@ -13,6 +13,7 @@ Get the five platform packages, corresponding source, and SHA-256 checksums from
 ## What you can do
 
 - Open RAW, IMD, JV3, DMK, and supported standard CPCEMU DSK images. Some structured layouts and conversions require a physical mapping profile.
+- Open supported TeleDisk (.TD0) images as unsaved RAW tabs. Save suggests the original basename with a .raw extension. Double-sided and noncanonical layouts require a verified physical mapping profile.
 - Browse user areas and export individual files, selections, or entire user areas. In batch exports, choose which files to convert from CRLF to LF and trim at the first CP/M Ctrl+Z marker. Unchecked files keep their stored bytes. The file list shows record counts and the footer shows free filesystem space.
 - Import, rename, delete, and move files between user areas, edit supported attributes, and transfer files between open images.
 - Create or format images using a selected disk definition and manage reserved system tracks. Edits stay in a private working copy until Save or Save As.

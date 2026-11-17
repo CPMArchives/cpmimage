@@ -1,0 +1,125 @@
+--- a/lib/drvtele.c
++++ b/lib/drvtele.c
+@@ -51,6 +51,7 @@
+ #include "drvtele.h"
+ 
+ extern unsigned short teledisk_crc(unsigned char *buf, unsigned short len);
++extern void updt_crc(unsigned short *, unsigned char *, unsigned short);
+ 
+ DRV_CLASS dc_tele = 
+ {
+@@ -142,6 +143,7 @@
+ 	self->tele_sechead.cylinder_id = buf[0];
+ 	self->tele_sechead.head_id     = buf[1];
+ 	self->tele_sechead.sector_id   = buf[2];
++	if (buf[3] > 6) return DSK_ERR_BADFMT;
+ 	self->tele_sechead.sector_len  = (128 << buf[3]);
+ 	self->tele_sechead.syndrome    = buf[4];
+ 	self->tele_sechead.header_crc  = buf[5];
+@@ -206,12 +208,14 @@
+ 				{
+ 					err = tele_fread(self, pattern, plen);
+ 					if (err) return err;	
+-					if (plen > wleft) plen = wleft;
++					if (plen == 0 || plen > wleft) return DSK_ERR_BADFMT;
+ 					if (buf) memcpy(buf + w, pattern, plen);
+ 					w += plen;
+ 					continue;
+ 				}
++				if (ptype > 8 || plen == 0 || (1 << ptype) * plen > wleft) return DSK_ERR_BADFMT;
+ 				err = tele_fread(self, pattern, (1 << ptype));
++				if (err) return err;
+ 				for (n = 0; n < plen; n++)
+ 				{
+ 					if (buf)
+@@ -441,6 +445,15 @@
+ 			fclose(self->tele_fp);
+ 			return DSK_ERR_SYSERR;
+ 		}
++        unsigned short crc = teledisk_crc(header + 2, 8);
++        updt_crc(&crc, (unsigned char *)self->tele_comment->text, comment_len);
++        if (crc != (unsigned short)(header[0] | (header[1] << 8)))
++        {
++            dsk_free(self->tele_comment);
++            self->tele_comment = NULL;
++            fclose(self->tele_fp);
++            return DSK_ERR_DATAERR;
++        }
+ 		self->tele_comment->text[comment_len] = 0;
+ 		for (n = 0; n < comment_len; n++)
+ 		{
+@@ -452,6 +465,8 @@
+ 			}
+ 		}	
+ 		dsk_set_comment(s, self->tele_comment->text);
++        /* Loading an on-disk comment does not modify the archive. */
++        s->dr_dirty = 0;
+ 	}
+ 	self->tele_track_addr[0][0] = ftell(self->tele_fp);
+ 
+@@ -610,10 +625,13 @@
+ 				continue;
+ 			}
+ 		}
+-		/* Read the whole sector into the buffer (if it's there) */
++		/* Do not substitute filler for a sector with no payload. */
++		if (self->tele_sechead.syndrome & 0x30) return DSK_ERR_NODATA;
++		/* Read the whole sector into the buffer. */
+ 		secbuf = dsk_malloc(sseclen);
+ 		if (!secbuf) return DSK_ERR_NOMEM;
+ 		err = tele_readsec(self, secbuf);
++		if (err) { dsk_free(secbuf); return err; }
+ 		if (sseclen > sector_size) sseclen = sector_size;
+ 		memcpy(buf, secbuf, sseclen);
+ 		dsk_free(secbuf);
+@@ -669,3 +687,50 @@
+ {
+ 	return DSK_ERR_NOTIMPL;
+ }
++
++/* Scratch-only sequential inventory and payload export. The caller maps
++ * verified track/sector slots to RAW after this succeeds. */
++dsk_err_t cpmimage_tele_scan(DSK_DRIVER *s, FILE *out)
++{
++    DC_CHECK(s);
++    unsigned char seen_track[256][2] = {{0}};
++    unsigned char track[4], sector[8192];
++    unsigned long raw_size = 0;
++    if (self->tele_head.volume_seq || self->tele_head.sides < 1 ||
++        self->tele_head.sides > 2) return DSK_ERR_BADFMT;
++    if (fseek(self->tele_fp, self->tele_track_addr[0][0], SEEK_SET))
++        return DSK_ERR_SYSERR;
++    for (;;) {
++        if (tele_fread(self, track, 4)) return DSK_ERR_BADFMT;
++        unsigned count = track[0], cylinder = track[1], head = track[2] & 0x7f;
++        if (count == 255) return raw_size ? DSK_ERR_OK : DSK_ERR_BADFMT;
++        if ((unsigned char)teledisk_crc(track, 3) != track[3]) return DSK_ERR_DATAERR;
++        if (!count || head >= self->tele_head.sides || seen_track[cylinder][head]++)
++            return DSK_ERR_BADFMT;
++        unsigned char seen_id[256] = {0};
++        for (unsigned i = 0; i < count; ++i) {
++            dsk_err_t e = tele_readsechead(self);
++            if (e) return e;
++            unsigned id = self->tele_sechead.sector_id;
++            if (seen_id[id]++ || self->tele_sechead.cylinder_id != cylinder ||
++                self->tele_sechead.head_id != head) return DSK_ERR_BADFMT;
++            if (self->tele_sechead.syndrome & 0x30) return DSK_ERR_NODATA;
++            if (self->tele_sechead.syndrome & 0x46) return DSK_ERR_DATAERR;
++            long start = ftell(self->tele_fp);
++            if (start < 0) return DSK_ERR_SYSERR;
++            if (!self->tele_sechead.compressed_len) return DSK_ERR_BADFMT;
++            e = tele_readsec(self, sector);
++            if (e) return e;
++            if (ftell(self->tele_fp) - start != self->tele_sechead.compressed_len - 1)
++                return DSK_ERR_BADFMT;
++            unsigned size = self->tele_sechead.sector_len;
++            if ((unsigned char)teledisk_crc(sector, size) != self->tele_sechead.header_crc)
++                return DSK_ERR_DATAERR;
++            raw_size += size;
++            if (raw_size > 128UL * 1024 * 1024) return DSK_ERR_BADFMT;
++            unsigned char record[] = {cylinder, head, id, size & 255, size >> 8};
++            if (fwrite(record, 1, sizeof(record), out) != sizeof(record) ||
++                fwrite(sector, 1, size, out) != size) return DSK_ERR_SYSERR;
++        }
++    }
++}

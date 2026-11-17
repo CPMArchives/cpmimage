@@ -338,6 +338,8 @@ An optional container-mapping profile may supply physical information unavailabl
 
 **v0.5 implementation boundary.** Profile-free Open is qualified for canonical single-sided IMD, JV3, and DMK layouts with contiguous track numbers, uniform recording mode, and ordered contiguous sector IDs. The selected disk definition must match the verified inventory. Save to the current image reuses that mapping. Multi-sided and noncanonical layouts require explicit profiles, as does Save As with IMD, JV3, or DMK output. Broader container-derived mapping is deferred. RAW and standard CPCEMU DSK output require no destination profile.
 
+**TeleDisk import.** Opening a supported TD0 archive verifies its checksums and physical sector inventory, then opens a private, unsaved RAW tab. The initial Save suggests the original basename with a `.raw` extension. Uniform single-sided layouts with contiguous numbering can open without a profile. Multi-sided and noncanonical layouts require a verified physical mapping profile. TD0 is import-only.
+
 ### 5.5 Container adapters
 
 Container-specific decoding and encoding shall be encapsulated behind a common application-level interface.

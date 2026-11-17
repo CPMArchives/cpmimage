@@ -903,7 +903,7 @@ void Window::createImage() {
 void Window::chooseImage() {
     if (receivers(SIGNAL(imagePicked(QString))) && (!session.isEmpty() || busy)) {
         const auto path = QFileDialog::getOpenFileName(this, "Open CP/M image", image,
-            "Disk images (*.raw *.img *.dsk *.imd *.jv3 *.dmk);;All files (*)");
+            "Disk images (*.raw *.img *.dsk *.imd *.jv3 *.dmk *.td0 *.TD0);;All files (*)");
         if (!path.isEmpty()) emit imagePicked(path);
         return;
     }
@@ -912,7 +912,7 @@ void Window::chooseImage() {
 void Window::openFromPicker() {
     if (!resolveEdits([this] { chooseImage(); })) return;
     const QString path = QFileDialog::getOpenFileName(this, "Open CP/M image", image.isEmpty() ? QDir::homePath() : image,
-        "Disk images (*.raw *.img *.dsk *.imd *.jv3 *.dmk);;All files (*)");
+        "Disk images (*.raw *.img *.dsk *.imd *.jv3 *.dmk *.td0 *.TD0);;All files (*)");
     if (path.isEmpty()) return;
     inspectImage(path);
 }
@@ -2449,7 +2449,7 @@ void Window::readReply() {
             return;
         }
         inspectedHash = result["source_sha256"].toString();
-        inspectedContainer = requestedContainer.isEmpty() ? result["container"].toString() : requestedContainer;
+        inspectedContainer = result["container"].toString();
         if (!hash.match(inspectedHash).hasMatch() || !result["candidates"].isArray()) { invalid(); return; }
         const auto warning = result["sidecar_warning"].toString();
         if (!warning.isEmpty()) QMessageBox::warning(this, "Invalid image sidecar", warning);
@@ -2502,13 +2502,23 @@ void Window::readReply() {
         snapshotHash=result["source_sha256"].toString();
         imageGeometry = result["geometry"].toObject();
         imdComment = result["imd_comment"].toString();
+        if (result["suggested_name"].isString()) {
+            const auto suggested = result["suggested_name"].toString();
+            if (suggested.isEmpty() || suggested != QFileInfo(suggested).fileName() ||
+                !suggested.endsWith(".raw")) { invalid(); return; }
+            image = suggested;
+            unpublished = true;
+            dirty = true;
+            container = "raw";
+            imageNote = "Decoded from TeleDisk. Save to publish this RAW working image.";
+        }
         const auto definitionHash = result["definition_sha256"].toString();
-        if ((retainSource || requestedFormat.isEmpty()) && !activeCatalogue.isEmpty() && hash.match(definitionHash).hasMatch()) {
+        if (!unpublished && (retainSource || requestedFormat.isEmpty()) && !activeCatalogue.isEmpty() && hash.match(definitionHash).hasMatch()) {
             settings->setValue(associationKey(image, activeCatalogue),
                                QStringList{snapshotHash, format, definitionHash, container});
         }
         source->setText(QFileInfo(image).fileName()); source->setToolTip(image);
-        setWindowTitle("cpmimage — "+QFileInfo(image).fileName());
+        setWindowTitle("cpmimage — " + QFileInfo(image).fileName() + (dirty ? " *" : ""));
         updateUserAreas();
         { QSignalBlocker block(userAreas); userAreas->setCurrentItem(userAreas->item(1)); }
         showUserArea();
@@ -2534,7 +2544,7 @@ void Window::readReply() {
     setBusy(false);
     if (operation == "open") {
         updateSelectionStatus();
-        emit imageOpened(image);
+        if (!unpublished) emit imageOpened(image);
     }
     emit completed(true);
     if (closing) close();

@@ -219,6 +219,61 @@ def main():
         except (MappingError, OSError, ValueError) as error:
             raise backend.Failure('physical_mapping', f'{profile.name}: {error}') from error
 
+    def require_separate_archive(session, destination):
+        archive = session.get('archive_source')
+        if archive and (destination.resolve() == archive.resolve()
+                        or (destination.exists() and identity(destination.stat()) == session['archive_identity'])):
+            raise backend.Failure('invalid_destination', 'Choose a destination separate from the original TeleDisk archive.')
+
+    def teledisk_inventory(data, directory):
+        if data[:2] not in (b'TD', b'td'):
+            raise backend.Failure('teledisk', 'The file has no TeleDisk signature.')
+        archive = directory / 'source.td0'
+        records = directory / 'td0-records'
+        archive.write_bytes(data)
+        adapter().native(directory, 'teledisk-records', archive, records)
+        inventory = {}
+        with records.open('rb') as stream:
+            while header := stream.read(5):
+                if len(header) != 5:
+                    raise backend.Failure('teledisk', 'Incomplete TeleDisk sector inventory.')
+                cylinder, head, sector = header[:3]
+                size = int.from_bytes(header[3:], 'little')
+                payload = stream.read(size)
+                track = inventory.setdefault((cylinder, head), {})
+                if len(payload) != size or not size or sector in track:
+                    raise backend.Failure('teledisk', 'Invalid or duplicate TeleDisk sector.')
+                track[sector] = payload
+        return inventory
+
+    def teledisk_raw(source, inventory, geometry, raw):
+        profile = source.with_name(source.name + '.mapping.json')
+        try:
+            count = geometry['sectors_per_track']
+            size = geometry['sector_size']
+            if geometry.get('boot_geometry') or geometry['offset'] or len(inventory) != geometry['tracks']:
+                raise MappingError('TeleDisk tracks do not match the selected RAW definition.')
+            if profile.is_file():
+                mapping = PhysicalMapping.from_profile(json.loads(catalogue.read_text(profile)), geometry)
+                order = [(t.cylinder, t.head, t.sectors) for t in mapping.tracks]
+            else:
+                first = inventory.get((0, 0), {})
+                ids = tuple(sorted(first))
+                if (set(inventory) != {(c, 0) for c in range(geometry['tracks'])}
+                        or ids not in (tuple(range(count)), tuple(range(1, count + 1)))):
+                    raise MappingError(f'Multi-sided or nonstandard TD0 layouts require {profile.name}.')
+                order = [(c, 0, ids) for c in range(geometry['tracks'])]
+            for cylinder, head, ids in order:
+                sectors = inventory.get((cylinder, head), {})
+                if set(sectors) != set(ids) or any(len(payload) != size for payload in sectors.values()):
+                    raise MappingError(f'TeleDisk sectors do not match RAW geometry on track {cylinder}/{head}.')
+            with raw.open('wb') as stream:
+                for cylinder, head, ids in order:
+                    for sector in ids:
+                        stream.write(inventory[cylinder, head][sector])
+        except (OSError, ValueError, MappingError) as error:
+            raise backend.Failure('physical_mapping', str(error)) from error
+
     def transfer(container, mapping, directory, raw, data, writing):
         map_path = directory / 'disk.map'
         map_path.write_text(''.join(
@@ -410,10 +465,11 @@ def main():
             elif op == 'inspect':
                 source = Path(request['image']).absolute()
                 data = read_image(source)
-                container = request.get('container') or image_container(source, data)
+                container = ("td0" if source.suffix.lower() == ".td0" else
+                             request.get('container') or image_container(source, data))
                 if data.startswith(b'EXTENDED CPC DSK File'):
                     raise backend.Failure('unsupported_container', 'Extended CPCEMU DSK is outside the supported container scope.')
-                if container not in ('raw', 'dsk', *structured):
+                if container not in ('raw', 'dsk', 'td0', *structured):
                     raise backend.Failure('unsupported_container', f'Unsupported container: {container}')
                 explicit = request.get('explicit_format')
                 if explicit and explicit not in definitions:
@@ -433,6 +489,7 @@ def main():
                             if error.code != 'invalid_sidecar':
                                 raise
                             warning = error.message
+                    inventory = teledisk_inventory(data, directory) if container == 'td0' else None
                     candidates = []
                     raw = directory / 'candidate.raw'
                     ranked = []
@@ -446,7 +503,10 @@ def main():
                             continue
                         try:
                             missing = 0
-                            if container in structured:
+                            if container == 'td0':
+                                teledisk_raw(source, inventory, geometry, raw)
+                                tier, evidence = 0, 'Verified TeleDisk sector mapping and readable directory'
+                            elif container in structured:
                                 # Reuse only the validated open path. Geometry alone
                                 # does not establish equivalence of physical mappings.
                                 raw.unlink(missing_ok=True)
@@ -473,7 +533,7 @@ def main():
                         except backend.Failure as error:
                             if error.code == 'cancelled':
                                 raise
-                            if container in structured and not mapping_warning:
+                            if (container in structured or container == 'td0') and not mapping_warning:
                                 mapping_warning = str(error.message or error.code)
                             continue
                         probe = adapter().request({
@@ -515,6 +575,9 @@ def main():
                 if request.get('source_sha256', fingerprint) != fingerprint:
                     raise backend.Failure('source_changed', 'The image changed after format selection. Open it again.')
                 fmt, container = request['format'], request['container']
+                if source.suffix.lower() == '.td0':
+                    container = 'td0'
+                importing_td0 = container == 'td0'
                 if not isinstance(fmt, str) or not fmt or len(fmt) > 200 or '\0' in fmt:
                     raise backend.Failure('unknown_format', 'Invalid disk-definition identifier.')
                 snapshot = tempfile.TemporaryDirectory(prefix='cpmimage-open-')
@@ -531,7 +594,12 @@ def main():
                     geometry = describe(fmt, definition, directory)
                 if request.get('definition_sha256', catalogue.digest(definition)) != catalogue.digest(definition):
                     raise backend.Failure('definition_changed', 'The disk definition changed. Select it again.')
-                image, mapping, end = stage_image(source, data, container, geometry, directory)
+                if importing_td0:
+                    image = directory / 'image.raw'
+                    teledisk_raw(source, teledisk_inventory(data, directory), geometry, image)
+                    mapping, end = None, image.stat().st_size
+                else:
+                    image, mapping, end = stage_image(source, data, container, geometry, directory)
                 trimmed = image.stat().st_size < end
                 reply = adapter().request({
                     'v': 1, 'id': rid, 'op': 'list', 'image': str(image),
@@ -557,6 +625,10 @@ def main():
                                geometry=geometry, dirty=False, confirmed=False, mapping=mapping,
                                template=data if container == 'dmk' else None,
                                comment=inspect_imd(data)[1] if container == 'imd' else b'')
+                if importing_td0:
+                    session.update(source=None, identity=None, original_container='raw', dirty=True,
+                                   archive_source=source, archive_identity=source_identity)
+                    reply['result']['suggested_name'] = source.with_suffix('.raw').name
                 reply['result'].update(session=token, source_sha256=fingerprint, unused_tail_filled=trimmed,
                                        definition_sha256=catalogue.digest(definition),
                                        imd_comment=session['comment'].decode('utf-8', errors='replace'), geometry=geometry)
@@ -793,6 +865,9 @@ def main():
                 if not source and not request.get('destination'):
                     raise backend.Failure('invalid_destination', 'Choose a destination for the new image.')
                 destination = Path(request.get('destination') or source).absolute().resolve()
+                if destination.suffix.lower() == '.td0':
+                    raise backend.Failure('unsupported_container', 'TeleDisk is import-only. Choose a RAW filename.')
+                require_separate_archive(session, destination)
                 same = source is not None and source.resolve() == destination
                 if source and not same and destination.exists() and os.path.samefile(source, destination):
                     raise backend.Failure('invalid_destination', 'Save As requires a separate file, not an alias of the source.')
@@ -811,6 +886,7 @@ def main():
                     if not definition:
                         raise backend.Failure('unsupported_backend', 'This format has no standalone definition.')
                     target = catalogue.sidecar(destination) or destination.with_suffix('.FDF')
+                    require_separate_archive(session, target)
                     if target == destination:
                         raise backend.Failure('invalid_destination', 'Choose an image filename distinct from its FDF.')
                     require_recovery_clear(destination, [target])

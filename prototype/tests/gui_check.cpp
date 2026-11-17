@@ -458,6 +458,54 @@ private slots:
         QCOMPARE(QFile::exists(copy + ".BAK"), saveOnClose);
     }
 
+    void teleDiskImportSave() {
+        const auto maslin = qEnvironmentVariable("CPMIMAGE_MASLIN");
+        if (maslin.isEmpty()) QSKIP("External Maslin corpus unavailable");
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const auto source = temp.filePath("XEROX.TD0");
+        const auto destination = temp.filePath("XEROX.raw");
+        QVERIFY(QFile::copy(maslin + "/1995/sydex/xerox/820sys8s.td0", source));
+        Workspace workspace({qEnvironmentVariable("CPMIMAGE_ROOT"),
+                             qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}});
+        workspace.show();
+        auto &window = workspace.addSession();
+        window.inspectImage(source, "ibm-3740");
+        auto *tabs = workspace.findChild<QTabWidget *>();
+        QVERIFY(tabs);
+        QTRY_COMPARE_WITH_TIMEOUT(tabs->tabText(tabs->currentIndex()),
+                                  QString("XEROX.raw *"), 15000);
+        QVERIFY(!QFile::exists(destination));
+
+        QAction *save = nullptr;
+        for (auto *action : window.findChildren<QAction *>())
+            if (action->text() == "Save") save = action;
+        QVERIFY(save && save->isEnabled());
+        QString suggestion;
+        QTimer confirm;
+        connect(&confirm, &QTimer::timeout, &window, [&] {
+            if (auto *chooser = fileDialog()) {
+                if (auto *filename = chooser->findChild<QLineEdit *>("fileNameEdit")) {
+                    suggestion = QFileInfo(filename->text()).fileName();
+                    filename->setText(destination);
+                    QMetaObject::invokeMethod(chooser, "accept");
+                }
+            } else if (auto *prompt = qobject_cast<QMessageBox *>(QApplication::activeModalWidget())) {
+                if (auto *yes = prompt->button(QMessageBox::Yes)) yes->click();
+                else prompt->reject();
+            }
+        });
+        confirm.start(20);
+        QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, true);
+        save->trigger();
+        QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, false);
+        QCOMPARE(suggestion, QString("XEROX.raw"));
+        QTRY_COMPARE_WITH_TIMEOUT(tabs->tabText(tabs->currentIndex()),
+                                  QString("XEROX.raw"), 15000);
+        QCOMPARE(QFileInfo(destination).size(), qint64(256256));
+    }
+
     void saveWorkflow() {
         QTemporaryDir temp;
         QVERIFY(temp.isValid());
