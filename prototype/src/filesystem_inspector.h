@@ -15,7 +15,8 @@ class FilesystemInspector : public QDialog {
 public:
     using Reply = std::function<void(QJsonObject, QString)>;
     using Request = std::function<void(QJsonObject, Reply)>;
-    FilesystemInspector(Request request, const QString &imageName, QWidget *parent);
+    FilesystemInspector(Request request, const QString &imageName, QWidget *parent,
+                        int slot = -1, QString revision = {});
 
 private:
     enum class View { Directory, Extents, Blocks, References };

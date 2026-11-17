@@ -645,6 +645,135 @@ private slots:
         QTRY_VERIFY(!action->isEnabled());
     }
 
+    void filesystemCheckActiveFindingLinksToSlot() {
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        QFile fixture(root + "/fixtures/ibm3740-empty.raw");
+        QVERIFY(fixture.open(QIODevice::ReadOnly));
+        auto bytes = fixture.readAll();
+        QByteArray entry(32, '\0');
+        entry.replace(1, 11, "FILE    BIN");
+        entry[13] = char(129);
+        entry[15] = char(1);
+        entry[16] = char(2);
+        bytes.replace(2 * 26 * 128 + 2 * 32, entry.size(), entry);
+        QFile image(temp.filePath("active.raw"));
+        QVERIFY(image.open(QIODevice::WriteOnly));
+        QCOMPARE(image.write(bytes), bytes.size());
+        image.close();
+
+        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                      qEnvironmentVariable("CPMIMAGE_HELPER"), 30000, 2000, {}, temp.filePath("settings.ini"));
+        window.show();
+        QSignalSpy done(&window, &Window::completed);
+        window.openImage(image.fileName(), "ibm-3740", "raw");
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 15000);
+        QVERIFY(done.first().first().toBool());
+        auto *action = window.findChild<QAction *>("filesystemCheckAction");
+        QVERIFY(action && action->isEnabled());
+        action->trigger();
+        auto *dialog = window.findChild<QDialog *>("filesystemCheckDialog");
+        QVERIFY(dialog);
+        auto *mode = dialog->findChild<QComboBox *>("filesystemCheckMode");
+        QVERIFY(mode && mode->currentText().contains("Active tab"));
+        auto *run = dialog->findChild<QPushButton *>("filesystemCheckRun");
+        auto *report = dialog->findChild<QTableWidget *>("filesystemCheckFindings");
+        auto *identity = dialog->findChild<QLabel *>("filesystemCheckIdentity");
+        auto *goToSlot = dialog->findChild<QPushButton *>("filesystemCheckGoToSlot");
+        QVERIFY(run && report && identity && goToSlot);
+        run->click();
+        QTRY_COMPARE(report->rowCount(), 1);
+        QVERIFY(identity->text().contains("Working image · ibm-3740"));
+        QCOMPARE(report->editTriggers(), QAbstractItemView::NoEditTriggers);
+        QCOMPARE(report->item(0, 0)->text(), QString("Invalid last-record byte count"));
+        QCOMPARE(report->item(0, 1)->text(), QString("2"));
+        QCOMPARE(report->item(0, 6)->text(), QString("129"));
+        QVERIFY(goToSlot->isVisible() && goToSlot->isEnabled());
+        goToSlot->click();
+        auto *inspector = window.findChild<QDialog *>("filesystemStructureInspector");
+        QVERIFY(inspector);
+        auto *directory = inspector->findChild<QTableWidget *>("filesystemStructureRows");
+        QVERIFY(directory);
+        QTRY_COMPARE(directory->rowCount(), 64);
+        QCOMPARE(directory->item(directory->currentRow(), 0)->text(), QString("2"));
+        inspector->reject();
+        dialog->reject();
+        QVERIFY(!window.windowTitle().endsWith(" *"));
+        QVERIFY(image.open(QIODevice::ReadOnly));
+        QCOMPARE(image.readAll(), bytes);
+        QVERIFY(!QFile::exists(temp.filePath("active.FDF")));
+    }
+
+    void filesystemCheckExternalUnmountableAndIncomplete() {
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        QFile fixture(root + "/fixtures/ibm3740-empty.raw");
+        QVERIFY(fixture.open(QIODevice::ReadOnly));
+        const auto clean = fixture.readAll();
+        auto damaged = clean;
+        damaged[2 * 26 * 128] = char(0x7f);
+        auto write = [&temp](const QString &name, const QByteArray &bytes) {
+            QFile file(temp.filePath(name));
+            return file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size();
+        };
+        QVERIFY(write("damaged.raw", damaged));
+        QVERIFY(write("short.raw", clean.left(6657)));
+        QVERIFY(write("clean.raw", clean));
+        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                      qEnvironmentVariable("CPMIMAGE_HELPER"), 30000, 2000, {}, temp.filePath("settings.ini"));
+        window.show();
+        QSignalSpy done(&window, &Window::completed);
+        window.openImage(temp.filePath("damaged.raw"), "ibm-3740", "raw");
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 15000);
+        QVERIFY(!done.first().first().toBool());
+        auto *action = window.findChild<QAction *>("filesystemCheckAction");
+        QVERIFY(action && action->isEnabled());
+        bool onView = false;
+        for (auto *item : window.menuBar()->actions())
+            if (auto *menu = item->menu(); menu && menu->title() == "View")
+                onView = menu->actions().contains(action);
+        QVERIFY(onView);
+        action->trigger();
+        auto *dialog = window.findChild<QDialog *>("filesystemCheckDialog");
+        QVERIFY(dialog);
+        auto *mode = dialog->findChild<QComboBox *>("filesystemCheckMode");
+        auto *format = dialog->findChild<QComboBox *>("filesystemCheckFormat");
+        auto *path = dialog->findChild<QLineEdit *>("filesystemCheckPath");
+        auto *run = dialog->findChild<QPushButton *>("filesystemCheckRun");
+        auto *status = dialog->findChild<QLabel *>("filesystemCheckStatus");
+        auto *identity = dialog->findChild<QLabel *>("filesystemCheckIdentity");
+        auto *findings = dialog->findChild<QTableWidget *>("filesystemCheckFindings");
+        QVERIFY(mode && format && path && run && status && identity && findings);
+        QCOMPARE(mode->currentText(), QString("External image"));
+        QTRY_VERIFY_WITH_TIMEOUT(format->findData("ibm-3740") >= 0, 15000);
+        path->setText(temp.filePath("damaged.raw"));
+        QVERIFY(!run->isEnabled());
+        format->setCurrentIndex(format->findData("ibm-3740"));
+        QVERIFY(run->isEnabled());
+        run->click();
+        QTRY_COMPARE(findings->rowCount(), 1);
+        QVERIFY(identity->text().contains("damaged.raw"));
+        QVERIFY(identity->text().contains("SHA-256"));
+        QCOMPARE(findings->item(0, 0)->text(), QString("Invalid directory status"));
+        QVERIFY(!dialog->findChild<QPushButton *>("filesystemCheckGoToSlot")->isVisible());
+
+        path->setText(temp.filePath("short.raw"));
+        QCOMPARE(findings->rowCount(), 0);
+        run->click();
+        QTRY_VERIFY(status->text().contains("Check incomplete while reading the directory"));
+        QCOMPARE(findings->rowCount(), 0);
+        path->setText(temp.filePath("clean.raw"));
+        run->click();
+        QTRY_VERIFY(status->text().contains("No inconsistencies found"));
+        dialog->reject();
+        QFile original(temp.filePath("damaged.raw"));
+        QVERIFY(original.open(QIODevice::ReadOnly));
+        QCOMPARE(original.readAll(), damaged);
+        QVERIFY(!QFile::exists(temp.filePath("damaged.FDF")));
+    }
+
     void flatExportConsolidatesIdenticalHostFile() {
         const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
         Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),

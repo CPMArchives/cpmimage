@@ -27,3 +27,6 @@ if 'CPMIMAGE_FORMAT_HELPER' not in (source/'mkfs.cpm.c').read_text():
 
 if 'after preparing the directory' not in (source/'cpmfs.c').read_text():
  subprocess.run(['patch','-p1','-i',str(patch.parent/'cpmtools-2.23-mkfs-helper-geometry.patch')],cwd=source,check=True)
+
+if 'cpmImageReadDirectory' not in (source/'cpmfs.c').read_text():
+ subprocess.run(['patch','-p1','-i',str(patch.parent/'cpmtools-2.23-diagnostic-directory.patch')],cwd=source,check=True)
