@@ -10,6 +10,7 @@
 #include <QLineEdit>
 #include <QMap>
 #include <QPointer>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QTableWidget>
 #include <QTimer>
@@ -37,6 +38,25 @@ QString findingLabel(const QString &code) {
         {"misplaced_timestamp", "Misplaced timestamp entry"},
     };
     return labels.value(code, code);
+}
+
+QString repairAdvice(const QJsonObject &finding) {
+    const auto code = finding["code"].toString();
+    if (code == "invalid_extent_low" || code == "invalid_extent_high") {
+        const int mask = code == "invalid_extent_low" ? 31 : 63;
+        const int observed = finding["observed"].toInt(-1);
+        if (observed > mask && observed <= 255)
+            return QString("Proposed: clear the out-of-range bits (%1 → %2). Verify the disk definition and "
+                           "check for duplicate or overlapping extents before considering this change.")
+                .arg(observed).arg(observed & mask);
+    }
+    if (code == "missing_allocated_sectors")
+        return "Recover the missing sector data from a verified copy of this image. Missing bytes cannot be reconstructed from this finding.";
+    if (code == "shared_block" || code == "duplicate_extent")
+        return "Compare both directory entries with a known-good copy to establish ownership. Keep both references until ownership is verified.";
+    if (code == "reserved_block" || code == "block_out_of_range")
+        return "Verify the selected disk definition, then compare the pointer with a known-good directory. The correct block cannot be inferred.";
+    return "Compare this directory entry with a known-good copy. This finding alone does not establish a replacement value.";
 }
 
 QString phaseLabel(const QString &phase) {
@@ -135,6 +155,10 @@ FilesystemCheckDialog::FilesystemCheckDialog(QString activeImage, QString active
         if (goToBlock->isEnabled())
             openBlock(findings.at(table->currentRow()).toObject()["block"].toInt(), checkedRevision);
     });
+    reviewPlan = buttons->addButton("Review Repair Plan…", QDialogButtonBox::ActionRole);
+    reviewPlan->setObjectName("filesystemCheckReviewPlan");
+    reviewPlan->setAutoDefault(false);
+    connect(reviewPlan, &QPushButton::clicked, this, &FilesystemCheckDialog::showRepairPlan);
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     connect(run, &QPushButton::clicked, this, &FilesystemCheckDialog::check);
@@ -154,6 +178,7 @@ FilesystemCheckDialog::FilesystemCheckDialog(QString activeImage, QString active
 
 void FilesystemCheckDialog::updateControls() {
     const bool fileMode = mode->currentData().toInt() == externalMode;
+    reviewPlan->setEnabled(!busy && !findings.isEmpty());
     mode->setEnabled(!busy);
     external->setEnabled(!busy);
     run->setEnabled(!busy && (!fileMode || (catalogueLoaded && !path->text().trimmed().isEmpty()
@@ -171,6 +196,7 @@ void FilesystemCheckDialog::clearReport() {
     checkedRevision.clear();
     checkedBlockCount = 0;
     findings = {};
+    omittedFindings = 0;
     table->setRowCount(0);
     identity->clear();
     status->clear();
@@ -256,6 +282,7 @@ void FilesystemCheckDialog::showReport(const QJsonObject &report) {
     }
     const int count = report["finding_count"].toInt();
     const int omitted = report["omitted"].toInt();
+    omittedFindings = omitted;
     status->setText(omitted ? QString("%1 findings · %2 omitted from this report").arg(count).arg(omitted) :
                     QString(count == 1 ? "%1 finding" : "%1 findings").arg(count));
     if (working) checkedRevision = report["revision"].toString();
@@ -272,4 +299,37 @@ void FilesystemCheckDialog::showReport(const QJsonObject &report) {
             table->setItem(row, col, new QTableWidgetItem(values.at(col)));
     }
     if (!findings.isEmpty()) table->selectRow(0);
+}
+
+
+void FilesystemCheckDialog::showRepairPlan() {
+    QDialog plan(this);
+    plan.setWindowTitle("Filesystem Repair Plan");
+    plan.resize(680, 480);
+    auto *layout = new QVBoxLayout(&plan);
+    auto *details = new QPlainTextEdit(&plan);
+    details->setObjectName("filesystemRepairPlan");
+    details->setReadOnly(true);
+    QStringList lines{identity->text(), "Review only. This plan makes no changes to the image."};
+    if (omittedFindings)
+        lines << QString("Partial plan. %1 findings were omitted.").arg(omittedFindings);
+    for (const auto &value : findings) {
+        const auto finding = value.toObject();
+        QStringList evidence{findingLabel(finding["code"].toString())};
+        for (const auto &[key, label] : {std::pair{"slot", "Slot"}, {"block", "Block"},
+                                         {"pointer", "Pointer"}, {"related_slot", "Related slot"},
+                                         {"related_pointer", "Related pointer"}, {"observed", "Observed"}}) {
+            const auto detail = number(finding[key], QString(key).endsWith("pointer") ? 1 : 0);
+            if (!detail.isEmpty()) evidence << QString("%1 %2").arg(label, detail);
+        }
+        if (!finding["expected"].toString().isEmpty())
+            evidence << finding["expected"].toString();
+        lines << "" << evidence.join(" · ") << repairAdvice(finding);
+    }
+    details->setPlainText(lines.join('\n'));
+    layout->addWidget(details);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &plan);
+    connect(buttons, &QDialogButtonBox::rejected, &plan, &QDialog::reject);
+    layout->addWidget(buttons);
+    plan.exec();
 }

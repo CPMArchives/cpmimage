@@ -26,6 +26,7 @@ private:
     void updateControls();
     void clearReport();
     void check();
+    void showRepairPlan();
     void showReport(const QJsonObject &report);
 
     Request request;
@@ -35,10 +36,11 @@ private:
     bool catalogueLoaded = false;
     QString checkedRevision;
     QJsonArray findings;
+    int omittedFindings = 0;
     QComboBox *mode, *formats;
     QWidget *external;
     QLineEdit *path;
     QLabel *status, *identity;
-    QPushButton *run, *goToSlot, *goToBlock;
+    QPushButton *run, *goToSlot, *goToBlock, *reviewPlan;
     QTableWidget *table;
 };

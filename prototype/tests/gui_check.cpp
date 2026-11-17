@@ -728,6 +728,45 @@ private slots:
         inspector->reject();
     }
 
+    void filesystemRepairPlanIsReadOnly() {
+        QWidget parent;
+        QStringList operations;
+        auto *dialog = new FilesystemCheckDialog("active.raw", "ibm-3740",
+            [&](QJsonObject fields, FilesystemCheckDialog::Reply reply) {
+                operations << fields["op"].toString();
+                reply({{"status", "findings"}, {"mode", "working"}, {"format", "ibm-3740"},
+                       {"finding_count", 3}, {"omitted", 1},
+                       {"findings", QJsonArray{
+                           QJsonObject{{"code", "invalid_extent_low"}, {"slot", 2}, {"observed", 35}},
+                           QJsonObject{{"code", "shared_block"}, {"slot", 3}, {"related_slot", 2}, {"block", 8}}
+                       }}}, {});
+            }, [](int, QString) {}, [](int, QString) {}, &parent);
+        dialog->show();
+        auto *review = dialog->findChild<QPushButton *>("filesystemCheckReviewPlan");
+        QVERIFY(review && !review->isEnabled());
+        dialog->findChild<QPushButton *>("filesystemCheckRun")->click();
+        QVERIFY(review->isEnabled());
+        bool checked = false;
+        QTimer::singleShot(0, dialog, [&] {
+            auto *plan = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            QVERIFY(plan);
+            const auto close = qScopeGuard([plan] { plan->reject(); });
+            const auto *details = plan->findChild<QPlainTextEdit *>("filesystemRepairPlan");
+            QVERIFY(details && details->isReadOnly());
+            const auto text = details->toPlainText();
+            QVERIFY(text.contains("Partial plan"));
+            QVERIFY(text.contains("Slot 2 · Observed 35"));
+            QVERIFY(text.contains("35 → 3"));
+            QVERIFY(text.contains("Block 8 · Related slot 2"));
+            QVERIFY(text.contains("until ownership is verified"));
+            checked = true;
+        });
+        review->click();
+        QVERIFY(checked);
+        QCOMPARE(operations, QStringList{"filesystem_check"});
+        dialog->reject();
+    }
+
     void filesystemCheckActiveFindingLinksToSlot() {
         const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
         QTemporaryDir temp;
@@ -815,11 +854,11 @@ private slots:
         QVERIFY(!done.first().first().toBool());
         auto *action = window.findChild<QAction *>("filesystemCheckAction");
         QVERIFY(action && action->isEnabled());
-        bool onView = false;
+        bool onWorkbench = false;
         for (auto *item : window.menuBar()->actions())
-            if (auto *menu = item->menu(); menu && menu->title() == "View")
-                onView = menu->actions().contains(action);
-        QVERIFY(onView);
+            if (auto *menu = item->menu(); menu && menu->title() == "Workbench")
+                onWorkbench = menu->actions().contains(action);
+        QVERIFY(onWorkbench);
         action->trigger();
         auto *dialog = window.findChild<QDialog *>("filesystemCheckDialog");
         QVERIFY(dialog);
