@@ -2,15 +2,13 @@
 
 CP/M Image Workbench is a graphical file manager for CP/M disk images on macOS, Windows, and Linux. It bundles cpmtools for command-line use.
 
-## Download v1.3
+## Download v2.0
 
-Get the five platform packages, corresponding source, and SHA-256 checksums from the [v1.3 release downloads](https://github.com/CPMArchives/cpmimage/releases/tag/v1.3#assets). The release notes cover the changes and supported formats.
+Get the five platform packages, corresponding source, and SHA-256 checksums from the [v2.0 release downloads](https://github.com/CPMArchives/cpmimage/releases/tag/v2.0#assets).
 
-**Experimental · 1.4 Beta 1** — [Download the macOS ARM64 preview](https://github.com/CPMArchives/cpmimage/releases/download/v1.4b1/CPMImage-v1.4b1-macOS-arm64.dmg) to try TeleDisk (.TD0) import. [Beta notes, source, and checksums](https://github.com/CPMArchives/cpmimage/releases/tag/v1.4b1#assets)
-
-- **macOS ARM64 (Apple silicon):** Open the DMG and drag **CPMImage.app** to **Applications**.
-- **Windows ARM64 and x86-64:** Download the executable for your architecture and run it.
-- **Linux ARM64 and x86-64:** Download the executable for your architecture, mark it executable with `chmod +x`, and run it.
+- **macOS ARM64 (Apple silicon)** — Open the DMG and drag **CPMImageWorkbench.app** to **Applications**.
+- **Windows ARM64 and x86-64** — Download and run the executable for your architecture.
+- **Linux ARM64 and x86-64** — Download the executable for your architecture and make it executable with `chmod +x`.
 
 ## What you can do
 
@@ -20,6 +18,16 @@ Get the five platform packages, corresponding source, and SHA-256 checksums from
 - Import, rename, delete, and move files between user areas, edit supported attributes, and transfer files between open images.
 - Create or format images using a selected disk definition and manage reserved system tracks. Edits stay in a private working copy until Save or Save As.
 - Choose a disk definition from the bundled cpmtools catalogue or supply your own definitions. The format picker can suggest candidates and accepts manual selection.
+
+## Workbench
+
+The **Workbench** menu gives you access to disk analysis and recovery tools. To show the optional toolbar, choose **View → Workbench Toolbar**.
+
+- **Analyze Disk** ranks plausible disk definitions and proposes candidates for supported layouts when the catalogue has no match. Review proposals in the Disk Format Editor.
+- **Physical Disk** and **Filesystem** inspect disk geometry, directory entries, and allocation blocks. With a verified sector mapping, you can follow an allocation block to its source sectors.
+- **Compare Images** compares directory structure and file contents across open images.
+- **Check Filesystem** reports inconsistencies and explains proposed repairs. Compare findings against a known-good image. Explicitly approved extent-bit repairs affect the working copy until you save. Findings such as shared blocks remain review-only.
+- View a sector in read-only hex from **Workbench → Physical Disk Inspector…**, or inspect the reserved system region from **Edit → View Reserved System Tracks…**.
 
 ## Disk Format Editor
 
@@ -35,7 +43,7 @@ For IMD, JV3, and DMK images, the editor can check the sector mapping. Existing 
 - Export a viewed archive member using its active byte stream, or select several members in the current LBR or ARK and export them to a folder. Choose original bytes or decompressed bytes when available. Multi-member export skips existing destination names.
 - Text mode recognizes Ctrl+Z in the last CP/M record even when leftover bytes follow it, handles high-bit line endings like the one in `ABSTRACT.062`, and shows embedded bell characters visibly, as in `KFORMAT.SUB`. Hex still shows the stored bytes.
 
-See [CP/M Image Help](docs/HELP.md) for everyday workflows. The same guide is available offline from the application's **Help** menu.
+See [CP/M Image Workbench Help](docs/HELP.md) for everyday workflows. The same guide is available offline from the application's **Help** menu.
 
 ## Command line
 
@@ -45,11 +53,11 @@ In Workbench v2.0, run `cpmwb` with a utility selector. On macOS, use the execut
 /Applications/CPMImageWorkbench.app/Contents/MacOS/cpmwb /cpmls -f ibm-3740 disk.raw
 ```
 
-On Windows, use `cpmwb.exe`. On Linux, use `cpmwb`. The v1.3 packages above use their original executable names. Selectors include `/cpmls`, `/cpmrm`, `/cpmcp`, `/cpmchmod`, `/cpmchattr`, `/mkfs.cpm`, `/fsck.cpm`, and `/fsed.cpm`. Use `/diskdefs=PATH` to override the bundled catalogue.
+The Windows and Linux downloads include the target architecture in their filenames. Use the downloaded filename or rename the file to `cpmwb.exe` on Windows or `cpmwb` on Linux. Selectors include `/cpmls`, `/cpmrm`, `/cpmcp`, `/cpmchmod`, `/cpmchattr`, `/mkfs.cpm`, `/fsck.cpm`, and `/fsed.cpm`. Use `/diskdefs=PATH` to override the bundled catalogue.
 
 ## Build and packaging
 
-CP/M Image uses Qt 6 Widgets and C++17, a separate Python broker, and a native helper built from pinned cpmtools 2.23 and LibDsk 1.4.2 sources. See the [build instructions](docs/BUILDING.md), [engineering specification](docs/ENGINEERING_SPEC.md), and [roadmap](docs/ROADMAP.md).
+CP/M Image Workbench uses Qt 6 Widgets and C++17, a separate Python broker, and a native helper built from pinned cpmtools 2.23 and LibDsk 1.4.2 sources. See the [build instructions](docs/BUILDING.md), [engineering specification](docs/ENGINEERING_SPEC.md), and [roadmap](docs/ROADMAP.md).
 
 The committed fixtures are independently generated test data. Private VM state, downloaded dependencies, toolchain binaries, and generated application packages are excluded from Git. Redistributable binary packages include corresponding source and third-party notices.
 
