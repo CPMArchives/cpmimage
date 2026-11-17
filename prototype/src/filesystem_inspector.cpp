@@ -149,7 +149,7 @@ void FilesystemInspector::load(View target, int offset, int targetBlock, int sel
     page->setText("Reading filesystem structures…");
     request(fields, [guard = QPointer<FilesystemInspector>(this), target, offset, targetBlock, selected]
                     (const QJsonObject &result, const QString &error) {
-        if (!guard || !guard->isVisible()) return;
+        if (!guard || (!guard->isVisible() && !guard->property("workbenchHidden").toBool())) return;
         guard->controls->setEnabled(true);
         if (!error.isEmpty() || !result["rows"].isArray() || result["revision"].toString().isEmpty()) {
             guard->page->setText(error.isEmpty() ? "The image reader returned incomplete filesystem data." : error);

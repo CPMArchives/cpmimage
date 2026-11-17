@@ -315,8 +315,11 @@ private slots:
 
     void physicalDiskInspectorUsesActiveTab() {
         const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
         Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
-                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}});
+                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}}, temp.filePath("workspace.ini"));
+        workspace.findChild<QAction *>("enableWorkbenchAction")->setChecked(true);
         workspace.show();
         auto &first = workspace.addSession();
         auto viewAction = [&workspace]() -> QAction * {
@@ -330,8 +333,6 @@ private slots:
         };
         QVERIFY(viewAction());
         QVERIFY(!viewAction()->isEnabled());
-        QTemporaryDir temp;
-        QVERIFY(temp.isValid());
         const auto disk = temp.filePath("Inspector source.dsk");
         QVERIFY(QFile::copy(root + "/fixtures/ampro200-independent.dsk", disk));
         QFile original(disk);
@@ -421,8 +422,11 @@ private slots:
 
     void filesystemStructureInspectorLinksWorkingImage() {
         const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
         Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
-                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}});
+                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}}, temp.filePath("workspace.ini"));
+        workspace.findChild<QAction *>("enableWorkbenchAction")->setChecked(true);
         workspace.show();
         auto &first = workspace.addSession();
         auto viewAction = [&workspace]() -> QAction * {
@@ -434,8 +438,6 @@ private slots:
         };
         QVERIFY(viewAction());
         QVERIFY(!viewAction()->isEnabled());
-        QTemporaryDir temp;
-        QVERIFY(temp.isValid());
         const auto source = temp.filePath("working.raw");
         QVERIFY(QFile::copy(root + "/fixtures/ibm3740-empty.raw", source));
         QFile disk(source);
@@ -582,9 +584,11 @@ private slots:
         leftDisk.close();
         rightDisk.close();
 
-        Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"), helper, {}});
+        Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"), helper, {}},
+                            temp.filePath("workspace.ini"));
         workspace.show();
         auto &left = workspace.addSession();
+        workspace.findChild<QAction *>("enableWorkbenchAction")->setChecked(true);
         auto *action = workspace.findChild<QAction *>("compareImagesAction");
         QMenu *workbenchMenu = nullptr;
         for (auto *item : workspace.menuBar()->actions())
@@ -951,7 +955,8 @@ private slots:
             QCOMPARE(file.write(bytes), bytes.size());
         }
         Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
-                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}});
+                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}}, temp.filePath("workspace.ini"));
+        workspace.findChild<QAction *>("enableWorkbenchAction")->setChecked(true);
         workspace.show();
         auto &reference = workspace.addSession();
         QSignalSpy opened(&reference, &Window::completed);
@@ -1193,6 +1198,85 @@ private slots:
         QTRY_VERIFY(!workspace.isVisible());
         QCOMPARE(prompts, 4);
         QCOMPARE(tabs->count(), 0);
+    }
+
+    void workbenchVisibilityPreservesDraftAndExit() {
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const auto profile = temp.filePath("workspace.ini");
+        const RuntimePaths paths{qEnvironmentVariable("CPMIMAGE_ROOT"),
+                                 qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                                 qEnvironmentVariable("CPMIMAGE_HELPER"), {}};
+        Workspace workspace(paths, profile);
+        workspace.show();
+        auto &page = workspace.addSession();
+        auto *enable = workspace.findChild<QAction *>("enableWorkbenchAction");
+        auto *edit = page.findChild<QAction *>("diskFormatEditorAction");
+        auto *menu = page.findChild<QMenu *>("workbenchMenu");
+        auto *toolbarToggle = page.findChild<QAction *>("workbenchToolbarVisible");
+        auto *toolbar = page.findChild<QWidget *>("workbenchToolbar");
+        QVERIFY(enable && edit && menu && toolbarToggle && toolbar);
+        const auto originalToolbar = toolbarToggle->isChecked();
+        const auto restoreToolbar = qScopeGuard([originalToolbar] {
+            QSettings("CPMArchives", "cpmimage").setValue("workbenchToolbarVisible", originalToolbar);
+        });
+        QVERIFY(!enable->isChecked());
+        QVERIFY(!toolbarToggle->isVisible() && toolbar->isHidden());
+        QVERIFY(!workspace.menuBar()->actions().contains(menu->menuAction()));
+        QVERIFY(!edit->isVisible() && !edit->isEnabled());
+
+        enable->setChecked(true);
+        QVERIFY(workspace.menuBar()->actions().contains(menu->menuAction()));
+        QVERIFY(edit->isVisible() && edit->isEnabled());
+        toolbarToggle->setChecked(true);
+        QVERIFY(toolbar->isVisible());
+        edit->trigger();
+        auto *editor = page.findChild<QDialog *>("diskFormatEditor");
+        QVERIFY(editor);
+        auto *identifier = editor->findChild<QLineEdit *>("diskFormatIdentifier");
+        QVERIFY(identifier);
+        QTRY_VERIFY(identifier->isEnabled());
+        identifier->setText("retained-draft");
+        enable->setChecked(false);
+        QVERIFY(!editor->isVisible());
+        QVERIFY(toolbarToggle->isChecked() && toolbar->isHidden());
+        QVERIFY(!edit->isVisible());
+        QVERIFY(!workspace.menuBar()->actions().contains(menu->menuAction()));
+
+        for (const auto *choice : {"Cancel and Return", "Enable Workbench"}) {
+            bool offered = false;
+            QTimer::singleShot(0, &workspace, [&] {
+                auto *warning = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+                QVERIFY(warning);
+                QCOMPARE(warning->buttons().size(), 2);
+                for (auto *button : warning->buttons()) {
+                    if (button->text() != QLatin1String(choice)) continue;
+                    offered = true;
+                    button->click();
+                    return;
+                }
+                warning->reject();
+            });
+            QVERIFY(!workspace.close());
+            QVERIFY(offered);
+            QVERIFY(workspace.isVisible());
+            QCOMPARE(identifier->text(), QString("retained-draft"));
+            QCOMPARE(editor->isVisible(), QLatin1String(choice) == "Enable Workbench");
+        }
+        QVERIFY(enable->isChecked());
+        QVERIFY(toolbar->isVisible());
+        identifier->clear();
+        QTRY_VERIFY(page.findChild<QAction *>("filesystemCheckAction")->isEnabled());
+        page.findChild<QAction *>("filesystemCheckAction")->trigger();
+        auto *check = page.findChild<QDialog *>("filesystemCheckDialog");
+        QVERIFY(check && check->isVisible());
+        enable->setChecked(false);
+        QVERIFY(!editor->isVisible());
+        QVERIFY(!check->isVisible());
+        workspace.close();
+        QTRY_VERIFY(!workspace.isVisible());
+        Workspace reopened(paths, profile);
+        QVERIFY(!reopened.findChild<QAction *>("enableWorkbenchAction")->isChecked());
     }
 
     void workbenchDiskAnalysis() {

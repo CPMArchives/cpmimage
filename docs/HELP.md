@@ -6,6 +6,8 @@ Choose **Open image** and select a disk image. If the format picker appears, com
 
 ## Edit disk format definitions
 
+Enable advanced tools with **Settings → Enable Workbench**. Workbench starts off. Turning it off hides the menu, toolbar, and open tools. Re-enable it to return to the same windows and drafts. If a hidden window has unsaved work when you try to quit, you can cancel or re-enable Workbench to review it.
+
 Open **File → Disk Format Editor…**, or choose **Disk Format Editor…** from the format picker. Use **New** to enter a definition, **Duplicate** to copy a catalogue entry under a new identifier, or **Import diskdefs…** to review a standalone definition. Review any import diagnostics before saving or exporting.
 
 Enter the sector size, track groups, and sectors per track as cpmtools should see them. For a synthetic RAW layout, these groups can be logical. An IMD, JV3, or DMK may supply physical sector IDs and track information, while the definition still supplies the CP/M allocation, directory, and boot settings. **Use mapped sector layout** fills only the sector size, track count, and sectors per track from a verified mapping. CP/M skew applies to the resulting RAW slots.

@@ -326,6 +326,7 @@ void DiskFormatEditor::load(const QJsonObject &item) {
     invalidateImageCheck();
     loading = false;
     updateDerived();
+    baseline = record();
 }
 
 QJsonObject DiskFormatEditor::record() const {
@@ -412,6 +413,7 @@ void DiskFormatEditor::importText(const QString &text) {
         if (!error.isEmpty()) { showError(error); return; }
         selection->setCurrentIndex(0);
         load(result["record"].toObject());
+        baseline = {};
         showImportDiagnostics(result["diagnostics"].toArray());
     });
 }
@@ -435,6 +437,7 @@ void DiskFormatEditor::duplicateSelected() {
     const auto messages = diagnostics->text();
     selection->setCurrentIndex(0);
     load(copy);
+    baseline = {};
     unresolved = review;
     diagnostics->setText(messages);
     identifier->setFocus();
@@ -476,6 +479,7 @@ void DiskFormatEditor::runDefinition(const QString &operation) {
         if (operation == "definition_save") {
             current = message["record"].toObject();
             saved = true;
+            baseline = record();
             definitionStatus->setText("Definition saved.");
             refreshRecords();
         } else if (operation == "definition_export") {
