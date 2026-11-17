@@ -531,7 +531,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
 #endif
         if (busy) fail("The image reader stopped unexpectedly. Open the image again.");
         resetImage();
-        if (closing) close();
+        if (closing) std::exchange(closing, {})();
     });
     deadline.setSingleShot(true);
     connect(&deadline, &QTimer::timeout, this, [this] {
@@ -2223,7 +2223,7 @@ void Window::finishBatch() {
     progress->setValue(exported+skipped+failed+cancelled);
     reportButton->setEnabled(true); reportButton->show(); status->setText(summary);
     emit completed(success);
-    if(closing) close();
+    if (closing) std::exchange(closing, {})();
 }
 void Window::showImageInformation() {
     if(busy || session.isEmpty()) return;
@@ -2311,7 +2311,7 @@ void Window::fail(const QString &message) {
     if (operation == "catalogue" || operation == "inspect") requestedImage.clear();
     retainSource = false;
     status->setText(message); emit completed(false);
-    if (closing) close();
+    if (closing) std::exchange(closing, {})();
 }
 void Window::readReply() {
     // A killed reader can still deliver queued output after its request failed.
@@ -2547,10 +2547,18 @@ void Window::readReply() {
         if (!unpublished) emit imageOpened(image);
     }
     emit completed(true);
-    if (closing) close();
+    if (closing) std::exchange(closing, {})();
+}
+bool Window::closeSession(std::function<void()> retry) {
+    closeRetry = std::move(retry);
+    const bool accepted = close();
+    closeRetry = {};
+    return accepted;
 }
 void Window::closeEvent(QCloseEvent *event) {
-    if (busy) { closing = true; cancel(); event->ignore(); }
-    else if (!resolveEdits([this] { close(); })) event->ignore();
+    auto retry = std::exchange(closeRetry, {});
+    if (!retry) retry = [this] { close(); };
+    if (busy) { closing = std::move(retry); cancel(); event->ignore(); }
+    else if (!resolveEdits(std::move(retry))) event->ignore();
     else { process.closeWriteChannel(); event->accept(); emit sessionClosed(); }
 }
