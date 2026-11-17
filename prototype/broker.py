@@ -665,6 +665,44 @@ def main():
                     for row in candidates:
                         row.pop('evaluation')
                     result.update(rejected=[], diagnostics_truncated=True)
+            elif op == 'filesystem_structure':
+                if not session or request.get('session') != session['token']:
+                    raise backend.Failure('stale_session', 'Open an image first.')
+                view = request.get('view')
+                start, limit = request.get('start', 0), request.get('limit', 128)
+                block = request.get('block') if view == 'references' else 0
+                if (view not in ('directory', 'extents', 'blocks', 'references')
+                        or type(start) is not int or not 0 <= start <= 0x7fffffff
+                        or type(limit) is not int or not 1 <= limit <= 128
+                        or type(block) is not int or not 0 <= block <= 0x7fffffff):
+                    raise backend.Failure('invalid_request', 'Choose a filesystem view and a valid page or block.')
+                working = session['image']
+                # Working-image edits publish by replacement. Include file identity and
+                # timestamps so a page cannot be resumed after replacement or Discard.
+                info = working.stat()
+                definition_hash = catalogue.digest(session['definitions'])
+                revision = hashlib.sha256(repr((
+                    session['token'], definition_hash, info.st_dev, info.st_ino, info.st_size,
+                    info.st_mtime_ns, info.st_ctime_ns, session['dirty'],
+                )).encode('ascii')).hexdigest()
+                if request.get('revision', revision) != revision:
+                    raise backend.Failure('stale_revision', 'The working image changed. Reload the filesystem structure.')
+                with tempfile.TemporaryDirectory(prefix='cpmimage-structure-') as temp:
+                    directory = Path(temp)
+                    (directory / 'diskdefs').write_text(session['definitions'], encoding='utf-8')
+                    result = adapter().native(directory, 'filesystem-structure', working,
+                                              session['format'], 'raw', view, start, limit, block)
+                if stop.is_set():
+                    raise backend.Failure('cancelled')
+                result.pop('v')
+                result.pop('ok')
+                total = result['total']
+                result.update(view=view, start=start, revision=revision, format=session['format'],
+                              definition_sha256=definition_hash, dirty=session['dirty'],
+                              next_start=start + limit if start + limit < total else None)
+                if view == 'references':
+                    result['block'] = block
+                reply = dict(v=1, id=rid, ok=True, result=result)
             elif op == 'source_metadata':
                 # Omit track for the summary, or pass [cylinder, head] for ordered sectors.
                 if not session or request.get('session') != session['token']:

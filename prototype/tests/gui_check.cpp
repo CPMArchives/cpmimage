@@ -390,6 +390,128 @@ private slots:
         QCOMPARE(original.readAll(), bytes);
     }
 
+    void filesystemStructureInspectorLinksWorkingImage() {
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}});
+        workspace.show();
+        auto &first = workspace.addSession();
+        auto viewAction = [&workspace]() -> QAction * {
+            for (auto *action : workspace.menuBar()->actions())
+                if (auto *menu = action->menu(); menu && menu->title() == "View")
+                    for (auto *item : menu->actions())
+                        if (item->objectName() == "filesystemStructureInspectorAction") return item;
+            return nullptr;
+        };
+        QVERIFY(viewAction());
+        QVERIFY(!viewAction()->isEnabled());
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const auto source = temp.filePath("working.raw");
+        QVERIFY(QFile::copy(root + "/fixtures/ibm3740-empty.raw", source));
+        QFile disk(source);
+        QVERIFY(disk.open(QIODevice::ReadOnly));
+        const auto bytes = disk.readAll();
+        disk.close();
+        QFile payload(temp.filePath("PROBE.BIN"));
+        QVERIFY(payload.open(QIODevice::WriteOnly));
+        QCOMPARE(payload.write(QByteArray(20000, 'P')), 20000);
+        payload.close();
+
+        QSignalSpy done(&first, &Window::completed);
+        first.openImage(source, "ibm-3740", "raw");
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 15000);
+        QVERIFY(done.takeFirst().first().toBool());
+        auto *areas = first.findChild<QListWidget *>("userAreas");
+        QVERIFY(areas);
+        areas->setCurrentRow(1);
+        QTimer approve;
+        connect(&approve, &QTimer::timeout, &first, [] {
+            auto *modal = QApplication::activeModalWidget();
+            if (!modal) return;
+            if (auto *message = qobject_cast<QMessageBox *>(modal)) {
+                if (auto *yes = message->button(QMessageBox::Yes)) yes->click();
+                else message->reject();
+            } else if (auto *review = qobject_cast<QDialog *>(modal)) {
+                if (review->windowTitle() == "Review import") review->accept();
+                else review->reject();
+            }
+        });
+        approve.start(20);
+        first.importFiles({payload.fileName()});
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 15000);
+        approve.stop();
+        QVERIFY(done.takeFirst().first().toBool());
+
+        QVERIFY(viewAction()->isEnabled());
+        viewAction()->trigger();
+        auto *inspector = first.findChild<QDialog *>("filesystemStructureInspector");
+        QVERIFY(inspector);
+        const auto button = [inspector](const char *name) { return inspector->findChild<QPushButton *>(name); };
+        auto *table = inspector->findChild<QTableWidget *>("filesystemStructureRows");
+        auto *page = inspector->findChild<QLabel *>("filesystemStructurePage");
+        auto *summary = inspector->findChild<QLabel *>("filesystemStructureSummary");
+        auto *pointers = inspector->findChild<QComboBox *>("filesystemExtentPointers");
+        QVERIFY(table && page && summary && pointers);
+        QTRY_COMPARE(table->rowCount(), 64);
+        QVERIFY(summary->text().contains("ibm-3740"));
+        QVERIFY(summary->text().contains("includes unsaved changes"));
+        QCOMPARE(table->editTriggers(), QAbstractItemView::NoEditTriggers);
+        QVERIFY(table->item(1, 3));
+        QCOMPARE(table->item(1, 3)->text(), QString("PROBE.BIN"));
+        table->setCurrentCell(1, 0);
+        const auto slot = table->item(1, 0)->text();
+        button("filesystemGoToExtent")->click();
+        QTRY_VERIFY(page->text().startsWith("File extents"));
+        QCOMPARE(table->rowCount(), 2);
+        QCOMPARE(table->item(table->currentRow(), 0)->text(), slot);
+        QCOMPARE(table->item(table->currentRow(), 4)->text(), QString("1"));
+        const int block = pointers->currentData().toInt();
+        QVERIFY(block > 0);
+        button("filesystemGoToBlock")->click();
+        QTRY_VERIFY(page->text().startsWith("Allocation blocks"));
+        QCOMPARE(table->item(table->currentRow(), 0)->text(), QString::number(block));
+        QCOMPARE(table->item(table->currentRow(), 1)->text(), QString("Allocated"));
+        QCOMPARE(table->item(0, 1)->text(), QString("Reserved for directory"));
+
+        button("filesystemNext")->click();
+        QTRY_VERIFY(page->text().contains("65–128"));
+        QCOMPARE(table->item(0, 0)->text(), QString("64"));
+        button("filesystemPrevious")->click();
+        QTRY_VERIFY(page->text().contains("1–64"));
+        QCOMPARE(table->item(0, 0)->text(), QString("0"));
+        table->setCurrentCell(block, 0);
+        button("filesystemShowReferences")->click();
+        QTRY_VERIFY(page->text().startsWith("References to block " + QString::number(block)));
+        QCOMPARE(table->rowCount(), 1);
+        QCOMPARE(table->item(0, 0)->text(), slot);
+        button("filesystemGoToSlot")->click();
+        QTRY_VERIFY(page->text().startsWith("Directory entries"));
+        QCOMPARE(table->item(table->currentRow(), 0)->text(), slot);
+        QCOMPARE(table->item(table->currentRow(), 3)->text(), QString("PROBE.BIN"));
+        inspector->reject();
+        QTRY_VERIFY(!first.findChild<QDialog *>("filesystemStructureInspector"));
+
+        auto &second = workspace.addSession();
+        QSignalSpy otherDone(&second, &Window::completed);
+        second.openImage(root + "/fixtures/ibm3740-empty.raw", "ibm-3740", "raw");
+        QTRY_COMPARE_WITH_TIMEOUT(otherDone.size(), 1, 15000);
+        QVERIFY(otherDone.first().first().toBool());
+        viewAction()->trigger();
+        auto *other = second.findChild<QDialog *>("filesystemStructureInspector");
+        QVERIFY(other);
+        auto *otherTable = other->findChild<QTableWidget *>("filesystemStructureRows");
+        QTRY_COMPARE(otherTable->rowCount(), 64);
+        QCOMPARE(otherTable->item(0, 1)->text(), QString("Unused slot"));
+        QVERIFY(other->findChild<QLabel *>("filesystemStructureSummary")->text().contains("no unsaved changes"));
+        other->reject();
+
+        QVERIFY(first.windowTitle().endsWith(" *"));
+        QVERIFY(disk.open(QIODevice::ReadOnly));
+        QCOMPARE(disk.readAll(), bytes);
+        QVERIFY(!QFile::exists(temp.filePath("working.FDF")));
+    }
+
     void flatExportConsolidatesIdenticalHostFile() {
         const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
         Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
