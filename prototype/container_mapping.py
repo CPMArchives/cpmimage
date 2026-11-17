@@ -7,6 +7,10 @@ class MappingError(ValueError):
     pass
 
 
+class MappingProfileRequired(MappingError):
+    pass
+
+
 @dataclass(frozen=True)
 class Track:
     cylinder: int
@@ -293,8 +297,10 @@ def derive_mapping(container, data, geometry):
         tracks = [Track(c, h, 5 if mfm else 2, size, tuple(ids))
                   for (c, h, size, mfm), ids in grouped.items()]
     else:
-        if len(data) < 16 or data[4] != 16:
-            raise MappingError('An explicit profile is required for this DMK geometry.')
+        if len(data) < 16:
+            raise MappingError('Truncated DMK header.')
+        if data[4] != 16:
+            raise MappingProfileRequired('An explicit profile is required for this DMK geometry.')
         length = int.from_bytes(data[2:4], 'little')
         if length <= 128 or len(data) != 16 + data[1] * length:
             raise MappingError('Invalid DMK track length.')
@@ -317,7 +323,7 @@ def derive_mapping(container, data, geometry):
     if (not tracks or [t.cylinder for t in tracks] != list(range(len(tracks)))
             or any(t.head or t.sectors != tracks[0].sectors or t.mode != tracks[0].mode for t in tracks)
             or tracks[0].sectors not in canonical):
-        raise MappingError('An explicit profile is required for noncanonical track or sector order.')
+        raise MappingProfileRequired('An explicit profile is required for noncanonical track or sector order.')
     mapping = PhysicalMapping(tuple(tracks))
     mapping.verify(geometry)
     return mapping

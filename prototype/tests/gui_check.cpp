@@ -224,6 +224,18 @@ private slots:
             apply->click();
             for (const auto &[field, value] : fields)
                 QCOMPARE(editor->findChild<QSpinBox *>("diskFormat" + field)->value(), value);
+            auto *compatibility = editor->findChild<QLabel *>("diskFormatCompatibility");
+            editor->findChild<QPushButton *>("diskFormatCheck")->click();
+            QTRY_VERIFY(compatibility->text().contains("directory readable and empty"));
+            QVERIFY(compatibility->text().contains("4 tracks, 4 sectors per track, 512 bytes per sector"));
+            editor->findChild<QSpinBox *>("diskFormatTracks")->setValue(5);
+            QVERIFY(!compatibility->text().contains("directory readable"));
+            editor->findChild<QPushButton *>("diskFormatCheck")->click();
+            QTRY_VERIFY(compatibility->text().contains("The sector mapping could not be verified"));
+            QVERIFY(compatibility->text().contains("5 tracks"));
+            QVERIFY(compatibility->text().contains("directory was not checked"));
+            QVERIFY(!apply->isEnabled());
+            editor->findChild<QSpinBox *>("diskFormatTracks")->setValue(4);
 
             bool previewed = false;
             QTimer previewTimer;
@@ -749,6 +761,67 @@ private slots:
         QFile saved(destination), original(path);
         QVERIFY(saved.open(QIODevice::ReadOnly) && original.open(QIODevice::ReadOnly));
         QCOMPARE(saved.readAll(), original.readAll());
+    }
+
+    void formatPickerExplainsRankAndRejection() {
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        QFile catalogue(temp.filePath("diskdefs"));
+        QVERIFY(catalogue.open(QIODevice::WriteOnly));
+        for (const auto &[id, tracks] : QList<QPair<QByteArray, int>>{
+                 {"alpha", 77}, {"beta", 77}, {"larger", 80}, {"too-small", 70}}) {
+            catalogue.write("diskdef " + id + "\n seclen 128\n tracks " + QByteArray::number(tracks)
+                            + "\n sectrk 26\n blocksize 1024\n maxdir 64\n skew 6\n bootsec 52\n os 2.2\nend\n");
+        }
+        catalogue.close();
+        const auto path = temp.filePath("short.raw");
+        QVERIFY(QFile::copy(root + "/fixtures/ibm3740-independent.raw", path));
+        QFile image(path);
+        QVERIFY(image.open(QIODevice::ReadWrite));
+        QVERIFY(image.resize(image.size() - 128));
+        image.close();
+
+        Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                      qEnvironmentVariable("CPMIMAGE_HELPER"), 30000, 2000, {}, temp.filePath("settings.ini"));
+        window.show();
+        QSignalSpy done(&window, &Window::completed);
+        window.loadCatalogue(catalogue.fileName());
+        QVERIFY(done.wait(30000));
+        QVERIFY(done.takeFirst().first().toBool());
+
+        QTimer poll;
+        bool checked = false;
+        connect(&poll, &QTimer::timeout, &window, [&] {
+            auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            if (!dialog || dialog->windowTitle() != "Choose disk format") return;
+            poll.stop();
+            const auto close = qScopeGuard([dialog] { dialog->reject(); });
+            auto *list = dialog->findChild<QListWidget *>("formatPickerList");
+            auto *findings = dialog->findChild<QPlainTextEdit *>("formatPickerDiagnostics");
+            auto *group = dialog->findChild<QComboBox *>();
+            QVERIFY(list && findings && group);
+            QCOMPARE(list->count(), 3);
+            QVERIFY(findings->isReadOnly());
+            QVERIFY(findings->toPlainText().contains("Rank 1 of 3"));
+            QVERIFY(findings->toPlainText().contains("equal evidence are ordered by format ID"));
+            QVERIFY(findings->toPlainText().contains("128 bytes short"));
+            QVERIFY(findings->toPlainText().contains("CP/M directory readable"));
+            list->setCurrentRow(2);
+            QVERIFY(findings->toPlainText().contains("Ranks below beta because fewer missing bytes rank higher"));
+            group->setCurrentIndex(1);
+            const auto rejected = list->findItems("too-small", Qt::MatchExactly);
+            QCOMPARE(rejected.size(), 1);
+            list->setCurrentItem(rejected.first());
+            QVERIFY(findings->toPlainText().contains("Excluded from plausible candidates"));
+            QVERIFY(findings->toPlainText().contains("RAW image size disagrees"));
+            checked = true;
+        });
+        poll.start(20);
+        window.inspectImage(path);
+        QVERIFY(done.wait(30000));
+        QVERIFY(checked);
+        QVERIFY(!done.takeFirst().first().toBool());
     }
 
     void formatSelection() {

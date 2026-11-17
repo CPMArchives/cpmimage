@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "window.h"
 #include "disk_format_editor.h"
+#include "format_diagnostics.h"
 #include <QEventLoop>
 #include <QMetaMethod>
 #include <QLocale>
@@ -1056,6 +1057,13 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
     list->setObjectName("formatPickerList");
     search->results = list;
     layout->addWidget(list);
+    auto *findings = new QPlainTextEdit;
+    findings->setObjectName("formatPickerDiagnostics");
+    findings->setAccessibleName("Format investigation findings");
+    findings->setReadOnly(true);
+    findings->setMaximumHeight(135);
+    findings->hide();
+    layout->addWidget(findings);
     auto *favorite = new QPushButton("Toggle favorite");
     layout->addWidget(favorite);
     auto *editFormats = new QPushButton("Disk Format Editor…");
@@ -1079,7 +1087,74 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
         hint->setWordWrap(true);
         layout->insertWidget(0, hint);
     }
-    const auto candidates = inspection["candidates"].toArray();
+    auto candidates = inspection["candidates"].toArray();
+    QHash<QString, int> candidatePositions;
+    for (int index = 0; index < candidates.size(); ++index)
+        candidatePositions.insert(candidates.at(index).toObject()["id"].toString(), index);
+    QHash<QString, QJsonObject> rejected;
+    for (const auto &value : inspection["rejected"].toArray()) {
+        const auto rejection = value.toObject();
+        rejected.insert(rejection["id"].toString(), rejection);
+    }
+    int rejectedCount = inspection["rejected_count"].toInt();
+    bool findingsInvalidated = false;
+    auto showFindings = [&] {
+        QStringList lines;
+        if (const auto *item = list->currentItem()) {
+            const auto id = item->data(Qt::UserRole).toJsonObject()["id"].toString();
+            const int index = candidatePositions.value(id, -1);
+            if (index >= 0) {
+                const auto candidate = candidates.at(index).toObject();
+                const auto evaluation = candidate["evaluation"].toObject();
+                const auto rank = evaluation["rank"].toArray();
+                lines << QString("Rank %1 of %2 plausible candidates.").arg(index + 1).arg(candidates.size());
+                if (rank.size() == 3 && candidates.size() > 1) {
+                    const auto rankAt = [&candidates](int position) {
+                        return candidates.at(position).toObject()["evaluation"].toObject()["rank"].toArray();
+                    };
+                    if ((index > 0 && rankAt(index - 1) == rank) ||
+                        (index + 1 < candidates.size() && rankAt(index + 1) == rank)) {
+                        lines << "Candidates with equal evidence are ordered by format ID.";
+                    } else {
+                        const int other = index > 0 ? index - 1 : 1;
+                        const auto compared = rankAt(other);
+                        if (compared.size() == 3) {
+                            const auto direction = index > 0 ? "Ranks below" : "Ranks above";
+                            const auto otherId = candidates.at(other).toObject()["id"].toString();
+                            QString reason;
+                            if (rank.at(0) != compared.at(0))
+                                reason = "full extent ranks ahead of a short extent";
+                            else if (rank.at(1) != compared.at(1))
+                                reason = "for short images, a populated directory ranks ahead of an empty directory";
+                            else if (rank.at(2) != compared.at(2))
+                                reason = "fewer missing bytes rank higher";
+                            if (!reason.isEmpty())
+                                lines << QString("%1 %2 because %3.").arg(direction, otherId, reason);
+                        }
+                    }
+                }
+                const auto details = FormatDiagnostics::describe(evaluation);
+                lines << (details.isEmpty() ? candidate["evidence"].toString() : details);
+            } else if (rejected.contains(id)) {
+                const auto reason = rejected.value(id);
+                lines << "Excluded from plausible candidates."
+                      << FormatDiagnostics::rejection(reason["stage"].toString(), reason["code"].toString());
+                const auto detail = reason["detail"].toString();
+                if (!detail.isEmpty()) lines << detail;
+            }
+        }
+        if (rejectedCount > 0) {
+            lines << QString("%1 definitions rejected. Select a definition in All formats to see its available findings.")
+                     .arg(rejectedCount);
+        }
+        if (findingsInvalidated)
+            lines << "The format catalogue changed. Reopen the image to run detection again.";
+        else if (inspection["diagnostics_truncated"].toBool() || rejectedCount > rejected.size())
+            lines << "Some detailed findings were omitted.";
+        findings->setPlainText(lines.join('\n'));
+        findings->setVisible(!lines.isEmpty());
+    };
+    connect(list, &QListWidget::currentItemChanged, &dialog, showFindings);
     const QString favoritesKey = "formatFavorites";
     auto favorites = settings->value(favoritesKey).toStringList();
     auto populate = [&] {
@@ -1109,6 +1184,7 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
         if (mode != 0) list->sortItems();
         if (!list->currentItem() && list->count()) list->setCurrentRow(0);
         updateButtons();
+        showFindings();
     };
     group->setCurrentIndex(candidates.isEmpty() ? 1 : 0);
     connect(group, &QComboBox::currentIndexChanged, &dialog, populate);
@@ -1122,6 +1198,11 @@ void Window::chooseFormat(const QJsonObject &inspection, bool switching) {
     connect(editFormats, &QPushButton::clicked, &dialog, [&] {
         const auto selected = list->currentItem() ? list->currentItem()->data(Qt::UserRole).toJsonObject()["id"].toString() : QString();
         if (showDiskFormatEditor(selected)) {
+            findingsInvalidated = findingsInvalidated || !candidates.isEmpty() || rejectedCount > 0;
+            candidates = {};
+            candidatePositions.clear();
+            rejected.clear();
+            rejectedCount = 0;
             group->setCurrentIndex(1);
             populate();
         }
@@ -2416,13 +2497,13 @@ void Window::cancel() {
     cancelButton->setEnabled(false);
     status->setText("Cancelling…");
 }
-void Window::fail(const QString &message) {
+void Window::fail(const QString &message, const QJsonObject &details) {
     if (brokerResultHandler) {
         deadline.stop(); cancellationDeadline.stop();
         auto reply = std::exchange(brokerResultHandler, {});
         setBusy(false);
         status->setText(message);
-        reply({}, message);
+        reply(details, message);
         return;
     }
     previewDirectory.reset();
@@ -2469,7 +2550,9 @@ void Window::readReply() {
             } else message = reply["message"].toString();
         }
         else message = "Cannot complete the operation (" + code + "). " + reply["message"].toString();
-        fail(message); return;
+        const auto details = operation == "definition_check_image" && reply["evaluation"].isObject()
+            ? QJsonObject{{"evaluation", reply["evaluation"]}} : QJsonObject{};
+        fail(message, details); return;
     }
     const auto result = reply["result"].toObject();
     const QRegularExpression hash("^[0-9a-f]{64}$");

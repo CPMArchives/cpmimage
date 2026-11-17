@@ -26,6 +26,7 @@ EDITOR_OPERATIONS = frozenset({
     'definition_save', 'definition_export', 'mapping_preview', 'mapping_write',
 })
 MAX_EDITOR_REQUEST_BYTES = 2 * 1024 * 1024
+MAX_INSPECT_REPLY_BYTES = 256 * 1024
 DSK_MAGIC = b'MV - CPCEMU Disk-File\r\nDisk-Info\r\n'
 
 
@@ -89,7 +90,7 @@ def main():
     sys.path.insert(0, str(args.root / 'experiments/process-comparison'))
     sys.path.insert(0, str(args.root / 'prototype'))
     import catalogue
-    from container_mapping import MappingError, PhysicalMapping, inspect_imd, transfer_dmk, dmk_template, replace_imd_comment, verify_jv3, derive_mapping, strict_profile
+    from container_mapping import MappingError, MappingProfileRequired, PhysicalMapping, inspect_imd, transfer_dmk, dmk_template, replace_imd_comment, verify_jv3, derive_mapping, strict_profile
     from publication import fingerprint as file_hash, publish, recovery_directory, require_recovery_clear
     from source_ownership import Ownership, OwnershipError, identity, native_lock
     from disk_format_store import DefinitionStore, DefinitionStoreError, atomic_write, encode_record
@@ -201,7 +202,11 @@ def main():
 
     structured = ('imd', 'jv3', 'dmk')
 
-    def image_container(source, data):
+    def image_container(source, data, requested=None):
+        if source.suffix.lower() == '.td0':
+            return 'td0'
+        if requested:
+            return requested
         if data.startswith(DSK_MAGIC):
             return 'dsk'
         if data.startswith(b'IMD '):
@@ -209,16 +214,21 @@ def main():
         extension = source.suffix.lower().lstrip('.')
         return extension if extension in structured else 'raw'
 
-    def mapped_image(container, source, data, geometry, directory, raw, *, proposed_profile=None, observations=None):
+    def mapped_image(container, source, data, geometry, directory, raw, *, proposed_profile=None, observations=None, mapping_details=None):
         profile = source.with_name(source.name + '.mapping.json')
         try:
             if proposed_profile is not None:
                 mapping = PhysicalMapping.from_profile(proposed_profile, geometry)
+                mapping_source = 'proposed'
             else:
                 try:
                     mapping = PhysicalMapping.from_profile(json.loads(catalogue.read_text(profile)), geometry)
+                    mapping_source = 'sidecar'
                 except FileNotFoundError:
                     mapping = derive_mapping(container, data, geometry)
+                    mapping_source = 'inferred'
+            if mapping_details is not None:
+                mapping_details['mapping_source'] = mapping_source
             if container == 'dmk':
                 def observe(cylinder, head, sectors):
                     observations[cylinder, head] = sectors
@@ -283,13 +293,15 @@ def main():
             if profile.is_file():
                 mapping = PhysicalMapping.from_profile(json.loads(catalogue.read_text(profile)), geometry)
                 order = [(t.cylinder, t.head, t.sectors) for t in mapping.tracks]
+                mapping_source = 'sidecar'
             else:
                 first = inventory.get((0, 0), {})
                 ids = tuple(sorted(first))
                 if (set(inventory) != {(c, 0) for c in range(geometry['tracks'])}
                         or ids not in (tuple(range(count)), tuple(range(1, count + 1)))):
-                    raise MappingError(f'Multi-sided or nonstandard TD0 layouts require {profile.name}.')
+                    raise MappingProfileRequired(f'Multi-sided or nonstandard TD0 layouts require {profile.name}.')
                 order = [(c, 0, ids) for c in range(geometry['tracks'])]
+                mapping_source = 'inferred'
             for cylinder, head, ids in order:
                 sectors = inventory.get((cylinder, head), {})
                 if set(sectors) != set(ids) or any(len(payload) != size for payload in sectors.values()):
@@ -298,6 +310,7 @@ def main():
                 for cylinder, head, ids in order:
                     for sector in ids:
                         stream.write(inventory[cylinder, head][sector])
+            return mapping_source
         except (OSError, ValueError, MappingError) as error:
             raise backend.Failure('physical_mapping', str(error)) from error
 
@@ -336,6 +349,102 @@ def main():
             end = raw_extent(data, geometry, backend)
             image.write_bytes(data)
         return image, mapping, end
+
+    class CandidateFailure(backend.Failure):
+        def __init__(self, error, evaluation):
+            super().__init__(error.code, error.message)
+            self.evaluation = evaluation
+
+    def evaluate_candidate(source, data, container, fmt, definition, geometry, directory, rid,
+                           *, inventory=None, detecting=False):
+        """Stage one interpretation in scratch storage and probe its directory read-only."""
+        raw = directory / 'candidate.raw'
+        layout = dict(kind='raw_extent' if container == 'raw' else 'physical_mapping')
+        evaluation = dict(layout=layout, directory=dict(status='unavailable'))
+        missing = 0
+        mapping = None
+        try:
+            if container != 'raw':
+                layout['expected'] = {key: geometry[key] for key in
+                                      ('tracks', 'sectors_per_track', 'sector_size', 'offset')
+                                      if key in geometry}
+            if container == 'td0':
+                if inventory is None:
+                    inventory = teledisk_inventory(data, directory)
+                layout['observed'] = dict(tracks=len(inventory))
+                layout['mapping_source'] = teledisk_raw(source, inventory, geometry, raw)
+                evidence = 'Verified TeleDisk sector mapping and readable directory'
+            elif container in structured:
+                raw.unlink(missing_ok=True)
+                mapping = mapped_image(container, source, data, geometry, directory, raw,
+                                       mapping_details=layout)
+                evidence = 'Verified sector mapping and readable directory'
+            elif container == 'dsk':
+                check_standard_dsk(data, geometry, backend)
+                if not raw.exists():
+                    encoded = directory / 'source.dsk'
+                    encoded.write_bytes(data)
+                    decoded = directory / 'decoded.raw'
+                    adapter().native(directory, 'decode', encoded, decoded)
+                    decoded.replace(raw)
+                evidence = 'Container geometry and readable directory'
+            else:
+                layout['observed'] = dict(bytes=len(data))
+                end = raw_extent(data, geometry, backend)
+                layout['expected'] = dict(bytes=end)
+                if len(data) > end:
+                    layout['trailing_bytes'] = len(data) - end
+                    if detecting:
+                        raise backend.Failure('image_size', 'The RAW image exceeds the selected definition extent.')
+                if not raw.exists():
+                    raw.write_bytes(data)
+                missing = max(0, end - len(data))
+                evidence = 'Exact RAW extent and readable directory'
+                if missing:
+                    evidence = 'Short RAW extent'
+                elif 'trailing_bytes' in layout:
+                    evidence = 'Readable directory within the selected RAW extent'
+        except backend.Failure as error:
+            if error.code == 'cancelled':
+                raise
+            reason = ('mapping_profile_required' if isinstance(error.__cause__, MappingProfileRequired)
+                      else error.code)
+            layout.update(status='failed', code=reason, message=error.message)
+            raise CandidateFailure(error, evaluation) from error
+        layout['status'] = 'passed'
+        if container == 'raw':
+            layout['missing_bytes'] = missing
+
+        probe = adapter().request({
+            'v': 1, 'id': rid, 'op': 'list', 'image': str(raw),
+            'format': fmt, 'container': 'raw'}, defs_override=definition)
+        if stop.is_set() or probe.get('error') == 'cancelled':
+            raise backend.Failure('cancelled')
+        if not probe['ok']:
+            error = backend.Failure(probe['error'], probe.get('message', ''))
+            evaluation['directory'] = dict(status='failed', code=error.code, message=error.message)
+            raise CandidateFailure(error, evaluation)
+        entries = probe['result']['entries']
+        if not geometry.get('boot_geometry'):
+            capacity = geometry['tracks'] * geometry['sectors_per_track'] * geometry['sector_size']
+            if any(not 0 <= entry['size'] <= capacity for entry in entries):
+                error = backend.Failure('image_incompatible', 'A reported file size exceeds the candidate capacity.')
+                evaluation['directory'] = dict(status='failed', code=error.code, message=error.message)
+                raise CandidateFailure(error, evaluation)
+        evaluation['directory'] = dict(status='passed', entries=len(entries))
+        if missing:
+            directory_evidence = 'populated directory' if entries else 'empty directory'
+            evidence += f' ({missing:,} bytes short) and {directory_evidence}'
+        evaluation.update(evidence=evidence, rank=[int(bool(missing)), bool(missing and not entries), missing])
+        return evaluation, probe['result'], mapping
+
+    def validate_investigation_container(data, container):
+        if data.startswith(b'EXTENDED CPC DSK File'):
+            raise backend.Failure('unsupported_container', 'Extended CPCEMU DSK is outside the supported container scope.')
+        if container not in ('raw', 'dsk', 'td0', *structured):
+            raise backend.Failure('unsupported_container', f'Unsupported container: {container}')
+        if data.startswith(DSK_MAGIC) != (container == 'dsk'):
+            raise backend.Failure('container_mismatch', 'The image header does not match the selected container.')
 
     def render_record(record):
         try:
@@ -386,7 +495,17 @@ def main():
             if op in ('definition_check_image', 'mapping_preview', 'mapping_write'):
                 source = Path(request['image']).absolute()
                 data = read_image(source)
-                container = request.get('container') or image_container(source, data)
+                container = image_container(source, data, request.get('container'))
+                if op == 'definition_check_image':
+                    validate_investigation_container(data, container)
+                    evaluation, checked, mapping = evaluate_candidate(
+                        source, data, container, fmt, definition, geometry, directory, request['id'])
+                    result.update(checked, container=container, evaluation=evaluation,
+                                  source_sha256=hashlib.sha256(data).hexdigest())
+                    if mapping:
+                        result['mapping'] = strict_profile(mapping)
+                        result['mapping_source'] = evaluation['layout']['mapping_source']
+                    return result
                 profile = None
                 if op == 'mapping_write':
                     if request.get('confirmed') is not True or container not in structured:
@@ -405,17 +524,7 @@ def main():
                     original_hash = mapping_hash(original_data)
                 image, mapping, _ = stage_image(source, data, container, geometry, directory,
                                                 proposed_profile=profile)
-                if op == 'definition_check_image':
-                    checked = adapter().request(dict(v=1, id=request['id'], op='list', image=str(image),
-                                                     format=fmt, container='raw'), defs_override=definition)
-                    if not checked['ok']:
-                        raise backend.Failure(checked['error'], checked.get('message', ''))
-                    result.update(checked['result'], container=container)
-                    if mapping:
-                        result['mapping'] = strict_profile(mapping)
-                        adjacent = source.with_name(source.name + '.mapping.json')
-                        result['mapping_source'] = 'sidecar' if adjacent.is_file() else 'inferred'
-                elif op == 'mapping_preview':
+                if op == 'mapping_preview':
                     if mapping_bytes(path) != original_data:
                         raise backend.Failure('source_changed', 'The mapping changed. Preview it again.')
                     result.update(profile=strict_profile(mapping), mapping_sha256=original_hash,
@@ -492,12 +601,8 @@ def main():
             elif op == 'inspect':
                 source = Path(request['image']).absolute()
                 data = read_image(source)
-                container = ("td0" if source.suffix.lower() == ".td0" else
-                             request.get('container') or image_container(source, data))
-                if data.startswith(b'EXTENDED CPC DSK File'):
-                    raise backend.Failure('unsupported_container', 'Extended CPCEMU DSK is outside the supported container scope.')
-                if container not in ('raw', 'dsk', 'td0', *structured):
-                    raise backend.Failure('unsupported_container', f'Unsupported container: {container}')
+                container = image_container(source, data, request.get('container'))
+                validate_investigation_container(data, container)
                 explicit = request.get('explicit_format')
                 if explicit and explicit not in definitions:
                     raise backend.Failure('unknown_format', f'{explicit} is absent from the selected catalogue.')
@@ -517,11 +622,10 @@ def main():
                                 raise
                             warning = error.message
                     inventory = teledisk_inventory(data, directory) if container == 'td0' else None
-                    candidates = []
-                    raw = directory / 'candidate.raw'
-                    ranked = []
-                    mapping_warning = ''
-                    choices = () if selected or request.get('explicit_format') else sorted(definitions.items())
+                    ranked, rejected = [], []
+                    rejected_count = 0
+                    mapping_warning = False
+                    choices = () if selected or explicit else sorted(definitions.items())
                     for fmt, definition in choices:
                         if stop.is_set():
                             raise backend.Failure('cancelled')
@@ -529,57 +633,25 @@ def main():
                         if geometry.get('boot_geometry'):
                             continue
                         try:
-                            missing = 0
-                            if container == 'td0':
-                                teledisk_raw(source, inventory, geometry, raw)
-                                tier, evidence = 0, 'Verified TeleDisk sector mapping and readable directory'
-                            elif container in structured:
-                                # Reuse only the validated open path. Geometry alone
-                                # does not establish equivalence of physical mappings.
-                                raw.unlink(missing_ok=True)
-                                mapped_image(container, source, data, geometry, directory, raw)
-                                tier, evidence = 0, 'Verified sector mapping and readable directory'
-                            elif container == 'dsk':
-                                check_standard_dsk(data, geometry, backend)
-                                if not raw.exists():
-                                    encoded = directory / 'source.dsk'
-                                    encoded.write_bytes(data)
-                                    adapter().native(directory, 'decode', encoded, raw)
-                                tier, evidence = 0, 'Container geometry and readable directory'
-                            else:
-                                end = raw_extent(data, geometry, backend)
-                                if len(data) > end:
-                                    continue
-                                if not raw.exists():
-                                    raw.write_bytes(data)
-                                if end == len(data):
-                                    tier, evidence = 0, 'Exact RAW extent and readable directory'
-                                else:
-                                    tier, evidence = 1, 'Short RAW extent'
-                                    missing = end - len(data)
-                        except backend.Failure as error:
-                            if error.code == 'cancelled':
-                                raise
-                            if (container in structured or container == 'td0') and not mapping_warning:
-                                mapping_warning = str(error.message or error.code)
+                            evaluation, _, _ = evaluate_candidate(
+                                source, data, container, fmt, definition, geometry, directory, rid,
+                                inventory=inventory, detecting=True)
+                        except CandidateFailure as error:
+                            rejected_count += 1
+                            stage = 'layout' if error.evaluation['layout']['status'] == 'failed' else 'directory'
+                            mapping_warning |= stage == 'layout' and container in (*structured, 'td0')
+                            if len(rejected) < 64:
+                                finding = error.evaluation[stage]
+                                rejected.append(dict(id=fmt, stage=stage, code=finding['code'],
+                                                     detail=finding['message'][:240]))
                             continue
-                        probe = adapter().request({
-                            'v': 1, 'id': rid, 'op': 'list', 'image': str(raw),
-                            'format': fmt, 'container': 'raw'}, defs_override=definition)
-                        if probe['ok']:
-                            capacity = geometry['tracks'] * geometry['sectors_per_track'] * geometry['sector_size']
-                            if any(not 0 <= entry['size'] <= capacity
-                                   for entry in probe['result']['entries']):
-                                continue
-                            empty = not probe['result']['entries'] if missing else False
-                            if missing:
-                                directory_evidence = 'empty directory' if empty else 'populated directory'
-                                evidence += f' ({missing:,} bytes short) and {directory_evidence}'
-                            maker, model, family = metadata.get(fmt, ('', '', ''))
-                            ranked.append((tier, empty, missing, fmt, dict(id=fmt, manufacturer=maker, model=model, family=family,
-                                evidence=evidence, definition_sha256=catalogue.digest(definition))))
+                        maker, model, family = metadata.get(fmt, ('', '', ''))
+                        ranked.append((*evaluation['rank'], fmt, dict(id=fmt, manufacturer=maker,
+                            model=model, family=family, evidence=evaluation['evidence'],
+                            definition_sha256=catalogue.digest(definition), evaluation=evaluation)))
                     candidates = [row for *_, row in sorted(ranked)]
                 result = dict(container=container, source_sha256=fingerprint, candidates=candidates,
+                              rejected=rejected, rejected_count=rejected_count,
                               sidecar_warning=warning,
                               detection_warning=('No verified container mapping found during detection. '
                                                  'Select a definition to check its mapping and sector diagnostics.'
@@ -588,6 +660,11 @@ def main():
                     fmt, definition, _ = selected
                     result['sidecar'] = dict(id=fmt, definition_sha256=catalogue.digest(definition))
                 reply = dict(v=1, id=rid, ok=True, result=result)
+                # Preserve the legacy picker rows if added diagnostics would exceed its reply limit.
+                if len(json.dumps(reply)) + 1 > MAX_INSPECT_REPLY_BYTES:
+                    for row in candidates:
+                        row.pop('evaluation')
+                    result.update(rejected=[], diagnostics_truncated=True)
             elif op == 'source_metadata':
                 # Omit track for the summary, or pass [cylinder, head] for ordered sectors.
                 if not session or request.get('session') != session['token']:
@@ -1100,6 +1177,9 @@ def main():
             else:
                 raise backend.Failure('read_only', 'Only read-only operations are available.')
             respond(reply)
+        except CandidateFailure as error:
+            respond(dict(v=1, id=rid, ok=False, error=error.code, message=error.message,
+                         evaluation=error.evaluation))
         except backend.Failure as error:
             respond(dict(v=1, id=rid, ok=False, error=error.code, message=error.message))
         except DefinitionStoreError as error:
