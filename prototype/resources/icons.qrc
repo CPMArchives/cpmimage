@@ -2,11 +2,26 @@
   <qresource prefix="/icons">
     <file>cpmimage.png</file>
     <file>cpmimage-macos.png</file>
-    <file>toolbar/open.png</file>
-    <file>toolbar/new.png</file>
-    <file>toolbar/save.png</file>
-    <file>toolbar/import.png</file>
-    <file>toolbar/export.png</file>
+    <file>toolbar/dark/analyze-disk.png</file>
+    <file>toolbar/dark/check-filesystem.png</file>
+    <file>toolbar/dark/compare-images.png</file>
+    <file>toolbar/dark/export.png</file>
+    <file>toolbar/dark/filesystem.png</file>
+    <file>toolbar/dark/import.png</file>
+    <file>toolbar/dark/new.png</file>
+    <file>toolbar/dark/open.png</file>
+    <file>toolbar/dark/physical-disk.png</file>
+    <file>toolbar/dark/save.png</file>
+    <file>toolbar/light/analyze-disk.png</file>
+    <file>toolbar/light/check-filesystem.png</file>
+    <file>toolbar/light/compare-images.png</file>
+    <file>toolbar/light/export.png</file>
+    <file>toolbar/light/filesystem.png</file>
+    <file>toolbar/light/import.png</file>
+    <file>toolbar/light/new.png</file>
+    <file>toolbar/light/open.png</file>
+    <file>toolbar/light/physical-disk.png</file>
+    <file>toolbar/light/save.png</file>
     <file>toolbar/export-area.png</file>
   </qresource>
   <qresource prefix="/help">

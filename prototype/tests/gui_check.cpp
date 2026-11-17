@@ -497,6 +497,31 @@ private slots:
         QCOMPARE(tabs->count(), 0);
     }
 
+    void toolbarVisibility() {
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const auto check = [&](bool mainVisible, bool workbenchVisible, bool toggle) {
+            Window window(qEnvironmentVariable("CPMIMAGE_ROOT"),
+                          qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                          qEnvironmentVariable("CPMIMAGE_HELPER"), 30000, 2000, {},
+                          temp.filePath("settings.ini"));
+            auto *main = window.findChild<QWidget *>("mainToolbar");
+            auto *workbench = window.findChild<QWidget *>("workbenchToolbar");
+            QVERIFY(main && workbench);
+            QCOMPARE(!main->isHidden(), mainVisible);
+            QCOMPARE(!workbench->isHidden(), workbenchVisible);
+            if (toggle) {
+                for (auto *action : window.findChildren<QAction *>())
+                    if (action->text() == "Toolbar" || action->text() == "Workbench Toolbar")
+                        action->trigger();
+                QVERIFY(main->isHidden());
+                QVERIFY(!workbench->isHidden());
+            }
+        };
+        check(true, false, true);
+        check(false, true, false);
+    }
+
     void workspaceCloseSavingUnsavedTabs() {
         const auto maslin = qEnvironmentVariable("CPMIMAGE_MASLIN");
         if (maslin.isEmpty()) QSKIP("External Maslin corpus unavailable");
