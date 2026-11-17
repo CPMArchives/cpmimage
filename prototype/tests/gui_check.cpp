@@ -898,6 +898,78 @@ private slots:
         QVERIFY(!QFile::exists(temp.filePath("damaged.FDF")));
     }
 
+    void filesystemRepairPlanComparesReferenceSlots() {
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        QFile fixture(root + "/fixtures/ibm3740-empty.raw");
+        QVERIFY(fixture.open(QIODevice::ReadOnly));
+        auto good = fixture.readAll();
+        constexpr int directory = 2 * 26 * 128;
+        for (int i = 0; i < 2; ++i) {
+            QByteArray entry(32, '\0');
+            entry.replace(1, 11, i == 0 ? "FIRST   BIN" : "SECOND  BIN");
+            entry[15] = 1;
+            entry[16] = char(2 + i);
+            good.replace(directory + i * 32, 32, entry);
+        }
+        auto damaged = good;
+        damaged[directory + 12] = 35;
+        damaged[directory + 32 + 16] = 2;
+        const auto goodPath = temp.filePath("Known Good.raw");
+        const auto damagedPath = temp.filePath("Damaged.raw");
+        for (const auto &[path, bytes] : {std::pair{goodPath, good}, {damagedPath, damaged}}) {
+            QFile file(path);
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            QCOMPARE(file.write(bytes), bytes.size());
+        }
+        Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}});
+        workspace.show();
+        auto &reference = workspace.addSession();
+        QSignalSpy opened(&reference, &Window::completed);
+        reference.openImage(goodPath, "ibm-3740", "raw");
+        QTRY_COMPARE_WITH_TIMEOUT(opened.size(), 1, 15000);
+        QVERIFY(opened.first().first().toBool());
+        auto &empty = workspace.addSession();
+        empty.findChild<QAction *>("filesystemCheckAction")->trigger();
+        auto *check = empty.findChild<QDialog *>("filesystemCheckDialog");
+        QVERIFY(check);
+        auto *format = check->findChild<QComboBox *>("filesystemCheckFormat");
+        QTRY_VERIFY_WITH_TIMEOUT(format->findData("ibm-3740") >= 0, 15000);
+        format->setCurrentIndex(format->findData("ibm-3740"));
+        check->findChild<QLineEdit *>("filesystemCheckPath")->setText(damagedPath);
+        check->findChild<QPushButton *>("filesystemCheckRun")->click();
+        auto *review = check->findChild<QPushButton *>("filesystemCheckReviewPlan");
+        QTRY_VERIFY_WITH_TIMEOUT(review->isEnabled(), 15000);
+        bool checked = false;
+        QTimer::singleShot(0, check, [&] {
+            auto *plan = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+            QVERIFY(plan);
+            const auto close = qScopeGuard([plan] { plan->reject(); });
+            auto *referenceChoice = plan->findChild<QComboBox *>("filesystemRepairReference");
+            auto *slot = plan->findChild<QComboBox *>("filesystemRepairReferenceSlot");
+            auto *evidence = plan->findChild<QPlainTextEdit *>("filesystemRepairReferenceEvidence");
+            QVERIFY(referenceChoice && slot && evidence);
+            QCOMPARE(referenceChoice->count(), 2);
+            referenceChoice->setCurrentIndex(1);
+            QTRY_VERIFY(evidence->toPlainText().contains("FIRST.BIN"));
+            QVERIFY(evidence->toPlainText().contains("Pointer 1 → block 2"));
+            slot->setCurrentIndex(slot->findData(1));
+            QTRY_VERIFY(evidence->toPlainText().contains("SECOND.BIN"));
+            QVERIFY(evidence->toPlainText().contains("Pointer 1 → block 3"));
+            checked = true;
+        });
+        review->click();
+        QVERIFY(checked);
+        check->reject();
+        for (const auto &[path, bytes] : {std::pair{goodPath, good}, {damagedPath, damaged}}) {
+            QFile file(path);
+            QVERIFY(file.open(QIODevice::ReadOnly));
+            QCOMPARE(file.readAll(), bytes);
+        }
+    }
+
     void flatExportConsolidatesIdenticalHostFile() {
         const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
         Window window(root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),

@@ -98,6 +98,11 @@ public:
     Window &addSession() {
         auto *page = new Window(runtime.root, runtime.python, runtime.helper, 30000, 2000, runtime.notices);
         page->bindWorkbenchAction("compare-images", compareAction);
+        page->repairReferences = [this, page] {
+            QList<ImageComparison::Source> references;
+            for (auto *target : comparisonTargets(page)) references.append(comparisonSource(target));
+            return references;
+        };
         page->menuBar()->setNativeMenuBar(false);
         page->menuBar()->hide();
         page->findChild<QWidget *>("imageName")->hide();
@@ -169,10 +174,9 @@ private:
                            ? "Unpin Current Image" : "Pin Current Image");
     }
 
-    QList<Window *> comparisonTargets() const {
+    QList<Window *> comparisonTargets(const Window *active) const {
         QList<Window *> available;
-        const auto *active = qobject_cast<Window *>(tabs->currentWidget());
-        if (!active || active->busy || active->session.isEmpty()) return available;
+        if (!active || active->busy) return available;
         for (int index = 0; index < tabs->count(); ++index) {
             auto *page = qobject_cast<Window *>(tabs->widget(index));
             if (page && page != active && !page->busy && !page->session.isEmpty()) available.append(page);
@@ -181,36 +185,40 @@ private:
     }
 
     void updateCompareAction() {
-        compareAction->setEnabled(!comparisonTargets().isEmpty());
+        const auto *active = qobject_cast<Window *>(tabs->currentWidget());
+        compareAction->setEnabled(active && !active->session.isEmpty() && !comparisonTargets(active).isEmpty());
+    }
+
+    ImageComparison::Source comparisonSource(Window *page) const {
+        const auto token = page->session;
+        const QPointer<Window> guard(page);
+        const int index = tabs->indexOf(page);
+        return {
+            QString("Tab %1 · %2").arg(index + 1).arg(tabs->tabText(index)),
+            [guard, token](QJsonObject fields, auto reply) {
+                if (!guard || guard->session != token) {
+                    reply({}, "An image session changed. Reopen the comparison.");
+                    return;
+                }
+                fields["session"] = token;
+                guard->requestBrokerResult(std::move(fields), std::move(reply));
+            },
+            [guard, token] {
+                if (guard && guard->session == token && guard->busy &&
+                    (guard->operation.startsWith("comparison_") || guard->operation == "filesystem_structure"))
+                    guard->cancel();
+            }
+        };
     }
 
     void compareImages() {
-        const auto available = comparisonTargets();
+        auto *active = qobject_cast<Window *>(tabs->currentWidget());
+        if (!active || active->session.isEmpty()) return;
+        const auto available = comparisonTargets(active);
         if (available.isEmpty()) return;
-        auto source = [this](Window *page) -> ImageComparison::Source {
-            const auto token = page->session;
-            const QPointer<Window> guard(page);
-            const int index = tabs->indexOf(page);
-            return {
-                QString("Tab %1 · %2").arg(index + 1).arg(tabs->tabText(index)),
-                [guard, token](QJsonObject fields, auto reply) {
-                    if (!guard || guard->session != token) {
-                        reply({}, "An image session changed. Reopen the comparison.");
-                        return;
-                    }
-                    fields["session"] = token;
-                    guard->requestBrokerResult(std::move(fields), std::move(reply));
-                },
-                [guard, token] {
-                    if (guard && guard->session == token && guard->busy &&
-                        (guard->operation.startsWith("comparison_") || guard->operation == "filesystem_structure"))
-                        guard->cancel();
-                }
-            };
-        };
         QList<ImageComparison::Source> targets;
-        for (auto *page : available) targets.append(source(page));
-        auto *dialog = new ImageComparison(source(qobject_cast<Window *>(tabs->currentWidget())),
+        for (auto *page : available) targets.append(comparisonSource(page));
+        auto *dialog = new ImageComparison(comparisonSource(active),
                                            std::move(targets), this);
         dialog->show();
     }

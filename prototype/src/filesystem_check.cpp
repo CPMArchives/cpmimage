@@ -12,6 +12,7 @@
 #include <QPointer>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QSet>
 #include <QTableWidget>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -74,9 +75,10 @@ QString number(const QJsonValue &value, int base = 0) {
 }
 
 FilesystemCheckDialog::FilesystemCheckDialog(QString activeImage, QString activeFormat, Request request,
-                                             OpenLocation openFindingSlot, OpenLocation openFindingBlock, QWidget *parent)
+                                             OpenLocation openFindingSlot, OpenLocation openFindingBlock, QWidget *parent,
+                                             QList<ImageComparison::Source> referenceImages)
     : QDialog(parent), request(std::move(request)), openSlot(std::move(openFindingSlot)),
-      openBlock(std::move(openFindingBlock)) {
+      openBlock(std::move(openFindingBlock)), references(std::move(referenceImages)) {
     setAttribute(Qt::WA_DeleteOnClose);
     setWindowModality(Qt::ApplicationModal);
     setWindowTitle("Filesystem Check");
@@ -194,6 +196,7 @@ void FilesystemCheckDialog::updateControls() {
 
 void FilesystemCheckDialog::clearReport() {
     checkedRevision.clear();
+    checkedDefinition.clear();
     checkedBlockCount = 0;
     findings = {};
     omittedFindings = 0;
@@ -286,6 +289,7 @@ void FilesystemCheckDialog::showReport(const QJsonObject &report) {
     status->setText(omitted ? QString("%1 findings · %2 omitted from this report").arg(count).arg(omitted) :
                     QString(count == 1 ? "%1 finding" : "%1 findings").arg(count));
     if (working) checkedRevision = report["revision"].toString();
+    checkedDefinition = report["definition_sha256"].toString();
     checkedBlockCount = report["block_count"].toInt();
     findings = report["findings"].toArray();
     table->setRowCount(findings.size());
@@ -328,6 +332,98 @@ void FilesystemCheckDialog::showRepairPlan() {
     }
     details->setPlainText(lines.join('\n'));
     layout->addWidget(details);
+    if (!references.isEmpty()) {
+        auto *fields = new QFormLayout;
+        auto *reference = new QComboBox(&plan);
+        reference->setObjectName("filesystemRepairReference");
+        reference->addItem("Choose an open image");
+        for (const auto &source : references) reference->addItem(source.label);
+        auto *slot = new QComboBox(&plan);
+        slot->setObjectName("filesystemRepairReferenceSlot");
+        QSet<int> seen;
+        for (const auto &value : findings) {
+            const auto finding = value.toObject();
+            for (const auto *key : {"slot", "related_slot"}) {
+                const int index = finding[key].toInt(-1);
+                if (index < 0 || seen.contains(index)) continue;
+                seen.insert(index);
+                slot->addItem(QString("Directory slot %1").arg(index), index);
+            }
+        }
+        fields->addRow("Reference image", reference);
+        fields->addRow("Compare", slot);
+        layout->addLayout(fields);
+
+        auto *evidence = new QPlainTextEdit(&plan);
+        evidence->setObjectName("filesystemRepairReferenceEvidence");
+        evidence->setReadOnly(true);
+        evidence->setPlainText("Choose a known-good copy. Compare the same slot only if the entries correspond.");
+        layout->addWidget(evidence);
+        auto compare = [this, reference, slot, evidence] {
+            const int index = reference->currentIndex() - 1;
+            if (index < 0 || slot->currentIndex() < 0) {
+                evidence->setPlainText("Choose a reference image and a directory slot.");
+                return;
+            }
+            const int directorySlot = slot->currentData().toInt();
+            QStringList damagedEvidence;
+            for (const auto &value : findings) {
+                const auto finding = value.toObject();
+                if (finding["slot"].toInt(-1) != directorySlot &&
+                    finding["related_slot"].toInt(-1) != directorySlot) continue;
+                auto description = findingLabel(finding["code"].toString());
+                if (finding["block"].isDouble()) description += " · Block " + number(finding["block"]);
+                if (finding["observed"].isDouble()) description += " · Observed " + number(finding["observed"]);
+                damagedEvidence << description;
+            }
+            reference->setEnabled(false);
+            slot->setEnabled(false);
+            evidence->setPlainText("Reading reference directory…");
+            references.at(index).request({{"op", "filesystem_structure"}, {"view", "directory"},
+                                          {"start", directorySlot}, {"limit", 1}},
+                [reference = QPointer(reference), slot, evidence, directorySlot, damagedEvidence, definition = checkedDefinition]
+                (const QJsonObject &result, const QString &error) {
+                    if (!reference) return;
+                    reference->setEnabled(true);
+                    slot->setEnabled(true);
+                    if (!error.isEmpty()) {
+                        evidence->setPlainText(error);
+                        return;
+                    }
+                    if (definition.isEmpty() || result["definition_sha256"].toString() != definition) {
+                        evidence->setPlainText("The reference uses a different disk definition. Choose a copy opened with the checked definition.");
+                        return;
+                    }
+                    const auto rows = result["rows"].toArray();
+                    if (rows.size() != 1 || rows.first().toObject()["slot"].toInt(-1) != directorySlot) {
+                        evidence->setPlainText("That directory slot is unavailable in the reference.");
+                        return;
+                    }
+                    const auto row = rows.first().toObject();
+                    QStringList lines{QString("Checked slot %1").arg(directorySlot)};
+                    lines << damagedEvidence << ""
+                          << QString("Reference slot %1 · %2").arg(directorySlot).arg(row["kind"].toString());
+                    if (result["dirty"].toBool()) lines << "The reference includes unsaved changes.";
+                    if (row["kind"] == "file") {
+                        const auto extension = row["extension"].toString();
+                        const auto name = row["name"].toString() + (extension.isEmpty() ? QString() : "." + extension);
+                        lines << QString("User %1 · %2 · Extent %3 · %4 records")
+                                     .arg(row["user"].toInt()).arg(name).arg(row["extent"].toInt())
+                                     .arg(row["record_count"].toInt());
+                        QStringList pointers;
+                        const auto blocks = row["pointers"].toArray();
+                        for (int i = 0; i < blocks.size(); ++i)
+                            if (blocks.at(i).isDouble())
+                                pointers << QString("Pointer %1 → block %2").arg(i + 1).arg(blocks.at(i).toInt());
+                        lines << (pointers.isEmpty() ? "No allocated blocks." : pointers.join(" · "));
+                    }
+                    lines << "Verify that the reference entry corresponds to the damaged entry. Slot numbers alone do not establish ownership.";
+                    evidence->setPlainText(lines.join('\n'));
+                });
+        };
+        connect(reference, &QComboBox::currentIndexChanged, &plan, compare);
+        connect(slot, &QComboBox::currentIndexChanged, &plan, compare);
+    }
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &plan);
     connect(buttons, &QDialogButtonBox::rejected, &plan, &QDialog::reject);
     layout->addWidget(buttons);

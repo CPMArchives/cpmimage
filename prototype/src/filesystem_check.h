@@ -5,6 +5,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <functional>
+#include "image_comparison.h"
 
 class QComboBox;
 class QLabel;
@@ -19,7 +20,8 @@ public:
     using OpenLocation = std::function<void(int, QString)>;
 
     FilesystemCheckDialog(QString activeImage, QString activeFormat, Request request,
-                          OpenLocation openSlot, OpenLocation openBlock, QWidget *parent);
+                          OpenLocation openSlot, OpenLocation openBlock, QWidget *parent,
+                          QList<ImageComparison::Source> references = {});
 
 private:
     void updateSource();
@@ -34,7 +36,8 @@ private:
     int checkedBlockCount = 0;
     bool busy = false;
     bool catalogueLoaded = false;
-    QString checkedRevision;
+    QString checkedRevision, checkedDefinition;
+    QList<ImageComparison::Source> references;
     QJsonArray findings;
     int omittedFindings = 0;
     QComboBox *mode, *formats;

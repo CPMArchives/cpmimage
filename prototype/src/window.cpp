@@ -2554,7 +2554,7 @@ void Window::showFilesystemCheck() {
         [this, checkedSession](int block, QString revision) {
             if (session != checkedSession) return;
             showFilesystemInspector(-1, std::move(revision), block);
-        }, this);
+        }, this, repairReferences ? repairReferences() : QList<ImageComparison::Source>{});
     dialog->show();
 }
 
