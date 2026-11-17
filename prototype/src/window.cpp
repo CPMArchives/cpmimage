@@ -858,7 +858,10 @@ void Window::chooseSave(bool saveAs) {
     if (busy || session.isEmpty()) return;
     QString destination, selectedFilter;
     if (saveAs) {
-        destination = QFileDialog::getSaveFileName(this, "Save CP/M image as", image,
+        const QFileInfo previous(settings->value("saveDirectory").toString());
+        const auto suggested = previous.isDir()
+            ? QDir(previous.absoluteFilePath()).filePath(QFileInfo(image).fileName()) : image;
+        destination = QFileDialog::getSaveFileName(this, "Save CP/M image as", suggested,
             "RAW disk images (*.raw *.img);;Standard CPCEMU DSK (*.dsk);;ImageDisk (*.imd);;JV3 (*.jv3);;DMK (*.dmk)", &selectedFilter, QFileDialog::DontConfirmOverwrite);
         if (destination.isEmpty()) { afterSave = {}; return; }
     }
@@ -2421,6 +2424,7 @@ void Window::readReply() {
             dirty = false;
             unpublished = false;
             image = result["destination"].toString();
+            settings->setValue("saveDirectory", QFileInfo(image).absolutePath());
             container = result["container"].toString();
             snapshotHash = result["source_sha256"].toString();
             source->setText(QFileInfo(image).fileName());
