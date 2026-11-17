@@ -6,6 +6,8 @@ CP/M Image is a graphical file manager for CP/M disk images on macOS, Windows, a
 
 Get the five platform packages, corresponding source, and SHA-256 checksums from the [v1.3 release downloads](https://github.com/CPMArchives/cpmimage/releases/tag/v1.3#assets). The release notes cover the changes and supported formats.
 
+**Experimental · 1.4 Beta 1** — [Download the macOS ARM64 preview](https://github.com/CPMArchives/cpmimage/releases/download/v1.4b1/CPMImage-v1.4b1-macOS-arm64.dmg) to try TeleDisk (.TD0) import. [Beta notes, source, and checksums](https://github.com/CPMArchives/cpmimage/releases/tag/v1.4b1#assets)
+
 - **macOS ARM64 (Apple silicon):** Open the DMG and drag **CPMImage.app** to **Applications**.
 - **Windows ARM64 and x86-64:** Download the executable for your architecture and run it.
 - **Linux ARM64 and x86-64:** Download the executable for your architecture, mark it executable with `chmod +x`, and run it.
