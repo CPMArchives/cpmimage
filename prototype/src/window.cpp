@@ -41,6 +41,7 @@
 #include <QSplitter>
 #include <QPainter>
 #include <QStyle>
+#include <QStyleHints>
 #include <QUuid>
 #include <QSignalBlocker>
 #include <QVBoxLayout>
@@ -177,6 +178,7 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     auto *central = new QWidget(this);
     auto *layout = new QVBoxLayout(central);
     auto *toolbarWidget = new QWidget(central);
+    toolbarWidget->setObjectName("mainToolbar");
     auto *toolbar = new QHBoxLayout(toolbarWidget);
     toolbar->setContentsMargins(0,0,0,0);
     formats = new QPushButton("Choose format…");
@@ -195,25 +197,72 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     saveButton->setObjectName("toolbarSave");
     auto *importButton = new QPushButton("Import");
     importButton->setObjectName("toolbarImport");
-    for (const auto &[button, icon] : {
-             std::pair{openButton, "open"}, std::pair{newButton, "new"},
-             std::pair{saveButton, "save"}, std::pair{importButton, "import"},
-             std::pair{exportButton, "export"}}) {
+    const QList<std::pair<QPushButton *, const char *>> toolbarButtons = {
+        {openButton, "open"}, {newButton, "new"}, {saveButton, "save"},
+        {importButton, "import"}, {exportButton, "export"}
+    };
+    const auto addCaption = [](QHBoxLayout *row, QWidget *icon, const QString &title) {
+        auto *column = new QVBoxLayout;
+        column->setSpacing(0);
+        column->addWidget(icon, 0, Qt::AlignHCenter);
+        auto *caption = new QLabel(title);
+        caption->setAlignment(Qt::AlignCenter);
+        column->addWidget(caption);
+        row->addLayout(column);
+    };
+    auto *workbenchWidget = new QWidget(central);
+    workbenchWidget->setObjectName("workbenchToolbar");
+    auto *workbench = new QHBoxLayout(workbenchWidget);
+    workbench->setContentsMargins(0, 0, 0, 0);
+    QList<std::pair<QLabel *, const char *>> workbenchIcons;
+    for (const auto &[label, icon] : {
+             std::pair{"Analyze Disk", "analyze-disk"}, std::pair{"Physical Disk", "physical-disk"},
+             std::pair{"Filesystem", "filesystem"}, std::pair{"Compare Images", "compare-images"},
+             std::pair{"Check Filesystem", "check-filesystem"}}) {
+        auto *sample = new QLabel(workbenchWidget);
+        sample->setAccessibleName(label);
+        sample->setToolTip(QString("%1 (preview)").arg(label));
+        sample->setContentsMargins(4, 4, 4, 4);
+        addCaption(workbench, sample, label);
+        workbenchIcons.append({sample, icon});
+    }
+    workbench->addStretch();
+
+    const auto updateToolbarIcons = [toolbarWidget, toolbarButtons, workbenchIcons] {
+        const auto scheme = QApplication::styleHints()->colorScheme();
+        const bool dark = scheme == Qt::ColorScheme::Dark ||
+            (scheme == Qt::ColorScheme::Unknown &&
+             toolbarWidget->palette().color(QPalette::Window).lightness() < 128);
+        const auto theme = dark ? "dark" : "light";
+        const auto artwork = [theme](const char *icon) {
+            return QIcon(QString(":/icons/toolbar/%1/%2.png").arg(theme, icon));
+        };
+        for (const auto &[button, icon] : toolbarButtons)
+            button->setIcon(artwork(icon));
+        for (const auto &[label, icon] : workbenchIcons)
+            label->setPixmap(artwork(icon).pixmap(QSize(64, 64), label->devicePixelRatioF()));
+    };
+    connect(QApplication::styleHints(), &QStyleHints::colorSchemeChanged,
+            toolbarWidget, updateToolbarIcons, Qt::QueuedConnection);
+    connect(qApp, &QApplication::paletteChanged, toolbarWidget, updateToolbarIcons, Qt::QueuedConnection);
+    updateToolbarIcons();
+    for (const auto &entry : toolbarButtons) {
+        auto *button = entry.first;
         button->setAccessibleName(button->text());
         if (button->toolTip().isEmpty()) button->setToolTip(button->text());
-        button->setIcon(QIcon(QString(":/icons/toolbar/%1.png").arg(icon)));
         button->setIconSize(QSize(64, 64));
         button->setText({});
         button->setFlat(true);
         button->setStyleSheet("QPushButton { border: none; background: transparent; padding: 4px; }"
                               "QPushButton:focus { background: palette(mid); }");
     }
-    toolbar->addWidget(openButton);
-    toolbar->addWidget(newButton);
-    toolbar->addWidget(saveButton);
-    toolbar->addWidget(importButton);
-    toolbar->addWidget(exportButton);
+    addCaption(toolbar, openButton, "Open");
+    addCaption(toolbar, newButton, "New");
+    addCaption(toolbar, saveButton, "Save");
+    addCaption(toolbar, importButton, "Import");
+    addCaption(toolbar, exportButton, "Export");
     layout->addWidget(toolbarWidget);
+    layout->addWidget(workbenchWidget);
     toolbar->addStretch();
 
     auto *imageRow=new QHBoxLayout;
@@ -495,14 +544,19 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     viewFileAction->setObjectName("viewFileAction");
     connect(viewFileAction, &QAction::triggered, this, [this] { viewFile(); });
     connect(table, &QTableWidget::cellDoubleClicked, viewFileAction, &QAction::trigger);
-    auto *showToolbar = view->addAction("Toolbar");
-    showToolbar->setCheckable(true);
-    showToolbar->setChecked(settings->value("toolbarVisible", true).toBool());
-    toolbarWidget->setVisible(showToolbar->isChecked());
-    connect(showToolbar, &QAction::toggled, this, [this, toolbarWidget](bool visible) {
-        toolbarWidget->setVisible(visible);
-        settings->setValue("toolbarVisible", visible);
-    });
+    const auto addToolbarToggle = [this, view](const char *label, const char *key,
+                                                QWidget *widget, bool defaultVisible) {
+        auto *action = view->addAction(label);
+        action->setCheckable(true);
+        action->setChecked(settings->value(key, defaultVisible).toBool());
+        widget->setVisible(action->isChecked());
+        connect(action, &QAction::toggled, this, [this, widget, key](bool visible) {
+            widget->setVisible(visible);
+            settings->setValue(key, visible);
+        });
+    };
+    addToolbarToggle("Toolbar", "toolbarVisible", toolbarWidget, true);
+    addToolbarToggle("Workbench Toolbar", "workbenchToolbarVisible", workbenchWidget, false);
     showAllAction = view->addAction("Show All User Areas");
     showAllAction->setCheckable(true);
     showAllAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_A));
