@@ -2,11 +2,14 @@
 /* One operation per child. Internal cpmfs API experiment, not production ABI. */
 #include "config.h"
 #include <stdio.h>
+#include <limits.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <sys/stat.h>
 #include "cpmfs.h"
+#include "cpmdir.h"
 const char cmd[]="cpmimage_helper";
 static void quoted(const char *s) {
   putchar('"'); for(const unsigned char *p=(const unsigned char*)s;*p;p++) {
@@ -275,6 +278,140 @@ static int teledisk_records(const char *source, const char *destination)
 }
 #endif
 
+static int structure_number(const char *text, int maximum)
+{
+  if (*text < '0' || *text > '9') return -1;
+  char *end;
+  errno = 0;
+  long value = strtol(text, &end, 10);
+  return !errno && !*end && value <= maximum ? (int)value : -1;
+}
+
+static const char *slot_kind(const struct cpmSuperBlock *sb, unsigned char status)
+{
+  if (status == 0xe5) return "unused";
+  if (status <= (sb->type & CPMFS_HI_USER ? 31 : 15)) return "file";
+  if ((sb->type & CPMFS_CPM3_OTHER) && status >= 16 && status <= 31) return "password";
+  if ((sb->type & CPMFS_CPM3_OTHER) && status == 0x20) return "label";
+  if ((sb->type & CPMFS_CPM3_DATES) && status == 0x21) return "timestamp";
+  return "unknown";
+}
+
+static int allocation_pointer(const struct PhysDirectoryEntry *entry, int index, int width)
+{
+  const unsigned char *pointer = (const unsigned char *)entry->pointers + index * width;
+  return width == 2 ? pointer[0] | (pointer[1] << 8) : pointer[0];
+}
+
+static void structure_slot(const struct cpmSuperBlock *sb, int slot, int width, const char *kind, int extent_index)
+{
+  const struct PhysDirectoryEntry *entry = sb->dir + slot;
+  unsigned char status = entry->status;
+  printf("{\"slot\":%d,\"status\":%u,\"kind\":", slot, (unsigned)status);
+  quoted(kind);
+  if (status <= (sb->type & CPMFS_HI_USER ? 31 : 15))
+  {
+    char name[9], extension[4];
+    int n = 8, e = 3, attrs = 0;
+    for (int i = 0; i < 8; ++i) name[i] = entry->name[i] & 0x7f;
+    for (int i = 0; i < 3; ++i) extension[i] = entry->ext[i] & 0x7f;
+    while (n > 0 && name[n-1] == ' ') --n;
+    while (e > 0 && extension[e-1] == ' ') --e;
+    name[n] = extension[e] = '\0';
+    const int name_flags[] = {CPM_ATTR_F1, CPM_ATTR_F2, CPM_ATTR_F3, CPM_ATTR_F4};
+    const int extension_flags[] = {CPM_ATTR_RO, CPM_ATTR_SYS, CPM_ATTR_ARCV};
+    for (int i = 0; i < 4; ++i)
+      if (entry->name[i] & 0x80) attrs |= name_flags[i];
+    for (int i = 0; i < 3; ++i)
+      if (entry->ext[i] & 0x80) attrs |= extension_flags[i];
+    const int extent = EXTENT(entry->extnol, entry->extnoh);
+    printf(",\"extent_index\":%d,\"user\":%u,\"name\":", extent_index, (unsigned)status);
+    quoted(name);
+    fputs(",\"extension\":", stdout);
+    quoted(extension);
+    printf(",\"attributes\":%d,\"extent\":%d,\"physical_extent\":%d,\"record_count\":%u,\"pointers\":[",
+           attrs, extent, extent / sb->extents, (unsigned)(unsigned char)entry->blkcnt);
+    for (int index = 0; index < 16 / width; ++index)
+    {
+      if (index) putchar(',');
+      const int block = allocation_pointer(entry, index, width);
+      /* Zero is the empty pointer sentinel, not a reference to directory block 0. */
+      if (block) printf("%d", block);
+      else fputs("null", stdout);
+    }
+    putchar(']');
+  }
+  putchar('}');
+}
+
+static int filesystem_structure(struct cpmSuperBlock *sb, const char *view, int start, int limit, int block)
+{
+  const int blocks = !strcmp(view, "blocks");
+  const int references = !strcmp(view, "references");
+  const int extents = !strcmp(view, "extents");
+  const int width = sb->size > 256 ? 2 : 1;
+  if (references && block >= sb->size)
+  {
+    Device_close(&sb->dev);
+    return fail("unknown_block", "Allocation block is outside the filesystem.");
+  }
+  if (sb->extents <= 0)
+  {
+    Device_close(&sb->dev);
+    return fail("image_incompatible", "Invalid logical extent factor.");
+  }
+
+  printf("{\"v\":1,\"ok\":true,\"directory_slots\":%d,\"block_count\":%d,\"block_size\":%d,"
+         "\"directory_blocks\":%d,\"pointer_bytes\":%d,\"extent_factor\":%d,\"rows\":[",
+         sb->maxdir, sb->size, sb->blksiz, sb->dirblks, width, sb->extents);
+  int total = 0, emitted = 0;
+  if (blocks)
+  {
+    const int bits = CHAR_BIT * sizeof(*sb->alv);
+    total = sb->size;
+    for (int number = start; number < total && emitted < limit; ++number)
+    {
+      const int used = ((unsigned)sb->alv[number / bits] & (1u << (number % bits))) != 0;
+      if (emitted++) putchar(',');
+      printf("{\"block\":%d,\"state\":", number);
+      quoted(number < sb->dirblks ? "directory" : used ? "allocated" : "free");
+      putchar('}');
+    }
+  }
+  else
+  {
+    int extent_index = -1;
+    for (int slot = 0; slot < sb->maxdir; ++slot)
+    {
+      const struct PhysDirectoryEntry *entry = sb->dir + slot;
+      const int file = (unsigned char)entry->status <= (sb->type & CPMFS_HI_USER ? 31 : 15);
+      if (file) ++extent_index;
+      if (references)
+      {
+        if (!file || block == 0) continue;
+        for (int index = 0; index < 16 / width; ++index)
+        {
+          if (allocation_pointer(entry, index, width) != block) continue;
+          if (total++ < start || emitted >= limit) continue;
+          if (emitted++) putchar(',');
+          printf("{\"slot\":%d,\"pointer\":%d}", slot, index);
+        }
+      }
+      else
+      {
+        if (extents && !file) continue;
+        if (total++ < start || emitted >= limit) continue;
+        if (emitted++) putchar(',');
+        structure_slot(sb, slot, width, slot_kind(sb, (unsigned char)entry->status), extent_index);
+      }
+    }
+  }
+  /* cpmUmount calls cpmSync. Close without syncing in this one-operation child. */
+  if (Device_close(&sb->dev)) return 2;
+  printf("],\"total\":%d}\n", total);
+  return 0;
+}
+
 int main(int argc,char **argv) {
   struct cpmSuperBlock sb={0};struct cpmInode root,ino; const char *err;
 #ifdef CPMIMAGE_READ_ONLY
@@ -309,7 +446,20 @@ int main(int argc,char **argv) {
   if(rename) return fail("read_only","this helper supports listing and export only");
 #endif
   const int preview = !strcmp(op,"preview");
-  if(strcmp(op,"list") && strcmp(op,"export") && !preview && !rename && !editing) return fail("operation","unsupported operation");
+  const int structures = !strcmp(op, "filesystem-structure");
+  int start = 0, limit = 0, block = 0;
+  if (structures)
+  {
+    if (argc != 9 || strcmp(argv[4], "raw") ||
+        (strcmp(argv[5], "directory") && strcmp(argv[5], "extents") &&
+         strcmp(argv[5], "blocks") && strcmp(argv[5], "references")))
+      return fail("arguments", "Expected a RAW image and a filesystem structure view.");
+    start = structure_number(argv[6], INT_MAX);
+    limit = structure_number(argv[7], 128);
+    block = structure_number(argv[8], INT_MAX);
+    if (start < 0 || limit < 1 || block < 0) return fail("arguments", "Invalid filesystem structure page.");
+  }
+  if(strcmp(op,"list") && strcmp(op,"export") && !preview && !rename && !editing && !structures) return fail("operation","unsupported operation");
   if((!strcmp(op,"list") && argc!=5) || ((!strcmp(op,"export")||preview||rename) && argc!=7)) return fail("arguments","wrong argument count");
   const char *device=argv[4];
 #ifdef CPMIMAGE_READ_ONLY
@@ -321,6 +471,7 @@ int main(int argc,char **argv) {
     Device_close(&sb.dev);
     return fail(boo && !strncmp(boo,"Missing ",8) ? "image_truncated" : "image_incompatible",boo);
   }
+  if (structures) return filesystem_structure(&sb, argv[5], start, limit, block);
   if(editing) return edit(&sb,&root,op,argv[5],argv[6]);
   if(!strcmp(op,"list")) {
     struct cpmFile dir;struct cpmDirent ent; struct cpmStatFS stats;

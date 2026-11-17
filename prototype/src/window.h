@@ -117,6 +117,7 @@ private:
     void showExportReport();
     void showImageInformation();
     void showPhysicalDiskInspector();
+    void showFilesystemInspector();
     void chooseFormat(const QJsonObject &inspection, bool switching);
     void openDefinition(const QJsonObject &definition, bool sidecar, bool switching);
     QString selectedExportName(QString *problem) const;
@@ -146,7 +147,7 @@ private:
     FilenamePolicy filenamePolicy;
     QSettings *settings;
     QPushButton *reportButton, *imageInfoButton;
-    QAction *openAction, *imageInfoAction, *physicalDiskAction;
+    QAction *openAction, *imageInfoAction, *physicalDiskAction, *filesystemInspectorAction;
     QString snapshotHash, exportDiagnostics;
     QProgressBar *progress;
     ExportPlan batch;

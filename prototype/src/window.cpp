@@ -4,6 +4,7 @@
 #include "window.h"
 #include "disk_format_editor.h"
 #include "format_diagnostics.h"
+#include "filesystem_inspector.h"
 #include <QEventLoop>
 #include <QMetaMethod>
 #include <QLocale>
@@ -483,6 +484,9 @@ Window::Window(QString root, QString python, QString helper, int deadlineMs, int
     physicalDiskAction = view->addAction("Physical Disk Inspector…");
     physicalDiskAction->setObjectName("physicalDiskInspectorAction");
     connect(physicalDiskAction, &QAction::triggered, this, &Window::showPhysicalDiskInspector);
+    filesystemInspectorAction = view->addAction("Filesystem Structure Inspector…");
+    filesystemInspectorAction->setObjectName("filesystemStructureInspectorAction");
+    connect(filesystemInspectorAction, &QAction::triggered, this, &Window::showFilesystemInspector);
     viewFileAction = view->addAction("View File…");
     viewFileAction->setObjectName("viewFileAction");
     connect(viewFileAction, &QAction::triggered, this, [this] { viewFile(); });
@@ -624,6 +628,7 @@ void Window::setBusy(bool value) {
     imageInfoButton->setEnabled(!busy && !session.isEmpty());
     imageInfoAction->setEnabled(!busy && !session.isEmpty());
     physicalDiskAction->setEnabled(!busy && !session.isEmpty());
+    filesystemInspectorAction->setEnabled(!busy && !session.isEmpty());
     progress->setVisible(busy && batchActive);
 }
 bool Window::confirmWrite() {
@@ -2333,6 +2338,21 @@ void Window::showImageInformation() {
     dialog.exec();
 }
 
+void Window::showFilesystemInspector() {
+    if (busy || session.isEmpty()) return;
+    const auto inspectedSession = session;
+    auto *dialog = new FilesystemInspector([this, inspectedSession](QJsonObject fields, auto reply) {
+        if (session != inspectedSession) {
+            reply({}, "The image session changed. Reopen the inspector.");
+            return;
+        }
+        fields["op"] = "filesystem_structure";
+        fields["session"] = inspectedSession;
+        requestBrokerResult(std::move(fields), std::move(reply));
+    }, QFileInfo(image).fileName(), this);
+    dialog->show();
+}
+
 void Window::showPhysicalDiskInspector() {
     if (busy || session.isEmpty()) return;
     const auto inspectedSession = session;
@@ -2468,7 +2488,8 @@ void Window::begin(QJsonObject request) {
         fail("The image reader is restarting. Open the image again."); return;
     }
     setBusy(true);
-    status->setText(operation == "source_metadata" ? "Reading source metadata…" :
+    status->setText(operation == "filesystem_structure" ? "Reading filesystem structures…" :
+        operation == "source_metadata" ? "Reading source metadata…" :
         brokerResultHandler ? "Checking disk definition…" : operation == "open" ? "Reading image…" : operation == "catalogue" ? "Loading disk definitions…" :
         operation == "inspect" ? "Checking image format…" :
         operation == "preview" ? "Reading file preview…" :
@@ -2567,7 +2588,8 @@ void Window::readReply() {
         auto handler = std::exchange(brokerResultHandler, {});
         setBusy(false);
         status->setText(dirty ? "Unsaved changes." :
-                        operation == "source_metadata" ? "Image ready." : "Disk definitions ready.");
+                        (operation == "source_metadata" || operation == "filesystem_structure")
+                        ? "Image ready." : "Disk definitions ready.");
         handler(result, {});
         return;
     }
