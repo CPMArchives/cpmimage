@@ -20,6 +20,20 @@ class Track:
     sectors: tuple
 
 
+def imd_summary(tracks):
+    """Summarize validated IMD track headers using IMDA's track-size estimate."""
+    modes = sorted({track.mode for track in tracks.values()})
+    # IMDA allows 85 bytes per sector and another 85 per track for overhead.
+    return dict(
+        cylinders=max(track.cylinder for track in tracks.values()) + 1,
+        heads=max(track.head for track in tracks.values()) + 1,
+        modes=modes,
+        data_rates_kbps=sorted({(500, 300, 250)[mode % 3] for mode in modes}),
+        estimated_max_track_bytes=max(
+            (track.size + 85) * len(track.sectors) + 85 for track in tracks.values()),
+    )
+
+
 @dataclass(frozen=True)
 class PhysicalMapping:
     """Tracks and sector IDs in independently verified RAW slot order."""

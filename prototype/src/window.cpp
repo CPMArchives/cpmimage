@@ -2698,6 +2698,28 @@ void Window::showPhysicalDiskInspector(int block, QString revision) {
         }
         layout->addWidget(origin);
 
+        const auto imd = result["imd_summary"].toObject();
+        if (!imd.isEmpty()) {
+            QStringList rates;
+            for (const auto &rate : imd["data_rates_kbps"].toArray())
+                rates.append(QString::number(rate.toInt()));
+            QStringList modes;
+            for (const auto &mode : imd["modes"].toArray()) {
+                const int value = mode.toInt();
+                modes.append(QString("%1 (%2)").arg(value).arg(value < 3 ? "FM" : "MFM"));
+            }
+            auto *summary = new QLabel(
+                QString("ImageDisk summary\nRequired cylinders: %1 · Required heads: %2\n"
+                        "Recorded modes: %3\nData rates: %4 kbps\nEstimated maximum track length: %5 bytes")
+                    .arg(imd["cylinders"].toInt()).arg(imd["heads"].toInt())
+                    .arg(modes.join(", "), rates.join(", "))
+                    .arg(imd["estimated_max_track_bytes"].toInt()), dialog);
+            summary->setObjectName("imageDiskSummary");
+            summary->setWordWrap(true);
+            summary->setTextInteractionFlags(Qt::TextSelectableByMouse);
+            layout->addWidget(summary);
+        }
+
         const bool rawSlots = result["raw_slots"].toBool();
         const auto tracks = result["tracks"].toArray();
         const auto blockSectors = result["block_sectors"].toArray();
