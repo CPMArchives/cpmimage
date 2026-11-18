@@ -202,7 +202,7 @@ See the [published v1.3 release and downloads](https://github.com/CPMArchives/cp
 - Keep the Workbench menu available in the main application.
 - Offer a separate **View → Workbench Toolbar** preference, off by default. Toggling the toolbar leaves open tools and drafts intact.
 
-## v2.1 — Recovery from Image Comparisons and ImageDisk Integration
+## v2.1 — Recovery from Image Comparisons and Disk Utilities
 
 Development remains paused at v2.0. This milestone has no scheduled implementation start or release date.
 
@@ -214,10 +214,10 @@ Development remains paused at v2.0. This milestone has no scheduled implementati
 
 Batch recovery, transfers back into an image, automatic selection of a preferred copy, and new repair operations remain deferred. Broader container-derived mappings and standalone Amstrad FDF generation remain separate work.
 
-### ImageDisk utilities and selective integration
+### LibDsk and ImageDisk utilities
 
-1. Bundle Howard Harte’s six ImageDisk utilities and expose them through the existing headless dispatcher as `cpmwb /imda`, `/imdchk`, `/imdu`, `/imdcmp`, `/bin2imd`, and `/imdv`. Pin the upstream revisions, include license notices, and verify argument, stream, and exit-status passthrough on all five release targets, including interactive IMDV. Document that CLI editing operates directly on the supplied files. GUI integration follows this step.
-2. Integrate qualified capabilities where they fill a Workbench gap. Start with an IMDA-style Physical Disk Inspector summary of required cylinders and heads, recorded modes and data rates, and an explicitly labeled maximum-track estimate. Evaluate physical IMD comparison as a complement to filesystem comparison. Keep LibDsk responsible for ordinary IMD I/O and retain existing validation and Save/Discard safeguards.
+1. Bundle Howard Harte’s six ImageDisk utilities and expose them through the existing headless dispatcher as `cpmwb /imda`, `/imdchk`, `/imdu`, `/imdcmp`, `/bin2imd`, and `/imdv`. Pin the upstream revisions, include license notices, and verify argument, stream, and exit-status passthrough on all five release targets, including interactive IMDV. Document that CLI editing operates directly on the supplied files. Bundle the LibDsk 1.4.2 command-line utilities from the pinned source alongside ImageDisk and cpmtools. Dispatch under the original utility names, including `cpmwb /dskid -type tele disk.td0`. Verify that a packaged build identifies a representative TeleDisk image and that the original utility arguments, standard streams, and exit status pass through without opening the GUI. Include the LibDsk notices and corresponding source.
+2. Review GUI integration separately from CLI packaging. Integrate qualified capabilities where they fill a Workbench gap. Start with an IMDA-style Physical Disk Inspector summary of required cylinders and heads, recorded modes and data rates, and an explicitly labeled maximum-track estimate. Evaluate physical IMD comparison as a complement to filesystem comparison. Keep LibDsk responsible for ordinary IMD I/O and retain existing validation and Save/Discard safeguards.
 
 ## Scope deferred from v1.0
 

@@ -126,5 +126,26 @@
     "url": "https://files.pythonhosted.org/packages/7b/ed/a03b09668e74e5dabbf2e211f6468e1820c0552f7b0500082da31841bf7b/rpds_py-2026.6.3-cp313-cp313-win_amd64.whl",
     "sha256": "9250a9a0a6fd4648b3f868da8d91a4c52b5811a62df58e753d50ae4454a36f80",
     "bytes": 219454
+  },
+  {
+    "group": "disk-utilities",
+    "path": "vendor/imd-utils-294e9af.tar.gz",
+    "url": "https://codeload.github.com/hharte/imd-utils/tar.gz/294e9af2ff6dae9eb69bb0b7bdf8b32b4e4da9cd",
+    "sha256": "7611daf0c10a7523ac1917a4e0a9193c667e4d7b832c3c797dfa77cf9c4e6fba",
+    "bytes": 58257
+  },
+  {
+    "group": "disk-utilities",
+    "path": "vendor/libimd-dbbe5d0.tar.gz",
+    "url": "https://codeload.github.com/hharte/libimd/tar.gz/dbbe5d0e6a450060262e028b8146093e8d4aa4b2",
+    "sha256": "6c532395219cddaf046ef685adeb17b328fc499e194379613dfa210a5409ded2",
+    "bytes": 45058
+  },
+  {
+    "group": "disk-utilities",
+    "path": "vendor/PDCursesMod-4.5.1.tar.gz",
+    "url": "https://codeload.github.com/Bill-Gray/PDCursesMod/tar.gz/refs/tags/v4.5.1",
+    "sha256": "21f896f553972de5647a39ac5793ddeaece9a126e60bd14111973801f9006201",
+    "bytes": 1613355
   }
 ]

@@ -16,6 +16,6 @@ def fetch(item,verify_only=False):
         os.replace(temp,dest);print('Downloaded and verified',item['path'])
     finally:Path(temp).unlink(missing_ok=True)
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--group',choices=['backend','runtime','windows','validator','all'],default='backend');p.add_argument('--verify-only',action='store_true');a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--group',choices=['backend','runtime','windows','validator','disk-utilities','all'],default='backend');p.add_argument('--verify-only',action='store_true');a=p.parse_args()
     for item in json.loads((root/'packaging/dependencies.json').read_text()):
         if a.group=='all' or item['group']==a.group:fetch(item,a.verify_only)
