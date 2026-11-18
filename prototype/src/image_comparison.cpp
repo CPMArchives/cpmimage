@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "image_comparison.h"
+#include "filename_policy.h"
+
+#include <QDir>
+#include <QFile>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QSettings>
+#include <QStandardPaths>
+#include <QTemporaryDir>
+#include <memory>
 
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -91,8 +101,8 @@ void appendRow(QTableWidget *table, const QStringList &values) {
 }
 }
 
-ImageComparison::ImageComparison(Source left, QList<Source> targets, QWidget *parent)
-    : QDialog(parent), left(std::move(left)), targets(std::move(targets)) {
+ImageComparison::ImageComparison(Source left, QList<Source> targets, QSettings &settings, QWidget *parent)
+    : QDialog(parent), settings(settings), left(std::move(left)), targets(std::move(targets)) {
     setAttribute(Qt::WA_DeleteOnClose);
     setWindowModality(Qt::ApplicationModal);
     setObjectName("imageComparison");
@@ -148,6 +158,20 @@ ImageComparison::ImageComparison(Source left, QList<Source> targets, QWidget *pa
     fileLayout->addWidget(fileTable, 1);
     fileDetails = makeDetails(files, "imageComparisonFileDetails");
     fileLayout->addWidget(fileDetails);
+    auto *recovery = new QHBoxLayout;
+    for (int side = 0; side < 2; ++side) {
+        const QString label = side == 0 ? "Left" : "Right";
+        viewCopy[side] = new QPushButton("View " + label + "…", files);
+        exportCopy[side] = new QPushButton("Export " + label + "…", files);
+        viewCopy[side]->setObjectName("comparisonView" + label);
+        exportCopy[side]->setObjectName("comparisonExport" + label);
+        recovery->addWidget(viewCopy[side]);
+        recovery->addWidget(exportCopy[side]);
+        connect(viewCopy[side], &QPushButton::clicked, this, [this, side] { recover(side, true); });
+        connect(exportCopy[side], &QPushButton::clicked, this, [this, side] { recover(side, false); });
+    }
+    recovery->addStretch();
+    fileLayout->addLayout(recovery);
     results->addTab(files, "Files");
 
     auto *directory = new QWidget(results);
@@ -440,7 +464,15 @@ void ImageComparison::renderFiles() {
 }
 
 void ImageComparison::showFileDetails() {
-    const int row = fileTable->currentRow();
+    const auto selected = fileTable->selectionModel()->selectedRows();
+    const int row = selected.isEmpty() ? -1 : selected.first().row();
+    for (int side = 0; side < 2; ++side) {
+        const auto file = row >= 0 && row < visibleFiles.size()
+            ? sides[side].files.value(visibleFiles.at(row)) : QJsonObject{};
+        const bool available = pendingSide < 0 && !file.isEmpty() && !file["read_error"].isString();
+        viewCopy[side]->setEnabled(available);
+        exportCopy[side]->setEnabled(available);
+    }
     if (row < 0 || row >= visibleFiles.size()) {
         fileDetails->setPlainText("No files match these filters.");
         return;
@@ -449,13 +481,14 @@ void ImageComparison::showFileDetails() {
     QStringList lines;
     for (int side = 0; side < 2; ++side) {
         const auto file = sides[side].files.value(name);
-        const auto label = side == 0 ? QString("Left") : QString("Right");
+        const auto label = source(side).label;
         if (file.isEmpty()) {
             lines << label + ": Absent";
             continue;
         }
-        lines << QString("%1: %2 logical bytes · Attributes %3").arg(label).arg(file["size"].toInteger()).arg(attributes(file));
+        lines << QString("%1 · User %2: %3 logical bytes · Attributes %4").arg(label).arg(name.left(2).toInt()).arg(file["size"].toInteger()).arg(attributes(file));
         if (file["read_error"].isString()) lines << "Content read failed (" + file["read_error"].toString() + ").";
+        else lines << ((file["sha256"].isString() || file["verified_read"].toBool()) ? "Complete content read." : "Complete content read not yet verified.");
         for (const auto &value : sides[side].extents.value(name)) {
             const auto extent = value.toObject();
             lines << QString("  Slot %1 · extent %2 · blocks %3")
@@ -463,6 +496,81 @@ void ImageComparison::showFileDetails() {
         }
     }
     fileDetails->setPlainText(lines.join('\n'));
+}
+
+void ImageComparison::recover(int side, bool preview) {
+    const auto selected = fileTable->selectionModel()->selectedRows();
+    const int row = selected.isEmpty() ? -1 : selected.first().row();
+    if (pendingSide >= 0 || row < 0 || row >= visibleFiles.size()) return;
+    const auto name = visibleFiles.at(row);
+    if (!sides[side].files.contains(name)) return;
+    const auto filename = fileTable->item(row, 1)->text();
+    QString destination;
+    std::shared_ptr<QTemporaryDir> temporary;
+    if (preview) {
+        temporary = std::make_shared<QTemporaryDir>();
+        if (!temporary->isValid()) {
+            status->setText("Cannot create a private file preview.");
+            return;
+        }
+        destination = temporary->filePath("preview");
+    } else {
+        FilenamePolicy policy;
+        policy.load(settings);
+        const auto suggested = policy.translate(filename);
+        const auto problem = FilenamePolicy::validateHostName(suggested);
+        if (!problem.isEmpty()) {
+            status->setText(problem);
+            return;
+        }
+        auto folder = settings.value("exports/directory",
+            QStandardPaths::writableLocation(QStandardPaths::DownloadLocation)).toString();
+        if (!QDir(folder).exists()) folder = QDir::homePath();
+        destination = QFileDialog::getSaveFileName(this, "Export compared file",
+            QDir(folder).filePath(suggested), "All files (*)", nullptr, QFileDialog::DontConfirmOverwrite);
+        if (destination.isEmpty()) return;
+        const auto invalid = FilenamePolicy::validateHostName(QFileInfo(destination).fileName());
+        if (!invalid.isEmpty()) {
+            status->setText(invalid);
+            return;
+        }
+        settings.setValue("exports/directory", QFileInfo(destination).absolutePath());
+    }
+    compare->setEnabled(false);
+    targetPicker->setEnabled(false);
+    pendingSide = side;
+    showFileDetails();
+    status->setText(preview ? "Reading selected copy…" : "Exporting selected copy…");
+    source(side).request({{"op", "comparison_recover"}, {"name", name}, {"destination", destination},
+                          {"revision", sides[side].manifest["revision"]}, {"preview", preview}},
+        [guard = QPointer<ImageComparison>(this), side, name, filename, temporary, destination]
+        (const QJsonObject &result, const QString &error) {
+            if (!guard || !guard->isVisible()) return;
+            guard->pendingSide = -1;
+            guard->compare->setEnabled(true);
+            guard->targetPicker->setEnabled(true);
+            if (!error.isEmpty()) {
+                guard->showFileDetails();
+                guard->status->setText(error);
+                return;
+            }
+            auto file = guard->sides[side].files.value(name);
+            file["verified_read"] = true;
+            guard->sides[side].files[name] = file;
+            guard->showFileDetails();
+            if (!temporary) {
+                guard->status->setText("Exported to " + destination);
+                return;
+            }
+            QFile fileData(destination);
+            if (!fileData.open(QIODevice::ReadOnly)) {
+                guard->status->setText("Cannot read the private preview.");
+                return;
+            }
+            guard->status->setText("Read " + filename + " from " + guard->source(side).label);
+            guard->source(side).view(fileData.readAll(),
+                filename + " · " + guard->source(side).label, result["truncated"].toBool(), guard->fileTable);
+        });
 }
 
 void ImageComparison::showSlotDetails() {

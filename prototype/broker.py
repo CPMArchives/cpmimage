@@ -1046,6 +1046,34 @@ def main():
                 if stop.is_set():
                     raise backend.Failure('cancelled')
                 reply = dict(v=1, id=rid, ok=True, result=dict(context, rows=rows))
+            elif op == 'comparison_recover':
+                context = working_revision(request)
+                if 'revision' not in request:
+                    raise backend.Failure('invalid_request', 'Run the comparison before recovering a file.')
+                name = backend.filename(request['name'], True)
+                entry = comparison_files(context, rid)['files'].get(name)
+                if entry is None:
+                    raise backend.Failure('not_found', 'Choose a file from this comparison.')
+                destination = Path(request['destination'])
+                preview = request.get('preview') is True
+                with tempfile.TemporaryDirectory(prefix='cpmimage-recovery-') as temp:
+                    folder = Path(temp)
+                    staged = folder / 'file.bin'
+                    (folder / 'diskdefs').write_text(session['definitions'], encoding='utf-8')
+                    helper = adapter()
+                    helper.export(session['image'], session['format'], 'raw', folder, name, staged, entry)
+                    if stop.is_set():
+                        raise backend.Failure('cancelled')
+                    if preview:
+                        with staged.open('rb') as payload, destination.open('xb') as output:
+                            output.write(payload.read(1024 * 1024))
+                    else:
+                        require_separate_archive(session, destination)
+                        if session['source'] and destination.resolve() == Path(session['source']).resolve():
+                            raise backend.Failure('invalid_destination', 'Choose a destination separate from the source image.')
+                        helper.publish(staged, destination)
+                reply = dict(v=1, id=rid, ok=True,
+                             result=dict(truncated=preview and entry['size'] > 1024 * 1024))
             elif op == 'comparison_classify':
                 reply = dict(v=1, id=rid, ok=True, result=classify_comparison(request, backend))
             elif op == 'filesystem_check':

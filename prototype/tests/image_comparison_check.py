@@ -1,6 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Exercise comparison with separate brokers and real CP/M working images."""
 import hashlib
+import os
+from pathlib import Path
+import sys
+import tempfile
+import shutil
+import subprocess
 import unittest
 
 import catalogue_check
@@ -117,6 +123,85 @@ class ImageComparisonCheck(unittest.TestCase):
         stale = left.request('comparison_fingerprints', session=left_token, revision=left_manifest['revision'],
                              names=['00SAME.BIN'])
         self.assertEqual(stale['error'], 'stale_revision')
+
+    def test_recover_selected_bytes_and_guard_destination(self):
+        left, right = self.tab(), self.tab()
+        original = left.image.read_bytes()
+        for broker, expected in ((left, b'L' * 128), (right, b'R' * 128)):
+            token = self.populate(broker, [('00COPY.BIN', expected)])
+            revision = self.result(broker, 'comparison_manifest', session=token)['revision']
+            destination = broker.directory / 'recovered.bin'
+            fields = dict(session=token, revision=revision, name='00COPY.BIN',
+                          destination=str(destination))
+            self.assertFalse(self.result(broker, 'comparison_recover', preview=True, **fields)['truncated'])
+            self.assertEqual(destination.read_bytes(), expected)
+            self.assertEqual(broker.request('comparison_recover', **fields)['error'], 'destination_exists')
+            self.assertEqual(destination.read_bytes(), expected)
+            destination.unlink()
+            self.result(broker, 'comparison_recover', **fields)
+            self.assertEqual(destination.read_bytes(), expected)
+            self.assertTrue(self.result(broker, 'comparison_manifest', session=token, revision=revision)['dirty'])
+            self.assertEqual(broker.image.read_bytes(), original)
+            self.result(broker, 'discard', session=token)
+            destination.unlink()
+            self.assertEqual(broker.request('comparison_recover', **fields)['error'], 'stale_revision')
+            self.assertFalse(destination.exists())
+
+    @unittest.skipUnless(shutil.which('cpmcp'), 'Independent cpmtools is unavailable')
+    def test_recover_known_good_copy_when_other_copy_is_damaged(self):
+        good, damaged = self.tab(), self.tab()
+        expected = b'Known good content'.ljust(128, b' ')
+        payload = good.directory / 'payload.bin'
+        payload.write_bytes(expected)
+        shutil.copyfile(catalogue_check.ROOT / 'fixtures/diskdefs', good.directory / 'diskdefs')
+        subprocess.run(['cpmcp', '-f', 'ibm-3740', str(good.image), str(payload), '0:CHECK.BIN'],
+                       cwd=good.directory, check=True)
+        independent = good.directory / 'independent.bin'
+        subprocess.run(['cpmcp', '-f', 'ibm-3740', str(good.image), '0:CHECK.BIN', str(independent)],
+                       cwd=good.directory, check=True)
+        image = good.image.read_bytes()
+        self.assertEqual(image.count(expected), 1)
+        corrupted = b'X' + expected[1:]
+        damaged.image.write_bytes(image.replace(expected, corrupted))
+        for broker in (good, damaged):
+            original = broker.image.read_bytes()
+            token = self.result(broker, 'open', image=str(broker.image),
+                                format='ibm-3740', container='raw')['session']
+            revision = self.result(broker, 'comparison_manifest', session=token)['revision']
+            destination = broker.directory / 'recovered.bin'
+            reply = broker.request('comparison_recover', session=token, revision=revision,
+                                   name='00CHECK.BIN', destination=str(destination))
+            self.assertTrue(reply['ok'], reply)
+            self.assertEqual(destination.read_bytes(), independent.read_bytes() if broker is good else corrupted)
+            self.assertEqual(broker.image.read_bytes(), original)
+
+    @unittest.skipIf(os.name == 'nt', 'Fixture uses a POSIX executable script')
+    def test_incomplete_extraction_publishes_nothing(self):
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as scratch:
+            shim = Path(scratch) / 'helper'
+            shim.write_text(
+                f'#!{sys.executable}\n'
+                'import json, os, sys\n'
+                'from pathlib import Path\n'
+                'if sys.argv[1] == "export":\n'
+                '    Path(sys.argv[-1]).write_bytes(b"short")\n'
+                '    print(json.dumps(dict(v=1, ok=True)))\n'
+                'else:\n'
+                f'    os.execv({str(catalogue_check.HELPER)!r}, '
+                f'[{str(catalogue_check.HELPER)!r}, *sys.argv[1:]])\n'
+            )
+            shim.chmod(0o700)
+            with patch.object(catalogue_check, 'HELPER', shim):
+                broker = self.tab()
+            token = self.populate(broker, [('00COPY.BIN', b'C' * 128)])
+            revision = self.result(broker, 'comparison_manifest', session=token)['revision']
+            destination = broker.directory / 'recovered.bin'
+            reply = broker.request('comparison_recover', session=token, revision=revision,
+                                   name='00COPY.BIN', destination=str(destination))
+            self.assertEqual(reply.get('error'), 'export_unverified', reply)
+            self.assertFalse(destination.exists())
 
     def test_unreadable_data_and_different_definitions(self):
         broker = self.tab()

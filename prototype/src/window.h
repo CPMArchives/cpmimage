@@ -102,7 +102,7 @@ private:
                         QPointer<QWidget> directoryView = {},
                         std::function<void(bool, QByteArray, QByteArray)> extracted = {});
     void showPreview(QByteArray bytes, QByteArray decoded, const QJsonObject &result,
-                     const QString &title, QWidget *pane, bool truncated, QPointer<QWidget> returnTo = {});
+                     const QString &title, QWidget *pane, bool truncated, QPointer<QWidget> returnTo = {}, QWidget *dialogParent = nullptr);
     void showArchive(QByteArray bytes, QByteArray decoded, const QJsonObject &result,
                      const QString &title, QWidget *pane, QPointer<QWidget> returnTo = {});
     void finishPreviewDialog(QDialog *dialog, QWidget *pane, QPointer<QWidget> returnTo);
