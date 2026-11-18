@@ -999,13 +999,16 @@ void Window::createImage() {
 }
 
 void Window::chooseImage() {
-    if (receivers(SIGNAL(imagePicked(QString))) && (!session.isEmpty() || busy)) {
-        const auto path = QFileDialog::getOpenFileName(this, "Open CP/M image", image,
-            "Disk images (*.raw *.img *.dsk *.imd *.jv3 *.dmk *.td0 *.TD0);;All files (*)");
-        if (!path.isEmpty()) emit imagePicked(path);
+    if (!receivers(SIGNAL(imagePicked(QString)))) {
+        openFromPicker();
         return;
     }
-    openFromPicker();
+    auto paths = QFileDialog::getOpenFileNames(this, "Open CP/M image",
+        image.isEmpty() ? QDir::homePath() : image,
+        "Disk images (*.raw *.img *.dsk *.imd *.jv3 *.dmk *.td0 *.TD0);;All files (*)");
+    if (paths.isEmpty()) return;
+    if (session.isEmpty() && !busy) inspectImage(paths.takeFirst());
+    for (const auto &path : paths) emit imagePicked(path);
 }
 void Window::openFromPicker() {
     if (!resolveEdits([this] { chooseImage(); })) return;
