@@ -2388,6 +2388,50 @@ private slots:
         toolbar->click();
         QVERIFY(opened);
     }
+    void openMultipleImagesFromPicker() {
+        const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        const auto first = temp.filePath("First.raw"), second = temp.filePath("Second disk.raw");
+        for (const auto &path : {first, second}) {
+            QVERIFY(QFile::copy(root + "/fixtures/ibm3740-independent.raw", path));
+            QFile definition(QFileInfo(path).absolutePath() + "/" + QFileInfo(path).completeBaseName() + ".FDF");
+            QVERIFY(definition.open(QIODevice::WriteOnly));
+            QVERIFY(definition.write("diskdef ibm-3740\n seclen 128\n tracks 77\n sectrk 26\n"
+                                     " blocksize 1024\n maxdir 64\n skew 6\n boottrk 2\n os 2.2\nend\n") > 0);
+        }
+        Workspace workspace({root, qEnvironmentVariable("CPMIMAGE_PYTHON", "python3"),
+                             qEnvironmentVariable("CPMIMAGE_HELPER"), {}}, temp.filePath("settings.ini"));
+        auto &page = workspace.addSession();
+        workspace.show();
+        const auto nativeDisabled = QApplication::testAttribute(Qt::AA_DontUseNativeDialogs);
+        QApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+        const auto restore = qScopeGuard([nativeDisabled] {
+            QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, nativeDisabled);
+        });
+        QTimer choose;
+        connect(&choose, &QTimer::timeout, &workspace, [&] {
+            if (auto *dialog = fileDialog()) {
+                choose.stop();
+                QCOMPARE(dialog->fileMode(), QFileDialog::ExistingFiles);
+                dialog->setDirectory(temp.path());
+                auto *name = dialog->findChild<QLineEdit *>("fileNameEdit");
+                QVERIFY(name);
+                name->setText(QStringLiteral("\"First.raw\" \"Second disk.raw\""));
+                QMetaObject::invokeMethod(dialog, "accept");
+            }
+        });
+        choose.start(20);
+        QPushButton *open = nullptr;
+        for (auto *button : page.findChildren<QPushButton *>())
+            if (button->accessibleName() == "Open Image…") open = button;
+        QVERIFY(open);
+        open->click();
+        auto *tabs = workspace.findChild<QTabWidget *>();
+        QCOMPARE(tabs->count(), 2);
+        QTRY_COMPARE(tabs->tabText(0), QString("First.raw"));
+        QTRY_COMPARE(tabs->tabText(1), QString("Second disk.raw"));
+    }
     void fileViewer() {
         const auto root = qEnvironmentVariable("CPMIMAGE_ROOT");
         const auto helper = qEnvironmentVariable("CPMIMAGE_HELPER");
