@@ -202,7 +202,7 @@ def main():
     sys.path.insert(0, str(args.root / 'experiments/process-comparison'))
     sys.path.insert(0, str(args.root / 'prototype'))
     import catalogue
-    from container_mapping import MappingError, MappingProfileRequired, PhysicalMapping, imd_summary, inspect_imd, transfer_dmk, dmk_template, replace_imd_comment, verify_jv3, derive_mapping, strict_profile
+    from container_mapping import MappingError, MappingProfileRequired, PhysicalMapping, imd_header_timestamp, imd_summary, inspect_imd, transfer_dmk, dmk_template, replace_imd_comment, verify_jv3, derive_mapping, strict_profile
     from publication import fingerprint as file_hash, publish, recovery_directory, require_recovery_clear
     from source_ownership import Ownership, OwnershipError, identity, native_lock
     from disk_format_store import DefinitionStore, DefinitionStoreError, atomic_write, encode_record
@@ -1321,6 +1321,7 @@ def main():
                     reply['result']['suggested_name'] = source.with_suffix('.raw').name
                 reply['result'].update(session=token, source_sha256=fingerprint, unused_tail_filled=trimmed,
                                        definition_sha256=catalogue.digest(definition),
+                                       imd_timestamp=imd_header_timestamp(data) if container == 'imd' else '',
                                        imd_comment=session['comment'].decode('utf-8', errors='replace'), geometry=geometry)
             elif op in ('new_image', 'format_image'):
                 creating = op == 'new_image'
@@ -1684,6 +1685,8 @@ def main():
                         session['mapping'] = mapping
                     session.pop('saved_comment', None)
                     plan['source_sha256'] = session['sha']
+                    if output is not None and output_container == 'imd':
+                        plan['imd_timestamp'] = imd_header_timestamp(encoded_bytes)
                 reply = dict(v=1, id=rid, ok=True, result=plan)
             elif op == 'preview':
                 if not session or request.get('session') != session['token']:

@@ -154,7 +154,7 @@ private:
     QTableWidget *table;
     QListWidget *userAreas;
     QJsonArray directoryEntries;
-    QString imageNote, imdComment;
+    QString imageNote, imdComment, imdTimestamp;
     FilenamePolicy filenamePolicy;
     QSettings *settings;
     QPushButton *reportButton, *imageInfoButton;

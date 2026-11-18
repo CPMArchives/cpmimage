@@ -2466,7 +2466,10 @@ void Window::showImageInformation() {
     text->setPlainText(details+(exportDiagnostics.isEmpty()?QString():"\n\n"+exportDiagnostics));layout->addWidget(text);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close);
     layout->addWidget(buttons);
-    if (container == "imd") text->append("\nIMD comment:\n" + imdComment.toHtmlEscaped());
+    if (container == "imd") {
+        if (!imdTimestamp.isEmpty()) text->append("\nIMD header timestamp: " + imdTimestamp);
+        text->append("\nIMD comment:\n" + imdComment.toHtmlEscaped());
+    }
     connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
     dialog.exec();
 }
@@ -3060,6 +3063,8 @@ void Window::readReply() {
             image = result["destination"].toString();
             settings->setValue("saveDirectory", QFileInfo(image).absolutePath());
             container = result["container"].toString();
+            if (result["imd_timestamp"].isString() || container != "imd")
+                imdTimestamp = result["imd_timestamp"].toString();
             snapshotHash = result["source_sha256"].toString();
             source->setText(QFileInfo(image).fileName());
             source->setToolTip(image);
@@ -3140,6 +3145,7 @@ void Window::readReply() {
         snapshotHash=result["source_sha256"].toString();
         imageGeometry = result["geometry"].toObject();
         imdComment = result["imd_comment"].toString();
+        imdTimestamp = result["imd_timestamp"].toString();
         if (result["suggested_name"].isString()) {
             const auto suggested = result["suggested_name"].toString();
             if (suggested.isEmpty() || suggested != QFileInfo(suggested).fileName() ||
