@@ -76,6 +76,7 @@ class SourceTracks(dict):
     def __init__(self):
         super().__init__()
         self.imd_comment = b''
+        self.imd_summary = None
         self.modes = {}
         self.densities = {}
         self.statuses = {}
@@ -201,7 +202,7 @@ def main():
     sys.path.insert(0, str(args.root / 'experiments/process-comparison'))
     sys.path.insert(0, str(args.root / 'prototype'))
     import catalogue
-    from container_mapping import MappingError, MappingProfileRequired, PhysicalMapping, inspect_imd, transfer_dmk, dmk_template, replace_imd_comment, verify_jv3, derive_mapping, strict_profile
+    from container_mapping import MappingError, MappingProfileRequired, PhysicalMapping, imd_summary, inspect_imd, transfer_dmk, dmk_template, replace_imd_comment, verify_jv3, derive_mapping, strict_profile
     from publication import fingerprint as file_hash, publish, recovery_directory, require_recovery_clear
     from source_ownership import Ownership, OwnershipError, identity, native_lock
     from disk_format_store import DefinitionStore, DefinitionStoreError, atomic_write, encode_record
@@ -385,6 +386,7 @@ def main():
                     for key, track in inventory.items():
                         observations[key] = tuple((sector, track.size) for sector in track.sectors)
                     observations.imd_comment = comment
+                    observations.imd_summary = imd_summary(inventory)
                     observations.modes = {key: track.mode for key, track in inventory.items()}
             if container == 'jv3':
                 inventory = verify_jv3(data, mapping)
@@ -1194,6 +1196,8 @@ def main():
                 elif source_snapshot is not None:
                     provenance, tracks = source_snapshot
                     result['source'] = provenance
+                    if tracks.imd_summary is not None and 'track' not in request:
+                        result['imd_summary'] = tracks.imd_summary
                     if 'track' in request:
                         address = request['track']
                         if (not isinstance(address, list) or len(address) != 2

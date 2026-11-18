@@ -50,6 +50,13 @@ class ContainerSaveCheck(unittest.TestCase):
                 self.assertTrue(metadata['ok'], metadata)
                 self.assertEqual(metadata['result']['source']['container'], container)
                 self.assertEqual(len(metadata['result']['tracks']), 77)
+                if container == 'imd':
+                    self.assertEqual(metadata['result']['imd_summary'], dict(
+                        cylinders=77, heads=1, modes=[5], data_rates_kbps=[250],
+                        estimated_max_track_bytes=5623))
+                    self.assertEqual(dst.read_bytes(), original)
+                else:
+                    self.assertNotIn('imd_summary', metadata['result'])
                 track = broker.request('source_metadata', session=token, track=[0, 0])
                 self.assertTrue(track['ok'], track)
                 self.assertEqual(sorted(row['id'] for row in track['result']['sectors']),
