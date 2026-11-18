@@ -51,6 +51,10 @@ class ContainerSaveCheck(unittest.TestCase):
                 self.assertEqual(metadata['result']['source']['container'], container)
                 self.assertEqual(len(metadata['result']['tracks']), 77)
                 if container == 'imd':
+                    timestamp = reopened['result']['imd_timestamp']
+                    self.assertTrue(timestamp)
+                    self.assertTrue(original.splitlines()[0].endswith(timestamp.encode('ascii')))
+                    self.assertEqual(saved['result']['imd_timestamp'], timestamp)
                     self.assertEqual(metadata['result']['imd_summary'], dict(
                         cylinders=77, heads=1, modes=[5], data_rates_kbps=[250],
                         estimated_max_track_bytes=5623))

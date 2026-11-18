@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Physical sector inventory and mapping checks for structured images."""
 from dataclasses import dataclass
+import re
 
 
 class MappingError(ValueError):
@@ -18,6 +19,16 @@ class Track:
     mode: int
     size: int
     sectors: tuple
+
+
+def imd_header_timestamp(data):
+    """Return the recorded date and time verbatim when the header has both."""
+    header = data[:256].split(b'\x1a', 1)[0].split(b'\n', 1)[0].rstrip(b'\r')
+    match = re.fullmatch(
+        rb'IMD (?:LibDsk )?[0-9.]+:[ \t]*(\d{1,2}/ *\d{1,2}/\d{4} +\d{1,2}:\d{2}:\d{2})[ \t]*',
+        header,
+    )
+    return match[1].decode('ascii') if match else ''
 
 
 def imd_summary(tracks):
