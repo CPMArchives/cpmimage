@@ -2,6 +2,8 @@
 
 CP/M Image Workbench is a graphical file manager for CP/M disk images on macOS, Windows, and Linux. It bundles cpmtools for command-line use.
 
+Original app icon PNGs — [256 × 256](docs/assets/workbench-icons/cpm_workbench_256.png) · [512 × 512](docs/assets/workbench-icons/cpm_workbench_512.png) · [1024 × 1024](docs/assets/workbench-icons/cpm_workbench_1024.png)
+
 ## Download v2.0
 
 Get the five platform packages, corresponding source, and SHA-256 checksums from the [v2.0 release downloads](https://github.com/CPMArchives/cpmimage/releases/tag/v2.0#assets).
