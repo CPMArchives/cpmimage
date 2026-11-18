@@ -8,6 +8,7 @@
 #include <functional>
 
 class QComboBox;
+class QSettings;
 class QLabel;
 class QPushButton;
 class QTabWidget;
@@ -21,9 +22,10 @@ public:
         QString label;
         std::function<void(QJsonObject, Reply)> request;
         std::function<void()> cancel;
+        std::function<void(QByteArray, QString, bool, QWidget *)> view;
     };
 
-    ImageComparison(Source left, QList<Source> targets, QWidget *parent);
+    ImageComparison(Source left, QList<Source> targets, QSettings &settings, QWidget *parent);
 
 private:
     struct Side {
@@ -46,9 +48,11 @@ private:
     void renderFiles();
     void showFileDetails();
     void showSlotDetails();
+    void recover(int side, bool preview);
     void fail(const QString &message);
     const Source &source(int side) const;
 
+    QSettings &settings;
     Source left;
     QList<Source> targets;
     Side sides[2];
@@ -63,6 +67,7 @@ private:
 
     QComboBox *targetPicker, *areas, *filter;
     QPushButton *compare;
+    QPushButton *viewCopy[2], *exportCopy[2];
     QLabel *status, *summary;
     QTabWidget *results;
     QTableWidget *fileTable, *slotTable;

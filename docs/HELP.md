@@ -50,3 +50,9 @@ For headless operation, use a utility selector such as `/cpmls -f ibm-3740 disk.
 Open **Workbench → Physical Disk Inspector**, choose a track, then select one sector and choose **View Sector Hex…**. The viewer reads the current working RAW image. Structured images use the verified mapping from the original container. RAW images show track and slot indices from the selected disk definition.
 
 Choose **Edit → View Reserved System Tracks…** to inspect the reserved region defined by the current disk definition. Use **Previous Page** and **Next Page** to browse the bytes. The viewer includes private edits and never writes to the image.
+
+## Recover a file from Compare Images
+
+Open both images in separate tabs and choose **Workbench → Compare Images**. Run the comparison and select a file in **Files**. The details identify each copy by image and user area and show its size, attributes, and any available read result.
+
+Use **View Left** or **View Right** to inspect the chosen copy in Text/Hex. Use **Export Left** or **Export Right** to save its stored bytes from the current working image, including any unsaved changes. Choose a new filename if the destination already exists.

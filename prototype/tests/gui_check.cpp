@@ -677,6 +677,53 @@ private slots:
         QVERIFY(files->item(same, 3)->text().contains("Allocation"));
         QCOMPARE(files->item(changed, 2)->text(), QString("Content changed"));
         QCOMPARE(files->item(attrs, 2)->text(), QString("Attributes changed"));
+        files->selectRow(changed);
+        auto *viewRight = comparison->findChild<QPushButton *>("comparisonViewRight");
+        QVERIFY(viewRight && viewRight->isEnabled());
+        viewRight->click();
+        QTRY_VERIFY(comparison->findChild<QPlainTextEdit *>("filePreviewText"));
+        auto *viewer = comparison->findChild<QPlainTextEdit *>("filePreviewText");
+        QCOMPARE(viewer->toPlainText(), QString(128, 'R'));
+        qobject_cast<QDialog *>(viewer->window())->reject();
+
+        const auto exportedPath = temp.filePath("CHANGED.BIN");
+        auto *exportLeft = comparison->findChild<QPushButton *>("comparisonExportLeft");
+        QVERIFY(exportLeft && exportLeft->isEnabled());
+        const auto chooseExport = [exportLeft](const QString &destination) {
+            const bool nativeDisabled = QApplication::testAttribute(Qt::AA_DontUseNativeDialogs);
+            QApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+            const auto restore = qScopeGuard([nativeDisabled] {
+                QApplication::setAttribute(Qt::AA_DontUseNativeDialogs, nativeDisabled);
+            });
+            QTimer chooser;
+            QObject::connect(&chooser, &QTimer::timeout, exportLeft, [&] {
+                if (auto *dialog = fileDialog()) {
+                    if (destination.isEmpty()) dialog->reject();
+                    else {
+                        dialog->setDirectory(QFileInfo(destination).absolutePath());
+                        QMetaObject::invokeMethod(dialog, "accept");
+                    }
+                }
+            });
+            chooser.start(20);
+            exportLeft->click();
+        };
+        chooseExport({});
+        QVERIFY(!QFile::exists(exportedPath));
+        chooseExport(exportedPath);
+        QTRY_VERIFY(exportLeft->isEnabled());
+        QVERIFY2(QFile::exists(exportedPath), qPrintable(comparison->findChild<QLabel *>("imageComparisonStatus")->text()));
+        QFile exported(exportedPath);
+        QVERIFY(exported.open(QIODevice::ReadOnly));
+        QCOMPARE(exported.readAll(), QByteArray(128, 'L'));
+        exported.close();
+        QTRY_VERIFY(exportLeft->isEnabled());
+        chooseExport(exportedPath);
+        QTRY_VERIFY(comparison->findChild<QLabel *>("imageComparisonStatus")->text().contains("destination already exists"));
+        QVERIFY(exported.open(QIODevice::ReadOnly));
+        QCOMPARE(exported.readAll(), QByteArray(128, 'L'));
+
+
         files->selectRow(attrs);
         QVERIFY(comparison->findChild<QPlainTextEdit *>("imageComparisonFileDetails")->toPlainText().contains("Attributes RO"));
         auto *userAreas = comparison->findChild<QComboBox *>("imageComparisonArea");

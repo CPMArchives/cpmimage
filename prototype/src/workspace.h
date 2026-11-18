@@ -234,6 +234,10 @@ private:
                 if (guard && guard->session == token && guard->busy &&
                     (guard->operation.startsWith("comparison_") || guard->operation == "filesystem_structure"))
                     guard->cancel();
+            },
+            [guard](QByteArray bytes, QString title, bool truncated, QWidget *returnTo) {
+                if (guard) guard->showPreview(std::move(bytes), {}, {}, title, guard.data(), truncated,
+                                              returnTo, returnTo->window());
             }
         };
     }
@@ -246,7 +250,7 @@ private:
         QList<ImageComparison::Source> targets;
         for (auto *page : available) targets.append(comparisonSource(page));
         auto *dialog = new ImageComparison(comparisonSource(active),
-                                           std::move(targets), this);
+                                           std::move(targets), *active->settings, this);
         active->registerWorkbenchDialog(dialog);
         dialog->show();
     }

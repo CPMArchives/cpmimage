@@ -1815,8 +1815,8 @@ void Window::showArchive(QByteArray bytes, QByteArray decoded, const QJsonObject
 }
 
 void Window::showPreview(QByteArray bytes, QByteArray decoded, const QJsonObject &result,
-                         const QString &title, QWidget *pane, bool truncated, QPointer<QWidget> returnTo) {
-    auto *dialog = new QDialog(this);
+                         const QString &title, QWidget *pane, bool truncated, QPointer<QWidget> returnTo, QWidget *dialogParent) {
+    auto *dialog = new QDialog(dialogParent ? dialogParent : this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setWindowTitle(title);
     auto *layout = new QVBoxLayout(dialog);
