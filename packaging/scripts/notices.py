@@ -69,6 +69,18 @@ def create(destination,platform,validator=None):
     for comment in re.findall(r'/\*.*?\*/',text,re.S):
      if any(x in comment.lower() for x in ['copyright','license','permission']):records.append(member.name+'\n'+comment)
   (destination/'libdsk-source-header-notices.txt').write_text('\n\n'.join(records)+'\n')
+ for archive_name, label, names in (
+  ('imd-utils-294e9af.tar.gz', 'ImageDisk Utilities', ('LICENSE',)),
+  ('libimd-dbbe5d0.tar.gz', 'libimd', ('LICENSE',)),
+  ('PDCursesMod-4.5.1.tar.gz', 'PDCursesMod', ('README.md', 'pdcurses/README.md', 'wincon/README.md')),
+ ):
+  if label == 'PDCursesMod' and platform != 'windows':continue
+  with tarfile.open(ROOT/'vendor'/archive_name) as archive:
+   for name in names:
+    member = next(item for item in archive.getmembers() if item.name.partition('/')[2] == name)
+    path = destination/label/name
+    path.parent.mkdir(parents=True,exist_ok=True)
+    path.write_bytes(archive.extractfile(member).read())
  if platform=='windows':
   tc=ROOT/'windows-runtime/llvm-mingw-20261104-ucrt-macos-universal'
   copy(tc/'LICENSE.TXT',destination/'LLVM-MinGW-LICENSE.txt')

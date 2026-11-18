@@ -97,3 +97,25 @@ Repeat after moving the whole bundle to a path containing spaces/Unicode and hid
 After committing reviewed source, `archive-review.py --source-only` creates the source companion from tracked source plus the four verified cpmtools/libdsk/Qt/Python archives. It rejects a dirty tracked tree. Available runtime configuration/SBOM records are included. Without `--source-only`, collect all three platform product directories under `packaging/dist` first; the script also archives them and writes SHA256SUMS. ZIP creation preserves framework symlinks and executable permissions.
 
 Do not distribute binaries without that matching companion and the generated notices. Developer toolchains remain excluded. This milestone does not implement a public release, CI matrix, installer, signing identity, or notarization workflow.
+
+### v2.1 disk utilities
+
+Fetch the pinned ImageDisk, libimd, and PDCursesMod sources with
+`python3 packaging/scripts/fetch-dependencies.py --group disk-utilities`.
+Include these archives in the corresponding-source companion.
+
+Build the LibDsk tools with `sh packaging/scripts/build-libdsk-utilities.sh`
+(using the absolute script path from inside an extracted LibDsk 1.4.2 tree).
+The build uses the same TD0 patch as the helper and links LibDsk statically.
+Apply the existing macOS configure patch or copy the newer cpmtools
+`config.guess` and `config.sub` as needed for the host. For Windows, use the
+same LLVM-MinGW compiler and configure host arguments as the helper build.
+Set `CPMIMAGE_LIBDSK_BIN` to the resulting `tools` directory.
+
+Configure `packaging/disk-utilities` with CMake. Set `LIBIMD_SOURCE` and
+`IMD_UTILS_SOURCE` to the extracted, pinned source directories. Unix builds
+use system curses. Debian runtime hosts need the curses shared library and a
+compatible terminal description. Windows builds also require `PDCURSES_SOURCE` pointing to
+the pinned PDCursesMod tree, and can use the LLVM-MinGW compiler for the
+target architecture. Build and install the six executables, then set
+`CPMIMAGE_IMAGEDISK_BIN` to the install's `bin` directory.

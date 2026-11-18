@@ -40,7 +40,7 @@ archive_codecs = sorted(str(path.relative_to(ROOT)) for path in (ROOT/'prototype
 for rel in ['prototype/archive_view.py', 'prototype/broker.py','prototype/catalogue.py','prototype/container_mapping.py','prototype/publication.py','prototype/source_ownership.py','prototype/helper_guard.py','experiments/process-comparison/adapters.py','experiments/process-comparison/windows_supervisor.py','fixtures/diskdefs','fixtures/diskdefs-metadata.json'] + archive_codecs:
  dst=out/'resources/cpmimage'/rel;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(ROOT/rel,dst)
 stage_editor(out/'resources/cpmimage')
-install_utilities(out/'cpmtools', 'windows')
+install_utilities(out, 'windows')
 create(out/'notices','windows',validator)
 with zipfile.ZipFile(BASE/'downloads'/f'windows-package-{a.arch}.zip','w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
  for f in out.rglob('*'):

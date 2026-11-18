@@ -19,10 +19,13 @@
 #endif
 
 inline std::optional<int> dispatchUtility(int &argc, char **argv) {
-    const QStringList utilities{"cpmls", "cpmrm", "cpmcp", "cpmchmod",
+    const QStringList cpmtools{"cpmls", "cpmrm", "cpmcp", "cpmchmod",
                                 "cpmchattr", "mkfs.cpm", "fsck.cpm", "fsed.cpm"};
+    const QStringList libdsk{"dsktrans", "dskform", "dskid", "dskdump", "dskscan", "dskutil", "md3serial", "apriboot"};
+    const QStringList imagedisk{"imda", "imdchk", "imdu", "imdcmp", "bin2imd", "imdv"};
     const auto isSelector = [&](const QString &arg) {
-        return arg.startsWith('/') && utilities.contains(arg.mid(1));
+        const auto name = arg.mid(1);
+        return arg.startsWith('/') && (cpmtools.contains(name) || libdsk.contains(name) || imagedisk.contains(name));
     };
     QStringList arguments;
 #ifdef Q_OS_WIN
@@ -45,7 +48,7 @@ inline std::optional<int> dispatchUtility(int &argc, char **argv) {
     for (qsizetype i = 0; i < arguments.size(); ++i) {
         const auto arg = arguments.at(i);
         if (isSelector(arg)) {
-            if (!utility.isEmpty()) return error("Choose exactly one cpmtools utility.");
+            if (!utility.isEmpty()) return error("Choose exactly one bundled utility.");
             utility = arg.mid(1);
         } else if (arg == "--diskdefs" || arg.startsWith("--diskdefs=") || arg.startsWith("/diskdefs=")) {
             const auto value = arg == "--diskdefs"
@@ -58,29 +61,33 @@ inline std::optional<int> dispatchUtility(int &argc, char **argv) {
         } else if (arg.startsWith("/img=") || arg.startsWith("/f=") ||
                    QStringList{"--image", "--format", "--container", "--root", "--python",
                                "--helper", "--diagnostics"}.contains(arg.section('=', 0, 0))) {
-            return error("GUI options cannot be combined with a cpmtools utility.");
+            return error("GUI options cannot be combined with a bundled utility.");
         } else {
             forwarded.append(arg);
         }
     }
 
     QCoreApplication core(argc, argv);
-    const auto runtime = packagedRuntime(core.applicationDirPath());
-    const auto directory = QDir(core.applicationDirPath()).filePath("cpmtools");
+    const bool needsCatalogue = cpmtools.contains(utility);
+    if (!needsCatalogue && !catalogue.isEmpty()) return error("Diskdefs applies only to cpmtools utilities.");
+    const auto directory = QDir(core.applicationDirPath()).filePath(
+        needsCatalogue ? "cpmtools" : libdsk.contains(utility) ? "libdsk" : "imagedisk");
 #ifdef Q_OS_WIN
     const auto executable = QDir(directory).filePath(utility + ".exe");
 #else
     const auto executable = QDir(directory).filePath(utility);
 #endif
     if (!QFileInfo(executable).isExecutable()) return error("Bundled utility missing: " + utility, 127);
-    if (catalogue.isEmpty()) catalogue = QDir(runtime.root).filePath("fixtures/diskdefs");
-    QFile definitions(catalogue);
-    if (!QFileInfo(catalogue).isFile() || !definitions.open(QIODevice::ReadOnly))
-        return error("Cannot read diskdefs: " + catalogue);
-    definitions.close();
+    if (needsCatalogue) {
+        const auto runtime = packagedRuntime(core.applicationDirPath());
+        if (catalogue.isEmpty()) catalogue = QDir(runtime.root).filePath("fixtures/diskdefs");
+        QFile definitions(catalogue);
+        if (!QFileInfo(catalogue).isFile() || !definitions.open(QIODevice::ReadOnly))
+            return error("Cannot read diskdefs: " + catalogue);
+    }
 #ifdef Q_OS_WIN
     auto environment = QProcessEnvironment::systemEnvironment();
-    environment.insert("CPMTOOLS_DISKDEFS", catalogue);
+    if (needsCatalogue) environment.insert("CPMTOOLS_DISKDEFS", catalogue);
     QProcess child;
     child.setProcessEnvironment(environment);
     child.setProcessChannelMode(QProcess::ForwardedChannels);
@@ -90,7 +97,7 @@ inline std::optional<int> dispatchUtility(int &argc, char **argv) {
     if (!child.waitForFinished(-1)) return error(child.errorString(), 126);
     return child.exitStatus() == QProcess::NormalExit ? child.exitCode() : 126;
 #else
-    if (setenv("CPMTOOLS_DISKDEFS", QFile::encodeName(catalogue).constData(), 1))
+    if (needsCatalogue && setenv("CPMTOOLS_DISKDEFS", QFile::encodeName(catalogue).constData(), 1))
         return error("Cannot set the diskdefs path.", 126);
     QList<QByteArray> encoded{QFile::encodeName(executable)};
     for (const auto &arg : forwarded) encoded.append(QFile::encodeName(arg));

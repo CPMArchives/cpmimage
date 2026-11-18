@@ -57,6 +57,15 @@ In Workbench v2.0, run `cpmwb` with a utility selector. On macOS, use the execut
 
 The Windows and Linux downloads include the target architecture in their filenames. Use the downloaded filename or rename the file to `cpmwb.exe` on Windows or `cpmwb` on Linux. Selectors include `/cpmls`, `/cpmrm`, `/cpmcp`, `/cpmchmod`, `/cpmchattr`, `/mkfs.cpm`, `/fsck.cpm`, and `/fsed.cpm`. Use `/diskdefs=PATH` to override the bundled catalogue.
 
+The v2.1 CLI also exposes the LibDsk tools (`/dsktrans`, `/dskform`,
+`/dskid`, `/dskdump`, `/dskscan`, `/dskutil`, `/md3serial`, and
+`/apriboot`) and Howard Harte’s ImageDisk tools (`/imda`, `/imdchk`,
+`/imdu`, `/imdcmp`, `/bin2imd`, and `/imdv`). Use
+`cpmwb /dskid -type tele disk.td0` to select the TeleDisk driver explicitly.
+LibDsk 1.4.2 accepts `-itype tele` but warns that it ignores that option and
+autodetects the image instead. Editing utilities write directly to the files you
+supply, outside the GUI’s Save and Discard workflow.
+
 ## Build and packaging
 
 CP/M Image Workbench uses Qt 6 Widgets and C++17, a separate Python broker, and a native helper built from pinned cpmtools 2.23 and LibDsk 1.4.2 sources. See the [build instructions](docs/BUILDING.md), [engineering specification](docs/ENGINEERING_SPEC.md), and [roadmap](docs/ROADMAP.md).

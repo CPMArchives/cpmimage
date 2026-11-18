@@ -15,7 +15,7 @@ def copy(src,rel):
 for name in tracked:copy(ROOT/name,name)
 records=json.loads((BASE/'dependencies.json').read_text())
 for item in records:
-    if item['group'] not in ['backend','runtime']:continue
+    if item['group'] not in ['backend','runtime','disk-utilities']:continue
     src=ROOT/item['path']
     if not src.is_file() or hashlib.sha256(src.read_bytes()).hexdigest()!=item['sha256']:raise SystemExit('Fetch matching source inputs first: '+item['path'])
     copy(src,item['path'])

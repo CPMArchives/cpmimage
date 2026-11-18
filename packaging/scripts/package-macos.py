@@ -52,7 +52,7 @@ subprocess.run([str(BASE/'qt-macos/install/bin/macdeployqt'),str(app),'-no-strip
 platforms=app/'Contents/PlugIns/platforms'
 shutil.copy2(BASE/'qt-macos/install/plugins/platforms/libqoffscreen.dylib',platforms/'libqoffscreen.dylib')
 subprocess.run(['install_name_tool','-add_rpath','@loader_path/../../Frameworks',str(platforms/'libqoffscreen.dylib')],check=True)
-install_utilities(app/'Contents/MacOS/cpmtools', 'macos')
+install_utilities(app/'Contents/MacOS', 'macos')
 create(resources/'notices','macos',validator)
 # Remove stale build-prefix fallback search paths, even when the relocated app
 # already works via its bundle-relative primary search path.

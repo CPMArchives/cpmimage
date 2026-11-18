@@ -36,7 +36,7 @@ archive_codecs = sorted(str(path.relative_to(ROOT)) for path in (ROOT/'prototype
 for rel in ['prototype/archive_view.py', 'prototype/broker.py','prototype/catalogue.py','prototype/container_mapping.py','prototype/publication.py','prototype/source_ownership.py','prototype/helper_guard.py','experiments/process-comparison/adapters.py','experiments/process-comparison/windows_supervisor.py','fixtures/diskdefs','fixtures/diskdefs-metadata.json'] + archive_codecs:
  dst=out/'share/cpmimage'/rel;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(ROOT/rel,dst)
 stage_editor(out/'share/cpmimage')
-install_utilities(out/'bin/cpmtools', 'linux')
+install_utilities(out/'bin', 'linux')
 (out/'bin/qt.conf').write_text('[Paths]\nPrefix=..\nLibraries=lib\nPlugins=plugins\n')
 launcher=out/'cpmwb';launcher.write_text('''#!/bin/sh
 HERE=$(CDPATH= cd -- "${0%/*}" && pwd)
@@ -52,7 +52,7 @@ for f in out.rglob('*'):
  # The locked manylinux extension is already relocatable. Preserve its wheel bytes.
  if validator/'rpds' in f.parents:continue
  if f==out/'bin/cpmwb' or f==out/'libexec/cpmimage-helper':rpath='$ORIGIN/../lib'
- elif out/'bin/cpmtools' in f.parents:rpath='$ORIGIN/../../lib'
+ elif any(out/'bin'/suite in f.parents for suite in ('cpmtools', 'libdsk', 'imagedisk')):rpath='$ORIGIN/../../lib'
  elif f==runtime/'bin/python3.13':rpath='$ORIGIN/../lib'
  elif out/'plugins' in f.parents:rpath='$ORIGIN/../../lib'
  else:rpath='$ORIGIN'
