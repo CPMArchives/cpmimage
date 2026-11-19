@@ -1,0 +1,22 @@
+--- a/device_libdsk.c
++++ b/device_libdsk.c
+@@ -61,9 +61,17 @@
+     boo = lookupFormat(&this->geom, format);
+     if (boo) return boo;
+   }
+-  else 
++  else if (strcmp(dsk_drvname(this->dev), "raw") == 0)
+   {
+-    dsk_getgeom(this->dev, &this->geom); 
++    /* Raw images have linear track order. CP/M directory bytes can look
++     * like a boot sector and produce an unrelated inferred geometry. */
++    memset(&this->geom, 0, sizeof(this->geom));
++    this->geom.dg_sidedness = SIDES_ALT;
++    this->geom.dg_secbase = 1;
++  }
++  else
++  {
++    dsk_getgeom(this->dev, &this->geom);
+   }
+   return NULL;
+ }
