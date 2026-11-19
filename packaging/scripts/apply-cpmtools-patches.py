@@ -30,3 +30,7 @@ if 'after preparing the directory' not in (source/'cpmfs.c').read_text():
 
 if 'cpmImageReadDirectory' not in (source/'cpmfs.c').read_text():
  subprocess.run(['patch','-p1','-i',str(patch.parent/'cpmtools-2.23-diagnostic-directory.patch')],cwd=source,check=True)
+
+# RCP/M reproduction d0e08be: directory bytes must not choose RAW sidedness.
+if 'Raw images have linear track order.' not in (source/'device_libdsk.c').read_text():
+ subprocess.run(['patch','-p1','-i',str(patch.parent/'cpmtools-2.23-raw-linear-order.patch')],cwd=source,check=True)

@@ -219,6 +219,11 @@ Batch recovery, transfers back into an image, automatic selection of a preferred
 1. Bundle Howard Harte’s six ImageDisk utilities and expose them through the existing headless dispatcher as `cpmwb /imda`, `/imdchk`, `/imdu`, `/imdcmp`, `/bin2imd`, and `/imdv`. Pin the upstream revisions, include license notices, and verify argument, stream, and exit-status passthrough on all five release targets, including interactive IMDV. Document that CLI editing operates directly on the supplied files. Bundle the LibDsk 1.4.2 command-line utilities from the pinned source alongside ImageDisk and cpmtools. Dispatch under the original utility names, including `cpmwb /dskid -type tele disk.td0`. Verify that a packaged build identifies a representative TeleDisk image and that the original utility arguments, standard streams, and exit status pass through without opening the GUI. Include the LibDsk notices and corresponding source.
 2. Review GUI integration separately from CLI packaging. Integrate qualified capabilities where they fill a Workbench gap. Start with an IMDA-style Physical Disk Inspector summary of required cylinders and heads, recorded modes and data rates, and an explicitly labeled maximum-track estimate. Evaluate physical IMD comparison as a complement to filesystem comparison. Keep LibDsk responsible for ordinary IMD I/O and retain existing validation and Save/Discard safeguards.
 
+## Next release — RAW geometry correctness
+
+- Include the cpmtools 2.23 RAW geometry correction from the RCP/M investigation. Prevent implicit LibDsk boot-sector probing from changing RAW side ordering while preserving explicit LibDsk formats.
+- Rebuild affected standalone cpmtools from the corrected source and verify the synthetic extraction and write/read regressions in the release packages. See [investigation and validation](RAW_GEOMETRY_REVIEW.md).
+
 ## Scope deferred from v1.0
 
 - Graphical `fsck.cpm`-style consistency checking and controlled repair are scheduled for v1.8.
